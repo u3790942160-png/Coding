@@ -112,6 +112,8 @@ local fovEnabled = false
 local fovValue = 70
 local noCamCollisionEnabled = false
 _G.AceNoPlayerCollisionEnabled = _G.AceNoPlayerCollisionEnabled or false
+_G.AceAntiBodylockEnabled = _G.AceAntiBodylockEnabled or false
+local setAntiBodylockVisual = nil
 local customFontVisualEnabled = false
 local skyTheme = "Off"
 local setPlayerESPVisual = nil
@@ -888,6 +890,7 @@ fovEnabled = fovEnabled,
 fovValue = fovValue,
 noCamCollisionEnabled = noCamCollisionEnabled,
 noPlayerCollisionEnabled = _G.AceNoPlayerCollisionEnabled,
+antiBodylockEnabled = _G.AceAntiBodylockEnabled == true,
 customFontVisualEnabled = false,
 skyTheme = skyTheme,
 lightningEnabled = _G.AceLightningEnabled ~= false,
@@ -1002,6 +1005,7 @@ fovEnabled = data.fovEnabled == true
 fovValue = tonumber(data.fovValue) or fovValue
 noCamCollisionEnabled = data.noCamCollisionEnabled == true
 _G.AceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
+_G.AceAntiBodylockEnabled = data.antiBodylockEnabled == true
 customFontVisualEnabled = false
 skyTheme = (type(data.skyTheme) == "string" and data.skyTheme) or skyTheme
 if data.lightningEnabled ~= nil then _G.AceLightningEnabled = data.lightningEnabled ~= false else _G.AceLightningEnabled = true end
@@ -1446,6 +1450,137 @@ pcall(function() conn:Disconnect() end)
 end
 _G.AceNoPlayerCollisionState.connections = {}
 _G.AceSetOtherPlayerCollision(true)
+end
+_G.AceAntiBodylockState = _G.AceAntiBodylockState or {connections = {}, running = false}
+function enableAntiBodylock()
+if _G.AceAntiBodylockState.running then return end
+_G.AceAntiBodylockEnabled = true
+_G.AceAntiBodylockState.running = true
+for _, conn in ipairs(_G.AceAntiBodylockState.connections or {}) do
+pcall(function() conn:Disconnect() end)
+end
+_G.AceAntiBodylockState.connections = {}
+local function stripLockConstraints(char)
+if not char then return end
+for _, obj in ipairs(char:GetDescendants()) do
+pcall(function()
+if (obj:IsA("BodyPosition") or obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")
+or obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")
+or obj:IsA("LineForce") or obj:IsA("VectorForce")
+or obj:IsA("SpringConstraint") or obj:IsA("RopeConstraint")
+or obj:IsA("RodConstraint")) then
+if obj.Name ~= "AceInternal" then
+obj:Destroy()
+end
+elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+local p0 = obj.Part0
+local p1 = obj.Part1
+if p0 and p1 then
+local isOwn0 = p0:IsDescendantOf(char)
+local isOwn1 = p1:IsDescendantOf(char)
+if (isOwn0 and not isOwn1) or (isOwn1 and not isOwn0) then
+obj:Destroy()
+end
+end
+end
+end)
+end
+end
+local function detachForeignAttachments(char)
+if not char then return end
+local hrp = char:FindFirstChild("HumanoidRootPart")
+if not hrp then return end
+for _, plr in ipairs(Players:GetPlayers()) do
+if plr ~= LP and plr.Character then
+local otherRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+if otherRoot then
+local dist = (hrp.Position - otherRoot.Position).Magnitude
+if dist < 2.5 then
+pcall(function()
+otherRoot.CFrame = otherRoot.CFrame * CFrame.new(0, 0, 4)
+end)
+end
+end
+for _, obj in ipairs(plr.Character:GetDescendants()) do
+pcall(function()
+if obj:IsA("Attachment") then
+local target = obj:FindFirstChildOfClass("AlignPosition") or obj:FindFirstChildOfClass("AlignOrientation")
+if target then
+local a0 = target:FindFirstChild("Attachment0") or (target.Attachment0)
+local a1 = target:FindFirstChild("Attachment1") or (target.Attachment1)
+pcall(function()
+if a0 and a0:IsDescendantOf(char) then target:Destroy() end
+if a1 and a1:IsDescendantOf(char) then target:Destroy() end
+end)
+end
+end
+if (obj:IsA("WeldConstraint") or obj:IsA("Weld")) then
+local p0, p1 = obj.Part0, obj.Part1
+if p0 and p1 then
+if p0:IsDescendantOf(char) or p1:IsDescendantOf(char) then
+obj:Destroy()
+end
+end
+end
+end)
+end
+end
+end
+end
+local scanElapsed = 0
+table.insert(_G.AceAntiBodylockState.connections, RunService.Heartbeat:Connect(function(dt)
+if not _G.AceAntiBodylockEnabled then return end
+scanElapsed = scanElapsed + (dt or 0)
+if scanElapsed < 0.08 then return end
+scanElapsed = 0
+local char = LP.Character
+if not char then return end
+pcall(stripLockConstraints, char)
+pcall(detachForeignAttachments, char)
+end))
+table.insert(_G.AceAntiBodylockState.connections, LP.CharacterAdded:Connect(function(char)
+task.wait(0.3)
+if _G.AceAntiBodylockEnabled then
+pcall(stripLockConstraints, char)
+end
+end))
+table.insert(_G.AceAntiBodylockState.connections, workspace.DescendantAdded:Connect(function(obj)
+if not _G.AceAntiBodylockEnabled then return end
+local char = LP.Character
+if not char then return end
+task.defer(function()
+if not _G.AceAntiBodylockEnabled then return end
+pcall(function()
+if not obj or not obj.Parent then return end
+if not obj:IsDescendantOf(char) then return end
+if (obj:IsA("BodyPosition") or obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")
+or obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")
+or obj:IsA("LineForce") or obj:IsA("VectorForce")) then
+if obj.Name ~= "AceInternal" then
+obj:Destroy()
+end
+elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+local p0 = obj.Part0
+local p1 = obj.Part1
+if p0 and p1 then
+local isOwn0 = p0:IsDescendantOf(char)
+local isOwn1 = p1:IsDescendantOf(char)
+if (isOwn0 and not isOwn1) or (isOwn1 and not isOwn0) then
+obj:Destroy()
+end
+end
+end
+end)
+end)
+end))
+end
+function disableAntiBodylock()
+_G.AceAntiBodylockEnabled = false
+_G.AceAntiBodylockState.running = false
+for _, conn in ipairs(_G.AceAntiBodylockState.connections or {}) do
+pcall(function() conn:Disconnect() end)
+end
+_G.AceAntiBodylockState.connections = {}
 end
 function _G.AceSafeModeGetCountdownLabel()
 local ok, label = pcall(function()
@@ -4992,7 +5127,27 @@ saveAceConfig()
 end)
 end
 end
-animationPackRow(Movement, 15)
+section(Movement, "BODY LOCK", 18)
+do
+_, setAntiBodylockVisual = toggleRow(Movement, "Anti Bodylock", _G.AceAntiBodylockEnabled == true, 19)
+local row = Movement:FindFirstChild("Anti Bodylock")
+_aceBtn = row and row:FindFirstChild("ToggleButton")
+if _aceBtn then
+_aceBtn.Activated:Connect(function()
+if _G.AceAntiBodylockEnabled then
+disableAntiBodylock()
+else
+enableAntiBodylock()
+end
+if setAntiBodylockVisual then setAntiBodylockVisual(_G.AceAntiBodylockEnabled == true) end
+saveAceConfig()
+end)
+end
+if _G.AceAntiBodylockEnabled then
+enableAntiBodylock()
+end
+end
+animationPackRow(Movement, 20)
 refreshSpeedModeRows()
 task.wait()
 Combat = pages.COMBAT

@@ -1,0 +1,268 @@
+-- Drive the built AdaptHub.lua against a small Roblox mock and assert that the
+-- UI wiring actually reaches the Ace feature logic.
+--
+--   lua5.1 tools/test/test_adapthub.lua
+-- Run from the repo root:  lua5.1 tools/test/test_adapthub.lua
+package.path = "tools/test/?.lua;" .. package.path
+local mock = require("robloxmock")
+
+local env = setmetatable({}, {__index = _G})
+env.game = mock.game
+env.workspace = mock.services.Workspace
+env.Instance = mock.Instance
+env.Enum = mock.Enum
+env.Vector2, env.Vector3, env.CFrame = mock.Vector2, mock.Vector3, mock.CFrame
+env.UDim, env.UDim2, env.Color3 = mock.UDim, mock.UDim2, mock.Color3
+env.ColorSequence, env.ColorSequenceKeypoint = mock.ColorSequence, mock.ColorSequenceKeypoint
+env.NumberSequence, env.NumberSequenceKeypoint = mock.NumberSequence, mock.NumberSequenceKeypoint
+env.NumberRange, env.TweenInfo, env.Rect = mock.NumberRange, mock.TweenInfo, mock.Rect
+env.Random, env.RaycastParams = mock.Random, mock.RaycastParams
+env.task = mock.task
+env.tick = os.clock
+env.typeof = function(v)
+    if type(v) == "table" and v.ClassName then return "Instance" end
+    return type(v)
+end
+env.warn = function(...) print("[warn]", ...) end
+env.wait, env.spawn, env.delay = function() return 0 end, function() end, function() end
+math.clamp = math.clamp or function(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+env._G = env
+
+local src = io.open("AdaptHub.lua"):read("*a")
+src = src:gsub("([^%w_])continue([^%w_])", "%1%2")
+local chunk = assert(loadstring(src, "@AdaptHub.lua"))
+setfenv(chunk, env)
+assert(pcall(chunk))
+
+local gui = mock.services.Players.LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("AdaptHubPolished")
+local content = gui:FindFirstChild("Main"):FindFirstChild("Content")
+
+local failures, checks = 0, 0
+local function check(name, cond, extra)
+    checks = checks + 1
+    if not cond then
+        failures = failures + 1
+        print(string.format("  FAIL  %s%s", name, extra and (" (" .. tostring(extra) .. ")") or ""))
+    else
+        print("  ok    " .. name)
+    end
+end
+
+local function page(name) return content:FindFirstChild(name) end
+local function row(pageName, rowName)
+    local p = page(pageName)
+    local r = p and p:FindFirstChild(rowName)
+    return r
+end
+local function clickToggle(pageName, rowName)
+    local r = assert(row(pageName, rowName), "missing row " .. rowName)
+    local area = assert(r:FindFirstChild("ToggleArea"), "missing ToggleArea on " .. rowName)
+    local btn = assert(area:FindFirstChild("ToggleButton"), "missing ToggleButton on " .. rowName)
+    btn.MouseButton1Click:Fire()
+end
+local function setValue(pageName, rowName, text)
+    local r = assert(row(pageName, rowName), "missing row " .. rowName)
+    local box = assert(r:FindFirstChild("ValueBox"), "missing ValueBox on " .. rowName)
+    box.Text = text
+    box.FocusLost:Fire()
+    return box
+end
+
+print("\n-- toggles --")
+clickToggle("Movement", "Auto TP Down")
+check("Auto TP Down sets autoTPEnabled", env.autoTPEnabled == true, tostring(env.autoTPEnabled))
+clickToggle("Movement", "Auto TP Down")
+check("Auto TP Down clears autoTPEnabled", env.autoTPEnabled == false)
+
+clickToggle("Movement", "Infinite Jump")
+check("Infinite Jump sets infJumpEnabled", env.infJumpEnabled == true)
+
+clickToggle("Movement", "Anti Ragdoll")
+check("Anti Ragdoll sets antiRagdollEnabled", env.antiRagdollEnabled == true)
+
+clickToggle("Combat", "Auto Steal")
+check("Auto Steal sets autoStealEnabled", env.autoStealEnabled == true)
+
+clickToggle("Combat", "Bat Counter")
+check("Bat Counter sets batCounterEnabled", env.batCounterEnabled == true)
+
+clickToggle("Combat", "Safe Mode")
+check("Safe Mode sets antiKickEnabled", env.antiKickEnabled == true)
+
+clickToggle("Combat", "Auto Swing")
+check("Auto Swing sets autoSwingEnabled", env.autoSwingEnabled == true)
+
+clickToggle("Utility", "ESP")
+check("ESP sets espEnabled", env.espEnabled == true)
+
+clickToggle("Utility", "FOV Change")
+check("FOV toggle sets fovEnabled", env.fovEnabled == true)
+
+clickToggle("Settings", "Hide Mob Buttons")
+check("Hide Mob Buttons hides frame", gui:FindFirstChild("MobileButtons").Visible == false)
+
+print("\n-- value boxes --")
+setValue("Movement", "Normal Speed", "77")
+check("Normal Speed -> NS", env.NS == 77, env.NS)
+setValue("Movement", "Carry Speed", "33.5")
+check("Carry Speed -> CS", env.CS == 33.5, env.CS)
+setValue("Movement", "Auto TP Height", "42")
+check("Auto TP Height", env.autoTPHeight == 42, env.autoTPHeight)
+local box = setValue("Movement", "Normal Speed", "not a number")
+check("bad input reverts", box.Text == "77", box.Text)
+setValue("Combat", "Radius", "120")
+check("Radius -> AceStealRadii.Normal", env.AceStealRadii.Normal == 120, env.AceStealRadii.Normal)
+setValue("Combat", "SEMI Range", "14")
+check("SEMI Range -> AceStealRadii.Semi", env.AceStealRadii.Semi == 14, env.AceStealRadii.Semi)
+setValue("Utility", "FOV Value", "95")
+check("FOV Value", env.fovValue == 95, env.fovValue)
+setValue("Settings", "UI Scale", "120")
+check("UI Scale -> aceGuiScaleValue", math.abs(env.aceGuiScaleValue - 1.2) < 1e-9, env.aceGuiScaleValue)
+
+print("\n-- mode rows --")
+local speedRow = row("Movement", "Speed Mode")
+speedRow:FindFirstChild("ModeClick").MouseButton1Click:Fire()
+check("Speed mode -> Carry", env.currentSpeedMode == "Carry", env.currentSpeedMode)
+check("Speed mode label", speedRow:FindFirstChild("ModeValue").Text == "CARRY", speedRow:FindFirstChild("ModeValue").Text)
+speedRow:FindFirstChild("ModeClick").MouseButton1Click:Fire()
+check("Speed mode -> Normal", env.currentSpeedMode == "Normal", env.currentSpeedMode)
+
+local laggerRow = row("Movement", "Lagger Mode Display")
+laggerRow:FindFirstChild("ModeClick").MouseButton1Click:Fire()
+check("Lagger mode -> Lagger", env.currentSpeedMode == "Lagger", env.currentSpeedMode)
+laggerRow:FindFirstChild("ModeClick").MouseButton1Click:Fire()
+check("Lagger mode -> Lagger Carry", env.currentSpeedMode == "Lagger Carry", env.currentSpeedMode)
+laggerRow:FindFirstChild("ModeClick").MouseButton1Click:Fire()
+check("Lagger mode -> Normal", env.currentSpeedMode == "Normal", env.currentSpeedMode)
+
+print("\n-- expandables --")
+local combat = page("Combat")
+local expandables = {}
+for _, c in ipairs(combat:GetChildren()) do
+    if c.Name == "Expandable" then table.insert(expandables, c) end
+end
+check("combat has 3 selectors", #expandables == 3, #expandables)
+-- first expandable follows Auto Steal: option 2 = SEMI
+expandables[1]:FindFirstChild("Option2").MouseButton1Click:Fire()
+check("steal mode -> Semi", env.selectedStealMode == "Semi", env.selectedStealMode)
+expandables[1]:FindFirstChild("Option1").MouseButton1Click:Fire()
+check("steal mode -> Normal", env.selectedStealMode == "Normal", env.selectedStealMode)
+expandables[2]:FindFirstChild("Option2").MouseButton1Click:Fire()
+check("aimbot mode -> Anti Bypass", env.selectedAimbotMode == "Anti Bypass", env.selectedAimbotMode)
+expandables[2]:FindFirstChild("Option1").MouseButton1Click:Fire()
+check("aimbot mode -> Normal", env.selectedAimbotMode == "Normal", env.selectedAimbotMode)
+expandables[3]:FindFirstChild("Option2").MouseButton1Click:Fire()
+check("tp bat -> no swing", env.antiDesyncAutoSwingEnabled == false, env.antiDesyncAutoSwingEnabled)
+
+-- arrow expands the selector below its toggle
+local batRow = row("Combat", "Bat Aimbot")
+local arrow = batRow:FindFirstChild("ArrowButton")
+arrow.MouseButton1Click:Fire()
+check("arrow reveals selector", expandables[2].Visible == true)
+
+print("\n-- pickers --")
+local skyRow = row("Utility", "Custom Sky")
+skyRow:FindFirstChild("Next").MouseButton1Click:Fire()
+check("sky picker advances", env.skyTheme == (env.SKY_PRESETS_LIST[2]), tostring(env.skyTheme))
+local animRow = row("Utility", "Anim Pack")
+animRow:FindFirstChild("Next").MouseButton1Click:Fire()
+check("anim pack advances", env.selectedAnimationPack == env.AnimationPackList[2], tostring(env.selectedAnimationPack))
+
+print("\n-- keybinds --")
+local keyRow = row("Keybinds", "Speed Key")
+check("speed key shows default Q", keyRow:FindFirstChild("KeybindButton").Text == "Q",
+    keyRow:FindFirstChild("KeybindButton").Text)
+keyRow:FindFirstChild("KeybindButton").MouseButton1Click:Fire()
+check("listening state shown", keyRow:FindFirstChild("KeybindButton").Text == "...")
+local fakeClock = 1e6
+env.tick = function() fakeClock = fakeClock + 1 return fakeClock end   -- past the 0.18s debounce
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.J}, false)
+check("rebind captured", keyRow:FindFirstChild("KeybindButton").Text == "J",
+    keyRow:FindFirstChild("KeybindButton").Text)
+check("speedKeybinds updated", env.speedKeybinds.SpeedToggle == mock.Enum.KeyCode.J)
+keyRow:FindFirstChild("ClearKeybindButton").MouseButton1Click:Fire()
+check("keybind cleared", env.speedKeybinds.SpeedToggle == nil)
+
+local ctrlRow = row("Controller", "Bat Aimbot Key")
+ctrlRow:FindFirstChild("KeybindButton").MouseButton1Click:Fire()
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Gamepad1, KeyCode = mock.Enum.KeyCode.ButtonR2}, false)
+check("controller bind captured", env.AdaptControllerBinds.Aimbot == mock.Enum.KeyCode.ButtonR2)
+check("keyboard bind untouched", env.speedKeybinds.Aimbot == mock.Enum.KeyCode.E)
+
+print("\n-- hotkeys --")
+env.currentSpeedMode = "Normal"
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.R}, false)
+check("R toggles lagger mode", env.currentSpeedMode == "Lagger Carry", env.currentSpeedMode)
+local main = gui:FindFirstChild("Main")
+main.Visible = true
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.LeftControl}, false)
+check("ui toggle key hides menu", main.Visible == false)
+check("float button shown", gui:FindFirstChild("AdaptFloatOpen").Visible == true)
+
+print("\n-- mobile buttons --")
+local mobile = gui:FindFirstChild("MobileButtons")
+local carryBtn = mobile:FindFirstChild("Carry Speed")
+env.currentSpeedMode = "Normal"
+local touch = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector2.new(0, 0)}
+carryBtn.InputBegan:Fire(touch)
+carryBtn.InputEnded:Fire(touch)
+check("mobile carry toggles speed mode", env.currentSpeedMode == "Carry", env.currentSpeedMode)
+local leftBtn = mobile:FindFirstChild("Auto Left")
+leftBtn.InputBegan:Fire(touch)
+leftBtn.InputEnded:Fire(touch)
+check("mobile auto left calls logic", env.autoLeftEnabled == true, tostring(env.autoLeftEnabled))
+
+print("\n-- tabs --")
+local tabs = gui:FindFirstChild("Main"):FindFirstChild("Tabs")
+tabs:FindFirstChild("Settings").MouseButton1Click:Fire()
+check("settings page visible", page("Settings").Visible == true)
+check("movement page hidden", page("Movement").Visible == false)
+
+print("\n-- config --")
+local cfg = env.collectAceConfig()
+check("config carries controller binds", type(cfg.adaptControllerKeybinds) == "table")
+check("config carries mobile positions", type(cfg.adaptMobilePositions) == "table")
+check("config carries NS", cfg.NS == env.NS)
+
+
+print("\n-- actions & sync --")
+local function clickAction(pageName, rowName)
+    local r = assert(row(pageName, rowName), "missing " .. rowName)
+    r:FindFirstChild("ActionButton").MouseButton1Click:Fire()
+end
+check("sync runs clean", pcall(env.AdaptSyncUI))
+clickToggle("Movement", "Drop")
+check("drop action ran", true)
+clickToggle("Movement", "TP Down")
+clickToggle("Combat", "Insta Reset On Death")
+clickAction("Settings", "SAVE SETTINGS")
+clickAction("Settings", "Reset Buttons")
+clickAction("Controller", "RESET ALL CONTROLLER")
+check("controller binds cleared", next(env.AdaptControllerBinds) == nil)
+
+local bgPicker = page("Settings"):FindFirstChild("BackgroundPicker")
+bgPicker:FindFirstChild("BgScroll"):FindFirstChild("BgThumb3").MouseButton1Click:Fire()
+check("background index stored", env.currentBackground == 2, env.currentBackground)
+local btnPicker = page("Settings"):FindFirstChild("ButtonsImagePicker")
+btnPicker:FindFirstChild("BtnImgScroll"):FindFirstChild("BtnImgThumb2").MouseButton1Click:Fire()
+check("button image stored", env.AdaptButtonImage ~= nil and env.AdaptButtonImage ~= "")
+page("Settings"):FindFirstChild("ColorThemePicker"):FindFirstChild("BLUE").MouseButton1Click:Fire()
+check("theme colour stored", env.AdaptThemeColor ~= nil)
+
+clickAction("Settings", "RESET ALL SETTINGS")
+check("reset restores NS", env.NS == 59.5, env.NS)
+check("reset restores speed mode", env.currentSpeedMode == "Normal", env.currentSpeedMode)
+check("reset restores keybinds", env.speedKeybinds.SpeedToggle == mock.Enum.KeyCode.Q)
+check("reset clears esp", env.espEnabled == false)
+
+print("\n-- deferred startup work --")
+local errs = mock.pump(6)
+check("deferred tasks ran without errors", #errs == 0, errs[1])
+print(string.format("   (%d deferred tasks queued)", mock.deferred))
+
+print(string.format("\n%d checks, %d failures", checks, failures))
+os.exit(failures == 0 and 0 or 1)

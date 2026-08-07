@@ -22,8 +22,10 @@ if ok and font then return font end
 end
 return Enum.Font.GothamBold
 end
-DICE_FONT_HEAD = diceResolveFont("Oswald", "RobotoCondensed", "GothamBlack")
-DICE_FONT_BODY = diceResolveFont("TitilliumWeb", "Nunito", "Gotham")
+DICE_FONT_HEAD = diceResolveFont("GothamBlack", "GothamBold", "Gotham")
+DICE_FONT_BODY = diceResolveFont("GothamSemibold", "GothamBold", "Gotham")
+DICE_FONT_BOLD = diceResolveFont("GothamBold", "GothamBlack", "Gotham")
+DICE_FONT_MED  = diceResolveFont("GothamMedium", "Gotham", "GothamBold")
 _G.DiceIsMobile = true
 _G.DiceCursedResetRemote = _G.DiceCursedResetRemote or nil
 _G.DiceCursedResetGuid = _G.DiceCursedResetGuid or "f888ee6e-c86d-46e1-93d7-0639d6635d42"
@@ -3925,7 +3927,7 @@ Close.BackgroundTransparency = 0.04
 Close.Text = "–"
 Close.TextColor3 = Color3.fromRGB(14, 14, 20)
 Close.TextSize = 20
-Close.Font = DICE_FONT_BODY
+Close.Font = DICE_FONT_BOLD
 Close.Size = UDim2.new(0, 30, 0, 26)
 Close.Position = UDim2.new(1, -38, 0.5, -13)
 Close.AutoButtonColor = false
@@ -3990,7 +3992,7 @@ NavCaption.Text = "NAVIGATION"
 NavCaption.TextColor3 = COLORS.textDim
 NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 NavCaption.TextStrokeTransparency = 0.5
-NavCaption.Font = DICE_FONT_BODY
+NavCaption.Font = DICE_FONT_BOLD
 NavCaption.TextSize = 9
 NavCaption.TextXAlignment = Enum.TextXAlignment.Left
 NavCaption.ZIndex = 4
@@ -4033,7 +4035,7 @@ MadeBy.Text = "Made By Dice"
 MadeBy.TextColor3 = COLORS.white
 MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 MadeBy.TextStrokeTransparency = 0.35
-MadeBy.Font = DICE_FONT_BODY
+MadeBy.Font = DICE_FONT_BOLD
 MadeBy.TextSize = 10
 MadeBy.TextXAlignment = Enum.TextXAlignment.Left
 MadeBy.ZIndex = 5
@@ -5367,7 +5369,7 @@ bb.Name="DiceDuelsESPTag"; bb.Adornee=head; bb.Size=UDim2.new(0,124,0,34); bb.St
 local box=Instance.new("Frame",bb); box.Size=UDim2.new(1,0,1,0); box.BackgroundTransparency=1; box.BorderSizePixel=0
 Instance.new("UICorner",box).CornerRadius=UDim.new(0,9)
 local n=Instance.new("TextLabel",box); n.Size=UDim2.new(1,-10,0,17); n.Position=UDim2.new(0,5,0,2); n.BackgroundTransparency=1; n.TextColor3=Color3.fromRGB(255,255,255); n.Font=DICE_FONT_HEAD; n.TextSize=15; n.TextStrokeTransparency=0.38
-local sub=Instance.new("TextLabel",box); sub.Size=UDim2.new(1,-10,0,11); sub.Position=UDim2.new(0,5,0,19); sub.BackgroundTransparency=1; sub.TextColor3=Color3.fromRGB(180,180,180); sub.Font=DICE_FONT_BODY; sub.TextSize=10; sub.TextStrokeTransparency=0.58
+local sub=Instance.new("TextLabel",box); sub.Size=UDim2.new(1,-10,0,11); sub.Position=UDim2.new(0,5,0,19); sub.BackgroundTransparency=1; sub.TextColor3=Color3.fromRGB(180,180,180); sub.Font=DICE_FONT_BOLD; sub.TextSize=10; sub.TextStrokeTransparency=0.58
 local conn=RunService.Heartbeat:Connect(function()
 if not PlayerESP.enabled or not hrp.Parent then return end
 local v=hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -6296,7 +6298,7 @@ label.TextColor3 = Color3.fromRGB(245, 245, 255)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.25
 label.TextSize = 11
-label.Font = DICE_FONT_BODY
+label.Font = DICE_FONT_MED
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 12, 0, 0)
 label.Size = UDim2.new(1, -155, 1, 0)
@@ -6447,7 +6449,7 @@ label.TextColor3 = Color3.fromRGB(245,245,255)
 label.TextStrokeColor3 = Color3.fromRGB(0,0,0)
 label.TextStrokeTransparency = 0.25
 label.TextSize = 11
-label.Font = DICE_FONT_BODY
+label.Font = DICE_FONT_MED
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 12, 0, 0)
 label.Size = UDim2.new(1, -145, 1, 0)
@@ -6839,7 +6841,7 @@ progressPct.Position = UDim2.new(0, 14, 0, 5)
 progressPct.BackgroundTransparency = 1
 progressPct.Text = "0%"
 progressPct.TextColor3 = THEME_ACCENT_BRIGHT
-progressPct.Font = DICE_FONT_BODY
+progressPct.Font = DICE_FONT_BOLD
 progressPct.TextSize = 12
 progressPct.TextXAlignment = Enum.TextXAlignment.Left
 progressPct.ZIndex = 4
@@ -6907,7 +6909,7 @@ progressRadLbl.Position = UDim2.new(0, 242, 0, 5)
 progressRadLbl.BackgroundTransparency = 1
 progressRadLbl.Text = "Radius: 0"
 progressRadLbl.TextColor3 = THEME_ACCENT_BRIGHT
-progressRadLbl.Font = DICE_FONT_BODY
+progressRadLbl.Font = DICE_FONT_BOLD
 progressRadLbl.TextSize = 12
 progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
 progressRadLbl.ZIndex = 4
@@ -7169,7 +7171,7 @@ title.Text = "DICE DUELS"; title.TextColor3 = Color3.fromRGB(245,245,245); title
 title.TextTransparency = 1; title.TextStrokeTransparency = 1; title.TextStrokeColor3 = Color3.fromRGB(35,35,35); title.ZIndex = 43
 local subtitle = Instance.new("TextLabel", center)
 subtitle.Size = UDim2.new(1,0,0,26); subtitle.Position = UDim2.new(0,0,0,169); subtitle.BackgroundTransparency = 1
-subtitle.Text = "Eugene"; subtitle.TextColor3 = Color3.fromRGB(200,200,200); subtitle.Font = DICE_FONT_BODY; subtitle.TextSize = 19; subtitle.TextTransparency = 1; subtitle.ZIndex = 43
+subtitle.Text = "Eugene"; subtitle.TextColor3 = Color3.fromRGB(200,200,200); subtitle.Font = DICE_FONT_MED; subtitle.TextSize = 19; subtitle.TextTransparency = 1; subtitle.ZIndex = 43
 TS:Create(darkBg, TweenInfo.new(0.65), {BackgroundTransparency = 0.22}):Play()
 for _, cd in ipairs(cards) do
 task.delay(math.random() * 0.9, function()
@@ -7677,7 +7679,7 @@ btn.BackgroundColor3 = FACE_OFF
 btn.BorderSizePixel = 0
 btn.Text = label
 btn.TextColor3 = TEXT_OFF
-btn.Font = DICE_FONT_BODY
+btn.Font = DICE_FONT_BOLD
 btn.TextSize = 10
 btn.TextWrapped = true
 btn.LineHeight = 1.15

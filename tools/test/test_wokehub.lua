@@ -308,8 +308,61 @@ check("config carries hub background", cfg2.wokeBackground ~= nil)
 
 -- The wordmark reads WOKE.
 check("gui named WokeHub", gui.Name == "WokeHub", gui.Name)
-check("main wordmark", gui:FindFirstChild("Main"):FindFirstChild("LogoAsset").Text == "WOKE")
-check("intro wordmark", gui:FindFirstChild("WokeIntro"):FindFirstChild("IntroBanner").Text == "WOKE")
+local headerMark = gui:FindFirstChild("Main"):FindFirstChild("LogoAsset")
+local introMark = gui:FindFirstChild("WokeIntro"):FindFirstChild("IntroBanner")
+check("main wordmark reads WOKE", headerMark:FindFirstChild("Face").Text == "WOKE")
+check("intro wordmark reads WOKE", introMark:FindFirstChild("Face").Text == "WOKE")
+check("wordmark is layered art", headerMark:FindFirstChild("Shadow") ~= nil
+    and headerMark:FindFirstChild("Glow") ~= nil and headerMark:FindFirstChild("AccentBar") ~= nil)
+
+
+print("\n-- reported bugs --")
+-- 1. The window must drag even when a saved Ace config had the GUI locked.
+check("gui lock flag cleared at startup", env.AceGuiLocked == false, tostring(env.AceGuiLocked))
+local mainFrame = gui:FindFirstChild("Main")
+mainFrame.Visible = true
+local startPosition = mainFrame.Position
+local dragTouch = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(100, 100, 0)}
+mainFrame.InputBegan:Fire(dragTouch)
+mock.services.UserInputService.InputChanged:Fire(
+    {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(160, 140, 0)})
+check("main window moved", mainFrame.Position.X.Offset == startPosition.X.Offset + 60,
+    mainFrame.Position.X.Offset)
+check("main window moved vertically", mainFrame.Position.Y.Offset == startPosition.Y.Offset + 40)
+check("drag records position for saving", env.savedMainPositionTable ~= nil)
+mock.services.UserInputService.InputEnded:Fire(dragTouch)
+
+-- A tap under the deadzone must not move the window.
+local restPosition = mainFrame.Position
+local tap = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(10, 10, 0)}
+mainFrame.InputBegan:Fire(tap)
+mock.services.UserInputService.InputChanged:Fire(
+    {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(12, 11, 0)})
+check("small movement ignored", mainFrame.Position.X.Offset == restPosition.X.Offset)
+mock.services.UserInputService.InputEnded:Fire(tap)
+
+-- 2. STAND must be honoured by every drop entry point, mobile button included.
+env.WokeDropMode = "Stand"
+local jumped = false
+local realDrop = env.runDropBrainrot
+env.runDropBrainrot = function() jumped = true end
+clickToggle("Movement", "Drop")
+check("drop row honours STAND", jumped == false)
+local dropMobile = mobileHolder:FindFirstChild("Drop Brainrot")
+local press = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector2.new(0, 0)}
+dropMobile.InputBegan:Fire(press)
+dropMobile.InputEnded:Fire(press)
+check("mobile drop honours STAND", jumped == false)
+env.speedKeybinds.DropBrainrot = mock.Enum.KeyCode.X
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.X}, false)
+check("drop keybind honours STAND", jumped == false)
+
+env.WokeDropMode = "Jump"
+dropMobile.InputBegan:Fire(press)
+dropMobile.InputEnded:Fire(press)
+check("mobile drop jumps in JUMP mode", jumped == true)
+env.runDropBrainrot = realDrop
 
 print("\n-- deferred startup work --")
 local errs = mock.pump(6)

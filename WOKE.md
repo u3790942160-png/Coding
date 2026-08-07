@@ -71,8 +71,9 @@ state, and drag to reposition when Move Buttons is on.
 ## Differences from the original AdaptHub mock-up
 
 The hub is named WOKE: the ScreenGui is `WokeHub`, and the banner and header
-wordmarks are drawn as WOKE text in the same slots and styling the logo art
-occupied. Colours, layout and animations are unchanged.
+wordmarks are drawn as layered logo art in the slots the old art occupied —
+dropped shadow, soft outer glow, gradient-filled face and an accent bar that
+fades at both ends. Colours, layout and animations are unchanged.
 
 * Arrows only appear on rows that actually have a selector under them.
 * Rows without an Ace counterpart were replaced with ones that have logic
@@ -104,3 +105,18 @@ occupied. Colours, layout and animations are unchanged.
   buttons.
 * Button Size % accepted up to 200% while the saved config clamps at 135%, so
   the value moved on its own after a reload.
+
+## Fixed after the rename
+
+* The window could not be dragged: the Ace config carries a `guiLocked` flag
+  that its own menu could toggle, and this hub has no such control, so a saved
+  `true` locked the window with no way to release it. The hub now always
+  starts unlocked.
+* The Drop selector's STAND option was ignored by the mobile DROP BRAINROT
+  button, which always ran the jumping routine. All three entry points — row,
+  keybind and mobile button — now go through one mode-aware function, and
+  STAND does the floor snap only (it used to teleport down to Y -7 instead of
+  simply skipping the hop).
+* The wordmark was a plain text label; it is layered art again.
+* The intro's tap catcher now stops swallowing input the moment the intro is
+  skipped, rather than 0.45s later.

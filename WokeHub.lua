@@ -4164,6 +4164,11 @@ local StatsService       = game:GetService("Stats")
 local LocalPlayer        = Players.LocalPlayer
 local PlayerGui          = LocalPlayer:WaitForChild("PlayerGui")
 
+-- The Ace config carries a "gui locked" flag that its own menu could toggle.
+-- This hub has no such control, so a saved `true` would leave the window
+-- permanently unmovable with no way to release it. Always start unlocked.
+_G.AceGuiLocked = false
+
 --------------------------------------------------------------------------------
 -- SHARED STYLE CONSTANTS
 --------------------------------------------------------------------------------
@@ -5117,6 +5122,83 @@ local function createTabButton(name, text, order, isActive, parent)
     return btn
 end
 
+--------------------------------------------------------------------------------
+-- COMPONENT: Wordmark — the hub name drawn as logo art rather than a label.
+-- Layered the way the old banner read: a dropped shadow, a soft outer glow,
+-- the gradient-filled face on top, and a thin accent bar underneath.
+--------------------------------------------------------------------------------
+local WORDMARK_GRADIENT = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(236, 238, 248)),
+    ColorSequenceKeypoint.new(0.62, Color3.fromRGB(150, 156, 186)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(228, 231, 243)),
+})
+
+local function createWordmark(name, text, parent, position, size, zIndex, maxTextSize)
+    local holder = new("Frame", {
+        Name = name,
+        ZIndex = zIndex,
+        Position = position,
+        Size = size,
+        BackgroundTransparency = 1,
+        Parent = parent,
+    })
+
+    local function layer(layerName, offsetY, dz)
+        local lbl = new("TextLabel", {
+            Name = layerName,
+            ZIndex = zIndex + dz,
+            Position = UDim2.new(0, 0, 0, offsetY),
+            Size = UDim2.new(1, 0, 1, -6),
+            BackgroundTransparency = 1,
+            Text = text,
+            TextColor3 = WHITE,
+            TextScaled = true,
+            Font = Enum.Font.GothamBlack,
+            Parent = holder,
+        })
+        new("UITextSizeConstraint", {MinTextSize = 14, MaxTextSize = maxTextSize, Parent = lbl})
+        return lbl
+    end
+
+    -- Shadow, sitting a few pixels low behind everything.
+    local shadow = layer("Shadow", 4, 0)
+    shadow.TextColor3 = DARKER_BG
+    shadow.TextTransparency = 0.35
+
+    -- Outer glow: same glyphs, blown out with a wide soft stroke.
+    local glow = layer("Glow", 0, 1)
+    glow.TextTransparency = 0.72
+    new("UIStroke", {Color = Color3.fromRGB(205, 212, 240), Thickness = 5, Transparency = 0.78, Parent = glow})
+
+    -- The face.
+    local face = layer("Face", 0, 2)
+    new("UIStroke", {Color = Color3.fromRGB(8, 8, 12), Thickness = 1.8, Transparency = 0.25, Parent = face})
+    new("UIGradient", {Color = WORDMARK_GRADIENT, Rotation = 90, Parent = face})
+
+    -- Accent bar, fading out at both ends.
+    local bar = new("Frame", {
+        Name = "AccentBar",
+        ZIndex = zIndex + 2,
+        AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, 0),
+        Size = UDim2.new(0.52, 0, 0, 2),
+        BackgroundColor3 = WHITE,
+        BorderSizePixel = 0,
+        Parent = holder,
+    })
+    new("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1, 0),
+            NumberSequenceKeypoint.new(0.5, 0.25, 0),
+            NumberSequenceKeypoint.new(1, 1, 0),
+        }),
+        Parent = bar,
+    })
+
+    return {holder = holder, face = face, glow = glow, shadow = shadow, bar = bar}
+end
+
 local function createTabPage(name, parent, visible)
     local page = new("ScrollingFrame", {
         Name = name,
@@ -5345,32 +5427,8 @@ do
     end
 end
 
--- Wordmark: same slot and styling as the old banner art, drawn as text so it
--- reads WOKE.
-local IntroBanner = new("TextLabel", {
-    Name = "IntroBanner",
-    ZIndex = 1002,
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.new(0.5, 0, 0.42, 0),
-    Size = UDim2.new(0.38, 0, 0, 78),
-    BackgroundTransparency = 1,
-    Text = "WOKE",
-    TextColor3 = WHITE,
-    TextScaled = true,
-    Font = Enum.Font.GothamBlack,
-    Parent = WokeIntro,
-})
-new("UITextSizeConstraint", {MinTextSize = 18, MaxTextSize = 56, Parent = IntroBanner})
-new("UIStroke", {Color = DARKER_BG, Thickness = 2, Transparency = 0.35, Parent = IntroBanner})
-new("UIGradient", {
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(178, 184, 210)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-    }),
-    Rotation = 90,
-    Parent = IntroBanner,
-})
+local IntroBanner = createWordmark("IntroBanner", "WOKE", WokeIntro,
+    UDim2.new(0.5, -140, 0.42, -39), UDim2.new(0, 280, 0, 78), 1002, 62)
 
 local TapAnywhere = new("TextLabel", {
     Name = "TapAnywhere",
@@ -5528,29 +5586,8 @@ local BackgroundAsset = new("ImageLabel", {
     Parent = Main,
 })
 
-local LogoAsset = new("TextLabel", {
-    Name = "LogoAsset",
-    ZIndex = 2,
-    Position = UDim2.new(0.5, -150, 0, 18),
-    Size = UDim2.new(0, 300, 0, 76),
-    BackgroundTransparency = 1,
-    Text = "WOKE",
-    TextColor3 = WHITE,
-    TextScaled = true,
-    Font = Enum.Font.GothamBlack,
-    Parent = Main,
-})
-new("UITextSizeConstraint", {MinTextSize = 18, MaxTextSize = 46, Parent = LogoAsset})
-new("UIStroke", {Color = DARKER_BG, Thickness = 2, Transparency = 0.4, Parent = LogoAsset})
-new("UIGradient", {
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(178, 184, 210)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-    }),
-    Rotation = 90,
-    Parent = LogoAsset,
-})
+local LogoAsset = createWordmark("LogoAsset", "WOKE", Main,
+    UDim2.new(0.5, -150, 0, 16), UDim2.new(0, 300, 0, 74), 2, 46)
 
 local Close = new("TextButton", {
     Name = "Close",
@@ -5862,6 +5899,34 @@ local function saveSoon()
     task.spawn(function() pcall(saveAceConfig) end)
 end
 
+-- Drop brainrot, in the mode the selector under the Drop row is set to.
+-- JUMP is the Ace routine: ascend for a moment, then slam down onto the floor.
+-- STAND does only the floor snap, so the character never leaves the ground.
+local function dropStand()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if _G.AceStopAutoTPForAction then _G.AceStopAutoTPForAction() end
+
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {char}
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local hit = workspace:Raycast(root.Position, Vector3.new(0, -2000, 0), params)
+    if hit then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local offset = (hum and hum.HipHeight or 2) + (root.Size.Y / 2)
+        root.CFrame = CFrame.new(root.Position.X, hit.Position.Y + offset, root.Position.Z)
+    end
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+    root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+end
+
+-- Every drop entry point goes through here: the row, the keybind and the
+-- mobile button all have to honour the JUMP/STAND selector.
+local function runDrop()
+    if _G.WokeDropMode == "Stand" then dropStand() else runDropBrainrot() end
+end
+
 -- Toggle bound to a piece of state: read() reports it, apply(state) changes it.
 local function bindToggle(api, read, apply)
     if not api then return end
@@ -5966,13 +6031,9 @@ do
         end)
     setAutoCarrySpeedVisual = function(state) UI.toggle["Auto Carry Speed"].setVisual(state) end
 
-    -- Drop: JUMP = ascend then slam down (drops the brainrot), STAND = plain
-    -- floor teleport without the hop.
     bindExpandable(UI.expand["Drop"], function() return _G.WokeDropMode == "Stand" and 2 or 1 end,
         function(idx) _G.WokeDropMode = (idx == 2) and "Stand" or "Jump" end)
-    bindAction(UI.toggle["Drop"], function()
-        if _G.WokeDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
-    end)
+    bindAction(UI.toggle["Drop"], runDrop)
 
     bindAction(UI.toggle["TP Down"], runTPFloor)
 
@@ -6517,7 +6578,7 @@ end
 --------------------------------------------------------------------------------
 do
     local actions = {
-        ["Drop Brainrot"] = {press = function() runDropBrainrot() end, momentary = true},
+        ["Drop Brainrot"] = {press = function() runDrop() end, momentary = true},
         ["TP Down"]       = {press = function() runTPFloor() end, momentary = true},
         ["Instant Reset"] = {press = function() if _G.AceCursedInstaReset then _G.AceCursedInstaReset() end end, momentary = true},
         ["Auto Left"]     = {
@@ -6663,7 +6724,6 @@ local function makeDraggable(frame, handle, onMoved)
     local dragging, moved, heldInput, startPos, framePos = false, false, nil, nil, nil
 
     handle.InputBegan:Connect(function(input)
-        if _G.AceGuiLocked == true then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             moved = false
@@ -6710,9 +6770,7 @@ end)
 local HOTKEY_ACTIONS = {
     SpeedToggle = function() toggleCarryMode() end,
     LaggerToggle = function() toggleLaggerMode() end,
-    DropBrainrot = function()
-        if _G.WokeDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
-    end,
+    DropBrainrot = function() runDrop() end,
     TPDown = function() runTPFloor() end,
     Aimbot = function()
         if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
@@ -7031,6 +7089,10 @@ local function skipIntro()
     if introSkipped then return end
     introSkipped = true
 
+    -- Stop swallowing input straight away: the catcher covers the screen, so
+    -- if anything below went wrong it would leave the game unclickable.
+    TapCatcher.Visible = false
+
     uiTween(WokeIntro, 0.4, {BackgroundTransparency = 1})
     for _, child in ipairs(WokeIntro:GetChildren()) do
         if child:IsA("ImageLabel") then
@@ -7040,7 +7102,15 @@ local function skipIntro()
         elseif child:IsA("Frame") then
             uiTween(child, 0.3, {BackgroundTransparency = 1})
             for _, sub in ipairs(child:GetDescendants()) do
-                if sub:IsA("ImageLabel") then uiTween(sub, 0.3, {ImageTransparency = 1}) end
+                if sub:IsA("ImageLabel") then
+                    uiTween(sub, 0.3, {ImageTransparency = 1})
+                elseif sub:IsA("TextLabel") then
+                    uiTween(sub, 0.3, {TextTransparency = 1, TextStrokeTransparency = 1})
+                elseif sub:IsA("Frame") then
+                    uiTween(sub, 0.3, {BackgroundTransparency = 1})
+                elseif sub:IsA("UIStroke") then
+                    uiTween(sub, 0.3, {Transparency = 1})
+                end
             end
         end
     end

@@ -3425,7 +3425,7 @@ local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
 if not head then return end
 overheadGui = Instance.new("BillboardGui")
 overheadGui.Name = "DiceDuelsOverheadInfo"
-overheadGui.Size = UDim2.new(0, 250, 0, 88)
+overheadGui.Size = UDim2.new(0, 280, 0, 92)
 overheadGui.StudsOffset = Vector3.new(0, 1.75, 0)
 overheadGui.AlwaysOnTop = true
 overheadGui.LightInfluence = 0
@@ -3445,34 +3445,36 @@ ragdollCountdownLabel.TextSize = 22
 ragdollCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 ragdollCountdownLabel.ZIndex = 10
 ragdollCountdownLabel.Parent = overheadGui
+-- Speed on top, discord under it, both plain outlined text with no
+-- plate or tint behind them.
+overheadSpeedLabel = Instance.new("TextLabel")
+overheadSpeedLabel.Name = "Speed"
+overheadSpeedLabel.Size = UDim2.new(1, 0, 0, 32)
+overheadSpeedLabel.Position = UDim2.new(0, 0, 0, 26)
+overheadSpeedLabel.BackgroundTransparency = 1
+overheadSpeedLabel.Text = "Speed: 0 | Normal"
+overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+overheadSpeedLabel.TextStrokeTransparency = 0
+overheadSpeedLabel.Font = DICE_FONT_HEAD
+overheadSpeedLabel.TextSize = 25
+overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
+overheadSpeedLabel.ZIndex = 10
+overheadSpeedLabel.Parent = overheadGui
 local discordLbl = Instance.new("TextLabel")
 discordLbl.Name = "Discord"
-discordLbl.Size = UDim2.new(1, 0, 0, 30)
-discordLbl.Position = UDim2.new(0, 0, 0, 26)
+discordLbl.Size = UDim2.new(1, 0, 0, 26)
+discordLbl.Position = UDim2.new(0, 0, 0, 58)
 discordLbl.BackgroundTransparency = 1
 discordLbl.Text = "discord.gg/diceduels"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 discordLbl.TextStrokeTransparency = 0
 discordLbl.Font = DICE_FONT_HEAD
-discordLbl.TextSize = 21
+discordLbl.TextSize = 19
 discordLbl.TextXAlignment = Enum.TextXAlignment.Center
 discordLbl.ZIndex = 10
 discordLbl.Parent = overheadGui
-overheadSpeedLabel = Instance.new("TextLabel")
-overheadSpeedLabel.Name = "Speed"
-overheadSpeedLabel.Size = UDim2.new(1, 0, 0, 26)
-overheadSpeedLabel.Position = UDim2.new(0, 0, 0, 54)
-overheadSpeedLabel.BackgroundTransparency = 1
-overheadSpeedLabel.Text = "Speed: 0"
-overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-overheadSpeedLabel.TextStrokeTransparency = 0
-overheadSpeedLabel.Font = DICE_FONT_HEAD
-overheadSpeedLabel.TextSize = 19
-overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
-overheadSpeedLabel.ZIndex = 10
-overheadSpeedLabel.Parent = overheadGui
 end
 local ragdollCountdownConn = nil
 local ragdollCountdownCharConn = nil
@@ -3568,11 +3570,13 @@ if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
 local speedMag = Vector3.new(v.X, 0, v.Z).Magnitude
 local rounded = math.floor(speedMag * 10 + 0.5) / 10
+local shown
 if math.abs(rounded - math.floor(rounded)) < 0.05 then
-overheadSpeedLabel.Text = string.format("Speed: %d", math.floor(rounded + 0.5))
+shown = string.format("%d", math.floor(rounded + 0.5))
 else
-overheadSpeedLabel.Text = string.format("Speed: %.1f", rounded)
+shown = string.format("%.1f", rounded)
 end
+overheadSpeedLabel.Text = string.format("Speed: %s | %s", shown, tostring(currentSpeedMode or "Normal"))
 end
 end)
 -- Slate base with a crimson accent rather than the flat monochrome the
@@ -3773,42 +3777,32 @@ end)
 local MiniFrame = Instance.new("Frame")
 MiniFrame.Name = "MiniFrame"
 MiniFrame.AnchorPoint = Vector2.new(0, 0)
-MiniFrame.Size = UDim2.new(0, 78, 0, 28)
+MiniFrame.Size = UDim2.new(0, 46, 0, 46)
 local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
 MiniFrame.Position = MINI_DEFAULT_POSITION
 savedMiniPositionTable = nil
-MiniFrame.BackgroundColor3 = Color3.fromRGB(17, 18, 25)
-MiniFrame.BackgroundTransparency = 0
+MiniFrame.BackgroundTransparency = 1
 MiniFrame.BorderSizePixel = 0
 MiniFrame.Visible = false
 MiniFrame.Active = true
 MiniFrame.ZIndex = 20
 MiniFrame.Parent = Gui
-corner(MiniFrame, 8)
-stroke(MiniFrame, COLORS.accent, 1.2, 0.15)
+-- The collapsed handle is a die rather than a labelled tab.
+local MiniDie, setMiniDieFace = makeDie(MiniFrame, 46, 6, false)
+MiniDie.Name = "MiniDie"
+MiniDie.Position = UDim2.new(0, 0, 0, 0)
 local MiniButton = Instance.new("TextButton")
 MiniButton.Name = "MiniButton"
 MiniButton.Size = UDim2.new(1, 0, 1, 0)
 MiniButton.BackgroundTransparency = 1
-MiniButton.Text = "DICE"
-MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-MiniButton.TextStrokeTransparency = 0.18
-MiniButton.TextSize = 17
-MiniButton.Font = DICE_FONT_HEAD
+MiniButton.Text = ""
 MiniButton.AutoButtonColor = false
-MiniButton.ZIndex = 21
+MiniButton.ZIndex = 25
 MiniButton.Parent = MiniFrame
-local MiniShade = Instance.new("Frame")
-MiniShade.Name = "MiniShade"
-MiniShade.Size = UDim2.new(1, -4, 1, -4)
-MiniShade.Position = UDim2.new(0, 2, 0, 2)
-MiniShade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-MiniShade.BackgroundTransparency = 0.12
-MiniShade.BorderSizePixel = 0
-MiniShade.ZIndex = 20
-MiniShade.Parent = MiniFrame
-corner(MiniShade, 7)
+-- Fresh roll every time it appears.
+MiniFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+if MiniFrame.Visible then setMiniDieFace(math.random(1, 6)) end
+end)
 do
 local miniDragging = false
 local miniDragStart = nil

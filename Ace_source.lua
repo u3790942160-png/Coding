@@ -3697,13 +3697,13 @@ end)
 end
 -- ═══════════════════════════════════════════════════════════════
 -- BACKGROUND
--- Drawn with gradients instead of uploaded images: nothing to fetch,
--- no decal that can moderated away, and it scales to any window size.
+-- Drawn with UI primitives instead of uploaded images: nothing to
+-- fetch, no decal that can be moderated away, and it scales to any
+-- window size. "Sakura" is an anime dusk scene built out of frames.
 -- ═══════════════════════════════════════════════════════════════
-BACKGROUND_NAMES = {"Aurora"}
--- Builds the full layer stack into `target`. Shared by the real
--- background and the little preview swatch in Settings.
-function paintAceBackground(target, radius, animate)
+BACKGROUND_NAMES = {"Aurora", "Sakura"}
+_G.AceBgGeneration = 0
+local function bgClear(target)
 for _, old in ipairs(target:GetChildren()) do
 if old.Name == "BgLayer" then old:Destroy() end
 end
@@ -3711,8 +3711,36 @@ local existingGradient = target:FindFirstChildOfClass("UIGradient")
 if existingGradient then existingGradient:Destroy() end
 target.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 target.BackgroundTransparency = 0
--- Base: deep indigo falling away to near-black at the bottom, so
--- rows near the bottom of the list keep their contrast.
+end
+-- Every layer is named BgLayer so a repaint can sweep the old style out.
+local function bgLayer(target, radius)
+local f = Instance.new("Frame")
+f.Name = "BgLayer"
+f.BorderSizePixel = 0
+f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+f.ZIndex = target.ZIndex or 1
+f.Parent = target
+if radius then corner(f, radius) end
+return f
+end
+-- A scrim over whatever the style drew, so row text never has to fight
+-- the artwork underneath it.
+local function bgScrim(target, radius, topAlpha, bottomAlpha)
+local scrim = bgLayer(target, radius)
+scrim.Size = UDim2.new(1, 0, 1, 0)
+scrim.BackgroundColor3 = Color3.fromRGB(4, 4, 10)
+scrim.BackgroundTransparency = 0
+local g = Instance.new("UIGradient")
+g.Rotation = 90
+g.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, topAlpha),
+NumberSequenceKeypoint.new(0.5, (topAlpha + bottomAlpha) * 0.5),
+NumberSequenceKeypoint.new(1, bottomAlpha),
+})
+g.Parent = scrim
+return scrim
+end
+function paintAceAurora(target, radius, animate, gen)
 local base = Instance.new("UIGradient")
 base.Rotation = 90
 base.Color = ColorSequence.new({
@@ -3721,18 +3749,8 @@ ColorSequenceKeypoint.new(0.45, Color3.fromRGB(14, 16, 32)),
 ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 6, 11)),
 })
 base.Parent = target
-local function layer()
-local f = Instance.new("Frame")
-f.Name = "BgLayer"
-f.BorderSizePixel = 0
-f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-f.ZIndex = target.ZIndex or 1
-f.Parent = target
-corner(f, radius)
-return f
-end
--- Aurora: a wide diagonal band of colour sweeping across the panel.
-local aurora = layer()
+-- A wide diagonal band of colour sweeping across the panel.
+local aurora = bgLayer(target, radius)
 aurora.Size = UDim2.new(1, 0, 1, 0)
 aurora.BackgroundTransparency = 0.35
 local auroraGrad = Instance.new("UIGradient")
@@ -3752,9 +3770,8 @@ NumberSequenceKeypoint.new(0.8, 0.45),
 NumberSequenceKeypoint.new(1, 1),
 })
 auroraGrad.Parent = aurora
--- Bloom: an oversized soft disc tucked past the top-right corner,
--- fading out toward the middle. Reads as a light source.
-local bloom = layer()
+-- An oversized soft disc past the top-right corner; reads as a light source.
+local bloom = bgLayer(target, radius)
 bloom.AnchorPoint = Vector2.new(0.5, 0.5)
 bloom.Position = UDim2.new(0.88, 0, 0.06, 0)
 bloom.Size = UDim2.new(1.1, 0, 1.1, 0)
@@ -3773,22 +3790,10 @@ NumberSequenceKeypoint.new(0.55, 0.8),
 NumberSequenceKeypoint.new(1, 1),
 })
 bloomGrad.Parent = bloom
--- Vignette: darkens the lower half so text never fights the colour.
-local vignette = layer()
-vignette.Size = UDim2.new(1, 0, 1, 0)
-vignette.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-vignette.BackgroundTransparency = 0.15
-local vignetteGrad = Instance.new("UIGradient")
-vignetteGrad.Rotation = 90
-vignetteGrad.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 1),
-NumberSequenceKeypoint.new(0.5, 0.75),
-NumberSequenceKeypoint.new(1, 0.35),
-})
-vignetteGrad.Parent = vignette
+bgScrim(target, radius, 1, 0.35)
 if animate then
 task.spawn(function()
-while aurora.Parent and bloom.Parent do
+while target:GetAttribute("BgGen") == gen and target.Parent do
 if target.Visible then
 local t = os.clock() * 0.06
 auroraGrad.Rotation = -28 + math.sin(t) * 12
@@ -3798,6 +3803,208 @@ end
 task.wait(0.06)
 end
 end)
+end
+end
+-- Anime dusk: violet sky over a low sun, stylised cloud bands, a ridge
+-- of mountain silhouettes and sakura petals drifting down the frame.
+function paintAceSakura(target, radius, animate, gen)
+local HORIZON = 0.66
+local rng = Random.new(20240607)
+-- Sky. Dark violet overhead falling to a warm rose band at the horizon.
+local sky = Instance.new("UIGradient")
+sky.Rotation = 90
+sky.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 22, 62)),
+ColorSequenceKeypoint.new(0.28, Color3.fromRGB(66, 38, 96)),
+ColorSequenceKeypoint.new(0.48, Color3.fromRGB(140, 62, 112)),
+ColorSequenceKeypoint.new(0.6, Color3.fromRGB(214, 116, 116)),
+ColorSequenceKeypoint.new(0.66, Color3.fromRGB(58, 32, 68)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 10, 26)),
+})
+sky.Parent = target
+-- Stars, thinning out as they approach the bright horizon.
+for i = 1, 22 do
+local star = bgLayer(target, nil)
+local sizePx = rng:NextInteger(1, 2)
+local yScale = rng:NextNumber(0.02, 0.42)
+star.AnchorPoint = Vector2.new(0.5, 0.5)
+star.Size = UDim2.new(0, sizePx, 0, sizePx)
+star.Position = UDim2.new(rng:NextNumber(0.02, 0.98), 0, yScale, 0)
+star.BackgroundColor3 = Color3.fromRGB(255, 246, 235)
+star.BackgroundTransparency = 0.25 + (yScale / 0.42) * 0.55
+local sc = Instance.new("UICorner")
+sc.CornerRadius = UDim.new(1, 0)
+sc.Parent = star
+end
+-- The sun, sitting just above the horizon with a soft halo behind it.
+local halo = bgLayer(target, nil)
+halo.AnchorPoint = Vector2.new(0.5, 0.5)
+halo.Position = UDim2.new(0.70, 0, HORIZON - 0.22, 0)
+halo.Size = UDim2.new(0.70, 0, 0.76, 0)
+halo.BackgroundColor3 = Color3.fromRGB(255, 176, 138)
+halo.BackgroundTransparency = 0.72
+local haloCorner = Instance.new("UICorner")
+haloCorner.CornerRadius = UDim.new(1, 0)
+haloCorner.Parent = halo
+local haloGrad = Instance.new("UIGradient")
+haloGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0.45),
+NumberSequenceKeypoint.new(0.5, 0.72),
+NumberSequenceKeypoint.new(1, 1),
+})
+haloGrad.Parent = halo
+local sun = bgLayer(target, nil)
+sun.AnchorPoint = Vector2.new(0.5, 0.5)
+sun.Position = UDim2.new(0.70, 0, HORIZON - 0.22, 0)
+sun.Size = UDim2.new(0.30, 0, 0.33, 0)
+sun.BackgroundColor3 = Color3.fromRGB(255, 232, 198)
+sun.BackgroundTransparency = 0.06
+local sunCorner = Instance.new("UICorner")
+sunCorner.CornerRadius = UDim.new(1, 0)
+sunCorner.Parent = sun
+local sunGrad = Instance.new("UIGradient")
+sunGrad.Rotation = 90
+sunGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 248, 226)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 158, 126)),
+})
+sunGrad.Parent = sun
+-- Cloud bands: flat stylised streaks rather than fluffy blobs.
+local clouds = {}
+for i = 1, 5 do
+local cloud = bgLayer(target, nil)
+local widthScale = rng:NextNumber(0.34, 0.72)
+cloud.AnchorPoint = Vector2.new(0.5, 0.5)
+cloud.Size = UDim2.new(widthScale, 0, 0, rng:NextInteger(4, 8))
+cloud.Position = UDim2.new(rng:NextNumber(0.1, 0.9), 0, rng:NextNumber(0.16, HORIZON - 0.06), 0)
+cloud.BackgroundColor3 = Color3.fromRGB(255, 206, 214)
+cloud.BackgroundTransparency = rng:NextNumber(0.45, 0.72)
+local cc = Instance.new("UICorner")
+cc.CornerRadius = UDim.new(1, 0)
+cc.Parent = cloud
+local cg = Instance.new("UIGradient")
+cg.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.5, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+cg.Parent = cloud
+table.insert(clouds, {frame = cloud, speed = rng:NextNumber(0.004, 0.014)})
+end
+-- Mountains. Squares rotated 45 degrees read as peaks once the ground
+-- band below covers their lower half.
+local peaks = {
+{x = 0.08, w = 0.24, h = 0.10, shade = Color3.fromRGB(58, 36, 80)},
+{x = 0.30, w = 0.30, h = 0.13, shade = Color3.fromRGB(44, 26, 64)},
+{x = 0.55, w = 0.22, h = 0.09, shade = Color3.fromRGB(62, 38, 84)},
+{x = 0.80, w = 0.28, h = 0.12, shade = Color3.fromRGB(40, 24, 58)},
+{x = 1.00, w = 0.20, h = 0.08, shade = Color3.fromRGB(34, 20, 50)},
+}
+for _, spec in ipairs(peaks) do
+local peak = bgLayer(target, nil)
+peak.AnchorPoint = Vector2.new(0.5, 0.5)
+peak.Size = UDim2.new(spec.w, 0, spec.h, 0)
+peak.Position = UDim2.new(spec.x, 0, HORIZON, 0)
+peak.Rotation = 45
+peak.BackgroundColor3 = spec.shade
+peak.BackgroundTransparency = 0.05
+end
+-- Ground: covers the bottom half of every peak and anchors the scene.
+local ground = bgLayer(target, nil)
+ground.AnchorPoint = Vector2.new(0.5, 0)
+ground.Position = UDim2.new(0.5, 0, HORIZON, 0)
+ground.Size = UDim2.new(1, 0, 1 - HORIZON, 0)
+ground.BackgroundColor3 = Color3.fromRGB(18, 12, 32)
+ground.BackgroundTransparency = 0
+local groundGrad = Instance.new("UIGradient")
+groundGrad.Rotation = 90
+groundGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 18, 48)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 6, 16)),
+})
+groundGrad.Parent = ground
+-- Haze along the ridge line; softens where the mountains meet the ground.
+local mist = bgLayer(target, nil)
+mist.AnchorPoint = Vector2.new(0.5, 0.5)
+mist.Position = UDim2.new(0.5, 0, HORIZON, 0)
+mist.Size = UDim2.new(1, 0, 0.10, 0)
+mist.BackgroundColor3 = Color3.fromRGB(255, 190, 170)
+mist.BackgroundTransparency = 0.55
+local mistGrad = Instance.new("UIGradient")
+mistGrad.Rotation = 90
+mistGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.5, 0.45),
+NumberSequenceKeypoint.new(1, 1),
+})
+mistGrad.Parent = mist
+-- Sakura petals drifting down over everything.
+local petals = {}
+for i = 1, 16 do
+local petal = bgLayer(target, nil)
+petal.AnchorPoint = Vector2.new(0.5, 0.5)
+petal.Size = UDim2.new(0, rng:NextInteger(4, 8), 0, rng:NextInteger(3, 5))
+petal.BackgroundColor3 = Color3.fromRGB(255, 188, 208)
+petal.BackgroundTransparency = rng:NextNumber(0.2, 0.55)
+petal.Rotation = rng:NextNumber(0, 180)
+local pc = Instance.new("UICorner")
+pc.CornerRadius = UDim.new(1, 0)
+pc.Parent = petal
+local state = {
+frame = petal,
+x = rng:NextNumber(0.02, 0.98),
+y = rng:NextNumber(0, 1),
+fall = rng:NextNumber(0.02, 0.06),
+sway = rng:NextNumber(0.01, 0.03),
+phase = rng:NextNumber(0, 6.28),
+spin = rng:NextNumber(-40, 40),
+}
+petal.Position = UDim2.new(state.x, 0, state.y, 0)
+table.insert(petals, state)
+end
+bgScrim(target, radius, 0.78, 0.45)
+if animate then
+task.spawn(function()
+local last = os.clock()
+while target:GetAttribute("BgGen") == gen and target.Parent do
+local now = os.clock()
+local dt = math.min(now - last, 0.2)
+last = now
+if target.Visible then
+for _, c in ipairs(clouds) do
+local pos = c.frame.Position
+local nx = pos.X.Scale + c.speed * dt
+if nx > 1.4 then nx = -0.4 end
+c.frame.Position = UDim2.new(nx, 0, pos.Y.Scale, 0)
+end
+for _, p in ipairs(petals) do
+p.y = p.y + p.fall * dt
+if p.y > 1.05 then
+p.y = -0.05
+p.x = math.random()
+end
+local drift = math.sin(now * 0.9 + p.phase) * p.sway
+p.frame.Position = UDim2.new(math.clamp(p.x + drift, -0.05, 1.05), 0, p.y, 0)
+p.frame.Rotation = p.frame.Rotation + p.spin * dt
+end
+end
+task.wait(0.05)
+end
+end)
+end
+end
+-- Repaints `target` with the chosen style. Shared by the real background
+-- and the preview swatches, so a swatch can never drift from the real thing.
+function paintAceBackground(target, radius, animate, styleIndex)
+bgClear(target)
+_G.AceBgGeneration = (_G.AceBgGeneration or 0) + 1
+local gen = _G.AceBgGeneration
+target:SetAttribute("BgGen", gen)
+local style = BACKGROUND_NAMES[tonumber(styleIndex) or 1] or "Aurora"
+if style == "Sakura" then
+paintAceSakura(target, radius, animate, gen)
+else
+paintAceAurora(target, radius, animate, gen)
 end
 return target
 end
@@ -3812,19 +4019,20 @@ BgHolder.Visible = false
 BgHolder.ZIndex = 1
 BgHolder.Parent = Main
 corner(BgHolder, 14)
-paintAceBackground(BgHolder, 14, true)
 function applyBackground(index)
 currentBackground = tonumber(index) or 0
--- Older configs stored one of four image indexes; they all map onto
--- the single drawn background now.
+-- Older configs stored one of four image indexes; anything past the end
+-- of the style list falls back to the first style.
 if currentBackground > #BACKGROUND_NAMES then currentBackground = 1 end
 if currentBackground < 0 then currentBackground = 0 end
 if currentBackground == 0 then
 Main.BackgroundColor3 = COLORS.bg
 BgHolder.Visible = false
+BgHolder:SetAttribute("BgGen", -1)
 saveAceConfig()
 return "None"
 end
+paintAceBackground(BgHolder, 14, true, currentBackground)
 BgHolder.Visible = true
 saveAceConfig()
 return BACKGROUND_NAMES[currentBackground] or "None"
@@ -6698,7 +6906,7 @@ local bgRow = Instance.new("Frame")
 bgRow.Name = "Background"
 bgRow.BackgroundColor3 = COLORS.row
 bgRow.BackgroundTransparency = 0.3
-bgRow.Size = UDim2.new(1, -4, 0, 58)
+bgRow.Size = UDim2.new(1, -4, 0, 76)
 bgRow.BorderSizePixel = 0
 bgRow.LayoutOrder = 2
 bgRow.ZIndex = 4
@@ -6729,8 +6937,8 @@ btn.TextColor3 = COLORS.white
 btn.TextSize = 8
 btn.Font = Enum.Font.GothamSemibold
 btn.AutoButtonColor = false
-btn.Size = UDim2.new(0, 52, 0, 40)
-btn.Position = UDim2.new(0, x, 0.5, -20)
+btn.Size = UDim2.new(0, 52, 0, 56)
+btn.Position = UDim2.new(0, x, 0.5, -28)
 btn.ZIndex = 6
 btn.ClipsDescendants = true
 btn.Parent = bgRow
@@ -6748,8 +6956,8 @@ holder.Name = BACKGROUND_NAMES[index] or ("Theme " .. tostring(index))
 holder.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
 holder.BackgroundTransparency = 0.35
 holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, width or 96, 0, 40)
-holder.Position = UDim2.new(0, x, 0.5, -20)
+holder.Size = UDim2.new(0, width or 96, 0, 56)
+holder.Position = UDim2.new(0, x, 0.5, -28)
 holder.ZIndex = 6
 holder.ClipsDescendants = true
 holder.Parent = bgRow
@@ -6766,14 +6974,14 @@ preview.ClipsDescendants = true
 preview.ZIndex = 6
 preview.Parent = holder
 corner(preview, 8)
-paintAceBackground(preview, 8, false)
+paintAceBackground(preview, 8, false, index)
 local caption = Instance.new("TextLabel")
 caption.Name = "Caption"
 caption.BackgroundTransparency = 1
 caption.Text = BACKGROUND_NAMES[index] or "Theme"
 caption.TextColor3 = COLORS.white
 caption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-caption.TextStrokeTransparency = 0.3
+caption.TextStrokeTransparency = 0.1
 caption.TextSize = 9
 caption.Font = Enum.Font.GothamBold
 caption.Size = UDim2.new(1, 0, 1, 0)
@@ -6883,7 +7091,8 @@ end)
 return row
 end
 makeNoneButton(0, 8)
-makeThemeButton(1, 66, 120)
+makeThemeButton(1, 68, 124)
+makeThemeButton(2, 200, 124)
 updateBackgroundButtons()
 stepperRow(Settings, "GUI Scale", aceGuiScaleValue, 3, function(v)
 aceGuiScaleValue = v

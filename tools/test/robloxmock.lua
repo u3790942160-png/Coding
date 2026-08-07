@@ -310,9 +310,104 @@ local RunService = service("RunService")
 function RunService:IsStudio() return false end
 function RunService:BindToRenderStep() end
 
+-- A real (if minimal) JSON round trip, so config save/load is testable.
 local Http = service("HttpService")
-function Http:JSONEncode() return "{}" end
-function Http:JSONDecode() return {} end
+
+local function isArray(t)
+    local n = 0
+    for k in pairs(t) do
+        if type(k) ~= "number" then return false end
+        n = n + 1
+    end
+    return n == #t
+end
+
+local function encode(v)
+    local kind = type(v)
+    if v == nil then return "null" end
+    if kind == "boolean" or kind == "number" then return tostring(v) end
+    if kind == "string" then return '"' .. v:gsub('[\\"]', '\\%0') .. '"' end
+    if kind ~= "table" then return "null" end
+    local parts = {}
+    if isArray(v) then
+        for _, item in ipairs(v) do table.insert(parts, encode(item)) end
+        return "[" .. table.concat(parts, ",") .. "]"
+    end
+    -- Sorted so the output is stable between runs.
+    local keys = {}
+    for k in pairs(v) do table.insert(keys, tostring(k)) end
+    table.sort(keys)
+    for _, k in ipairs(keys) do
+        table.insert(parts, encode(k) .. ":" .. encode(v[k]))
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local decodeValue
+
+local function skipSpace(s, i)
+    while i <= #s and s:sub(i, i):match("%s") do i = i + 1 end
+    return i
+end
+
+local function decodeString(s, i)
+    local out, j = {}, i + 1
+    while j <= #s do
+        local c = s:sub(j, j)
+        if c == "\\" then
+            table.insert(out, s:sub(j + 1, j + 1))
+            j = j + 2
+        elseif c == '"' then
+            return table.concat(out), j + 1
+        else
+            table.insert(out, c)
+            j = j + 1
+        end
+    end
+    error("unterminated string in JSON")
+end
+
+function decodeValue(s, i)
+    i = skipSpace(s, i)
+    local c = s:sub(i, i)
+    if c == '"' then return decodeString(s, i) end
+    if c == "{" then
+        local obj = {}
+        i = skipSpace(s, i + 1)
+        if s:sub(i, i) == "}" then return obj, i + 1 end
+        while true do
+            local key, val
+            key, i = decodeString(s, skipSpace(s, i))
+            i = skipSpace(s, i) + 1                     -- the ':'
+            val, i = decodeValue(s, i)
+            obj[key] = val
+            i = skipSpace(s, i)
+            if s:sub(i, i) == "," then i = i + 1 else return obj, i + 1 end
+        end
+    end
+    if c == "[" then
+        local arr = {}
+        i = skipSpace(s, i + 1)
+        if s:sub(i, i) == "]" then return arr, i + 1 end
+        while true do
+            local val
+            val, i = decodeValue(s, i)
+            table.insert(arr, val)
+            i = skipSpace(s, i)
+            if s:sub(i, i) == "," then i = i + 1 else return arr, i + 1 end
+        end
+    end
+    local literal = s:match("^%a+", i)
+    if literal == "true" then return true, i + 4 end
+    if literal == "false" then return false, i + 5 end
+    if literal == "null" then return nil, i + 4 end
+    local num = s:match("^-?%d+%.?%d*[eE]?[-+]?%d*", i)
+    if num then return tonumber(num), i + #num end
+    error("unexpected JSON at position " .. i)
+end
+
+function Http:JSONEncode(v) return encode(v) end
+function Http:JSONDecode(s) return (decodeValue(s, 1)) end
 function Http:GenerateGUID() return "guid" end
 
 service("Lighting")

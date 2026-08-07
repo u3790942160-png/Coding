@@ -16,7 +16,7 @@ None of the Ace source's own GUI code is included — only its logic.
 
 ```
 python3 tools/build_wokehub.py     # rebuild WokeHub.lua
-lua5.1 tools/test/test_wokehub.lua # 127 checks over the wiring
+lua5.1 tools/test/test_wokehub.lua # 76 checks over the wiring
 ```
 
 ## What the build does
@@ -41,7 +41,7 @@ UI lives inside its own function so it gets a fresh budget.
 ## Control map
 
 **Movement** — Normal/Carry/Lagger speed boxes, MODE rows (Normal↔Carry and the
-lagger modes), Auto Carry Speed, Speed Bypass + Power + Show Bypass Panel, Drop (arrow selects JUMP = hop-and-slam or
+lagger modes), Auto Carry Speed, Drop (arrow selects JUMP = hop-and-slam or
 STAND = plain floor teleport), TP Down, Auto TP Down + height, Infinite Jump,
 Anti Ragdoll, Unwalk.
 
@@ -51,7 +51,7 @@ Swing, Mirror TP, TP Bat = anti-desync bat (arrow selects SWING/NO SWING), Auto
 Left/Right, Bat Counter, Medusa Counter, Reset After Med, Insta Reset, Safe
 Mode, Anti Bodylock, No Player Collision.
 
-**KBM / CTRL** — the same ten actions plus the UI toggle, bound separately for
+**KBM / CTRL** — the same nine actions plus the UI toggle, bound separately for
 keyboard and gamepad. Click a row to listen, click the round button to clear,
 Escape cancels. Keyboard binds live in the Ace config; controller binds are
 saved alongside them under `adaptControllerKeybinds`.
@@ -64,46 +64,9 @@ Anti-Lag, Nuke Optimiser, FOV Change + value, No Cam Collision.
 background and button-image galleries, colour theme, UI scale, steal bar size,
 save and reset-all.
 
-**Mobile buttons** — Speed Bypass, Drop Brainrot, Auto Left/Right, Bat Aimbot,
-TP Bat, TP Down, Carry Speed, Lagger Mode, Instant Reset. They light up from
-the real state, and drag to reposition when Move Buttons is on.
-
-## Speed bypass
-
-The speed modes drive the humanoid, so they are limited by how fast the
-humanoid is allowed to walk — that is why Normal tops out around 59.5. The
-bypass does not touch that loop. It leaves the humanoid walking at its normal
-speed and moves the root part the *extra* distance itself on `RenderStepped`,
-along whatever direction the player is already holding.
-
-Each frame's extra distance is walked in hops of at most 3.5 studs with a
-raycast in front of every hop, so the character slides along the ground instead
-of punching through walls. The boost eases in and out over about a third of a
-second rather than snapping, and one frame's catch-up is capped at 1/30s worth
-of travel so a frame hitch can't fling the character.
-
-**Power** is the dial: 2000 power buys one extra stud/second, so the default
-100000 is +50 studs/s on top of the current speed mode (59.5 → 109.5). It is
-clamped to 1000–1000000, i.e. +0.5 to +500 studs/s.
-
-The bypass steps aside — pausing, not switching off — whenever something else
-is steering the character: any aimbot, auto left/right, an active drop, or a
-Safe Mode lock (duel countdown or carrying a brainrot, where a sudden speed
-jump is the loudest thing in the hub). It also does nothing while ragdolled,
-seated, dead, or standing still.
-
-It has its own small window (`WokeSpeedBypass`, a separate ScreenGui so it
-stays up with the hub closed): title bar that doubles as the drag handle, a
-Main Feature ENABLED/DISABLED pill, the Power box, the keybind, and a live
-speed readout. `×` hides it; the MOVEMENT tab's *Show Bypass Panel* row brings
-it back. The same three controls also live on the MOVEMENT tab, and both copies
-drive the same state.
-
-Default keybind is **CapsLock**, rebindable from the panel or the KBM tab (and
-separately bindable to a gamepad button on the CTRL tab). That bind lives in
-the Ace `speedKeybinds` table so it saves with everything else, but it is added
-by the hub after the Ace loader has already run, so the hub restores it from
-the saved config itself.
+**Mobile buttons** — Drop Brainrot, Auto Left/Right, Bat Aimbot, TP Bat, TP
+Down, Carry Speed, Lagger Mode, Instant Reset. They light up from the real
+state, and drag to reposition when Move Buttons is on.
 
 ## Differences from the original AdaptHub mock-up
 

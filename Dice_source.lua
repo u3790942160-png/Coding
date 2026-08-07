@@ -7486,8 +7486,8 @@ local mobileButtons = _G.DiceMobileButtonRefs
 local BTN_SIZE = 58
 local BTN_GAP = 14
 local PADDING = 6
-local COLS = 2
-local ROWS = 5
+local COLS = 3
+local ROWS = 4
 local PANEL_W = PADDING * 2 + COLS * BTN_SIZE + (COLS - 1) * BTN_GAP
 local PANEL_H = PADDING * 2 + ROWS * BTN_SIZE + (ROWS - 1) * BTN_GAP
 local PANEL_DEFAULT = UDim2.new(1, -(PANEL_W + 20), 0.5, -(PANEL_H / 2))
@@ -7695,21 +7695,21 @@ makeButton("drop", "DROP\nBR", 1, 0, 2, function(btn)
 if runDropBrainrot then runDropBrainrot() elseif runDrop then runDrop() end
 pulse(btn)
 end)
-makeButton("autoLeft", "AUTO\nLEFT", 0, 1, 4, function(btn)
+makeButton("autoLeft", "AUTO\nLEFT", 2, 0, 4, function(btn)
 if _G.DiceSetAutoLeft then _G.DiceSetAutoLeft(not autoLeftEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 end)
 end)
-makeButton("autoRight", "AUTO\nRIGHT", 1, 1, 4, function(btn)
+makeButton("autoRight", "AUTO\nRIGHT", 2, 1, 4, function(btn)
 if _G.DiceSetAutoRight then _G.DiceSetAutoRight(not autoRightEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 end)
 end)
-makeButton("aimbot", "BAT\nBOT", 0, 2, 4, function(btn)
+makeButton("aimbot", "BAT\nBOT", 1, 1, 4, function(btn)
 if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
 if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -7720,7 +7720,7 @@ task.delay(0.03, function()
 setActive(btn, (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true))
 end)
 end)
-makeButton("antiDesync", "ANTI\nDESYNC", 1, 2, 4, function(btn)
+makeButton("antiDesync", "ANTI\nDESYNC", 0, 1, 4, function(btn)
 if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
 if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -7732,11 +7732,11 @@ if _G.DiceAntiDesyncAimbotOn then _G.DiceStopAntiDesyncAimbot() else _G.DiceStar
 end
 task.delay(0.03, function() setActive(btn, _G.DiceAntiDesyncAimbotOn == true) end)
 end)
-makeButton("tp", "TP\nDOWN", 0, 3, 2, function(btn)
+makeButton("tp", "TP\nDOWN", 1, 2, 2, function(btn)
 if runTPFloor then runTPFloor() end
 pulse(btn)
 end)
-makeButton("carry", "CARRY\nSPEED", 1, 3, 4, function(btn)
+makeButton("carry", "CARRY\nSPEED", 2, 2, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Carry" and "Normal" or "Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7744,7 +7744,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerNormal", "LAGGER\nNORMAL", 0, 4, 4, function(btn)
+makeButton("laggerNormal", "LAGGER\nNORMAL", 1, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger" and "Normal" or "Lagger") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7752,7 +7752,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerCarry", "LAGGER\nCARRY", 1, 4, 4, function(btn)
+makeButton("laggerCarry", "LAGGER\nCARRY", 2, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger Carry" and "Normal" or "Lagger Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end

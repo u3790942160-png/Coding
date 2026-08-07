@@ -871,6 +871,8 @@ ANTI_BYPASS_AIMBOT_SPEED = _G.AceAntiBypassAimbotSpeed,
 ANTI_BYPASS_LAGGER_AIMBOT_SPEED = _G.AceAntiBypassLaggerAimbotSpeed,
 ANTI_DESYNC_AIMBOT_SPEED = ANTI_DESYNC_AIMBOT_SPEED,
 autoSwingEnabled = autoSwingEnabled,
+aceSwingRange = tonumber(_G.AceSwingRange) or 14,
+aceSwingDelay = tonumber(_G.AceSwingDelay) or 0.32,
 mirrorTPDownEnabled = mirrorTPDownEnabled,
 normalAimbotEnabled = _G.AceNormalAimbotOn == true,
 antiBypassAimbotEnabled = _G.AceAntiBypassAimbotOn == true,
@@ -986,6 +988,8 @@ _G.AceAntiBypassLaggerAimbotSpeed = tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPEE
 end
 ANTI_DESYNC_AIMBOT_SPEED = tonumber(data.ANTI_DESYNC_AIMBOT_SPEED) or ANTI_DESYNC_AIMBOT_SPEED or 58
 autoSwingEnabled = data.autoSwingEnabled == true
+_G.AceSwingRange = math.clamp(tonumber(data.aceSwingRange) or 14, 4, 60)
+_G.AceSwingDelay = math.clamp(tonumber(data.aceSwingDelay) or 0.32, 0.05, 3)
 mirrorTPDownEnabled = data.mirrorTPDownEnabled == true
 _G.AceNormalAimbotOn = data.normalAimbotEnabled == true
 _G.AceAntiBypassAimbotOn = data.antiBypassAimbotEnabled == true
@@ -1333,21 +1337,25 @@ return nil
 end
 function _G.AceSwingBatForCounter(bat, char)
 if not bat or not char then return end
-local hum = char:FindFirstChildOfClass("Humanoid")
 if bat.Parent ~= char then
-if hum then pcall(function() hum:EquipTool(bat) end) end
-task.wait(0.05)
-end
-local remote = bat:FindFirstChildOfClass("RemoteEvent") or bat:FindFirstChildOfClass("RemoteFunction")
-if remote and remote:IsA("RemoteEvent") then
-pcall(function() remote:FireServer() end)
-task.wait(0.15)
-pcall(function() remote:FireServer() end)
+if _G.AceEquipSwingTool then
+_G.AceEquipSwingTool(bat)
 else
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then pcall(function() hum:EquipTool(bat) end) end
+end
+task.wait(0.1)
+end
+-- Double tap: the first swing often lands mid-ragdoll and gets eaten.
+if _G.AceFireSwing then
+_G.AceFireSwing(bat)
+task.wait(0.15)
+_G.AceFireSwing(bat)
+return
+end
 pcall(function() bat:Activate() end)
 task.wait(0.15)
 pcall(function() bat:Activate() end)
-end
 end
 function _G.AceCounterIsRagdoll(hum)
 if not hum then return false end
@@ -1690,6 +1698,132 @@ if medCounterEnabled then _G.AceStartMedCounter(char) end
 if batCounterEnabled then _G.AceStartBatCounter() end
 end)
 _G.AceNormalAimbot = _G.AceNormalAimbot or {conn = nil, target = nil, swingCooldown = false}
+-- ═══════════════════════════════════════════════════════════════
+-- SWING ENGINE
+-- One place that decides *what* to swing, *when* to swing it and
+-- *how*. Every aimbot mode routes through this instead of blindly
+-- spamming Activate() on whatever tool happened to be equipped.
+-- ═══════════════════════════════════════════════════════════════
+_G.AceSwingRange = tonumber(_G.AceSwingRange) or 14
+_G.AceSwingDelay = tonumber(_G.AceSwingDelay) or 0.32
+_G.AceSwingArc = tonumber(_G.AceSwingArc) or 0.35
+_G.AceAimbotMaxRange = tonumber(_G.AceAimbotMaxRange) or 250
+_G.AceAimbotSticky = _G.AceAimbotSticky or {part = nil}
+_G.AceSwingToolNames = {"Bat","Slap","Iron Slap","Gold Slap","Diamond Slap","Emerald Slap","Ruby Slap","Dark Matter Slap","Flame Slap","Nuclear Slap","Galaxy Slap","Glitched Slap"}
+-- Never swing the thing you are carrying — activating a brainrot drops it.
+_G.AceSwingToolBlocklist = {"brainrot","balloon","food","drink","cash","money","gift","chest","crate","key","rod","bucket"}
+local function aceToolIsSwingable(tool)
+if not tool or not tool:IsA("Tool") then return false end
+local name = tool.Name:lower()
+for _, bad in ipairs(_G.AceSwingToolBlocklist) do
+if name:find(bad, 1, true) then return false end
+end
+for _, good in ipairs(_G.AceSwingToolNames) do
+if name == good:lower() then return true end
+end
+return name:find("bat", 1, true) ~= nil or name:find("slap", 1, true) ~= nil
+end
+-- Returns the tool to swing plus whether it is already equipped.
+function _G.AceResolveSwingTool()
+local char = LP.Character
+if not char then return nil, false end
+for _, tool in ipairs(char:GetChildren()) do
+if aceToolIsSwingable(tool) then return tool, true end
+end
+local bp = LP:FindFirstChildOfClass("Backpack") or LP:FindFirstChild("Backpack")
+if bp then
+for _, name in ipairs(_G.AceSwingToolNames) do
+local t = bp:FindFirstChild(name)
+if t and t:IsA("Tool") then return t, false end
+end
+for _, tool in ipairs(bp:GetChildren()) do
+if aceToolIsSwingable(tool) then return tool, false end
+end
+end
+return nil, false
+end
+-- Prefer the tool's own cooldown when it exposes one; swinging faster
+-- than the tool allows just burns remote calls and gets rate limited.
+function _G.AceSwingToolCooldown(tool)
+local fallback = math.max(tonumber(_G.AceSwingDelay) or 0.32, 0.05)
+if not tool then return fallback end
+for _, key in ipairs({"Cooldown", "SwingCooldown", "Debounce", "AttackSpeed", "SwingSpeed"}) do
+local ok, attr = pcall(function() return tool:GetAttribute(key) end)
+if ok and tonumber(attr) then return math.max(tonumber(attr), 0.05) end
+local v = tool:FindFirstChild(key)
+if v and v:IsA("ValueBase") and tonumber(v.Value) then
+return math.max(tonumber(v.Value), 0.05)
+end
+end
+return fallback
+end
+function _G.AceEquipSwingTool(tool)
+local char = LP.Character
+if not char or not tool then return false end
+if tool.Parent == char then return true end
+local hum = char:FindFirstChildOfClass("Humanoid")
+if not hum then return false end
+pcall(function() hum:EquipTool(tool) end)
+return tool.Parent == char
+end
+-- Activate() covers tools that listen for Tool.Activated; tools that gate
+-- damage behind their own remote need that fired directly or nothing lands.
+function _G.AceFireSwing(tool)
+if not tool then return false end
+pcall(function() tool:Activate() end)
+local remote = tool:FindFirstChildOfClass("RemoteEvent")
+if not remote then
+for _, d in ipairs(tool:GetDescendants()) do
+if d:IsA("RemoteEvent") then
+remote = d
+break
+end
+end
+end
+if remote then pcall(function() remote:FireServer() end) end
+return true
+end
+function _G.AceTargetInSwingReach(targetPart, root, ignoreArc)
+if not targetPart or not root then return false end
+local hum = targetPart.Parent and targetPart.Parent:FindFirstChildOfClass("Humanoid")
+if not hum or hum.Health <= 0 then return false end
+if (targetPart.Position - root.Position).Magnitude > (tonumber(_G.AceSwingRange) or 14) then
+return false
+end
+if ignoreArc then return true end
+local flat = targetPart.Position - root.Position
+flat = Vector3.new(flat.X, 0, flat.Z)
+local look = root.CFrame.LookVector
+look = Vector3.new(look.X, 0, look.Z)
+if flat.Magnitude < 0.05 or look.Magnitude < 0.05 then return true end
+return look.Unit:Dot(flat.Unit) >= (tonumber(_G.AceSwingArc) or 0.35)
+end
+-- Single entry point for every auto-swing loop. `state` is the per-mode
+-- table so each aimbot keeps its own cooldown clock.
+function _G.AceAutoSwingTick(state, targetPart, ignoreArc)
+if not state then return false end
+local char = LP.Character
+if not char then return false end
+local root = char:FindFirstChild("HumanoidRootPart")
+if not root then return false end
+if not _G.AceTargetInSwingReach(targetPart, root, ignoreArc) then return false end
+local now = os.clock()
+if (state.nextSwingAt or 0) > now then return false end
+local tool, equipped = _G.AceResolveSwingTool()
+if not tool then
+state.nextSwingAt = now + 0.25
+return false
+end
+if not equipped then
+-- The equip replicates a frame or two later, so swinging now whiffs.
+_G.AceEquipSwingTool(tool)
+state.nextSwingAt = now + 0.12
+return false
+end
+state.nextSwingAt = now + _G.AceSwingToolCooldown(tool)
+_G.AceFireSwing(tool)
+return true
+end
 function _G.AceFindAimbotBat()
 local char = LP.Character
 if not char then return nil end
@@ -1711,20 +1845,36 @@ end
 function _G.AceGetClosestAimbotTarget()
 local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 if not root then return nil end
+local maxRange = tonumber(_G.AceAimbotMaxRange) or 250
 local closest, minDist = nil, math.huge
 for _, plr in ipairs(Players:GetPlayers()) do
 if plr ~= LP and plr.Character then
 local tRoot = plr.Character:FindFirstChild("HumanoidRootPart")
 local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-if tRoot and hum and hum.Health > 0 then
+if tRoot and hum and hum.Health > 0 and not plr.Character:FindFirstChildOfClass("ForceField") then
 local dist = (tRoot.Position - root.Position).Magnitude
-if dist < minDist then
+if dist <= maxRange and dist < minDist then
 minDist = dist
 closest = tRoot
 end
 end
 end
 end
+-- Stay locked on the current target unless someone is clearly closer,
+-- otherwise the chase flip-flops between two players standing together
+-- and you end up swinging at neither of them.
+local sticky = _G.AceAimbotSticky and _G.AceAimbotSticky.part
+if sticky and sticky.Parent then
+local sChar = sticky.Parent
+local sHum = sChar:FindFirstChildOfClass("Humanoid")
+if sHum and sHum.Health > 0 and not sChar:FindFirstChildOfClass("ForceField") then
+local sDist = (sticky.Position - root.Position).Magnitude
+if sDist <= maxRange and sDist <= minDist * 1.25 then
+return sticky
+end
+end
+end
+_G.AceAimbotSticky = {part = closest}
 return closest
 end
 function _G.AceGetNormalAimbotSpeed()
@@ -1779,8 +1929,8 @@ local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if not hum then return end
-local bat = char:FindFirstChildOfClass("Tool") or _G.AceFindAimbotBat()
-if bat and bat.Parent ~= char then
+local bat, batEquipped = _G.AceResolveSwingTool()
+if bat and not batEquipped then
 pcall(function() hum:EquipTool(bat) end)
 end
 local target = _G.AceGetClosestAimbotTarget()
@@ -1817,12 +1967,8 @@ ry = math.clamp(ry, -2.5, 2.5)
 rz = math.clamp(rz, -2.5, 2.5)
 root.AssemblyAngularVelocity = root.CFrame:VectorToWorldSpace(Vector3.new(rx * 42, ry * 42, rz * 42))
 end
-if autoSwingEnabled and bat and not _G.AceNormalAimbot.swingCooldown then
-_G.AceNormalAimbot.swingCooldown = true
-pcall(function() bat:Activate() end)
-task.delay(0.08, function()
-if _G.AceNormalAimbot then _G.AceNormalAimbot.swingCooldown = false end
-end)
+if autoSwingEnabled then
+_G.AceAutoSwingTick(_G.AceNormalAimbot, target)
 end
 end)
 if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
@@ -1836,7 +1982,9 @@ end
 if _G.AceNormalAimbot then
 _G.AceNormalAimbot.target = nil
 _G.AceNormalAimbot.swingCooldown = false
+_G.AceNormalAimbot.nextSwingAt = 0
 end
+_G.AceAimbotSticky = {part = nil}
 local c = LP.Character
 local root = c and c:FindFirstChild("HumanoidRootPart")
 if root then
@@ -1872,24 +2020,13 @@ if ch:IsA("Tool") and (ch.Name:lower():find("bat") or ch.Name:lower():find("slap
 end
 return nil
 end
-function _G.AceAntiBypassTrySwing()
-if _G.AceAntiBypassAimbot.swingCooldown then return end
-_G.AceAntiBypassAimbot.swingCooldown = true
-pcall(function()
-local char = LP.Character
-if not char then return end
-local bat = _G.AceAntiBypassFindBat()
-if bat then
-if bat.Parent ~= char then
-local hum = char:FindFirstChildOfClass("Humanoid")
-if hum then pcall(function() hum:EquipTool(bat) end) end
+-- Kept as an export; the aimbot loop calls AceAutoSwingTick directly.
+function _G.AceAntiBypassTrySwing(targetPart)
+if not _G.AceAntiBypassAimbot then return false end
+if not targetPart then
+targetPart = select(1, _G.AceAntiBypassGetClosest())
 end
-pcall(function() bat:Activate() end)
-end
-end)
-task.delay(0.35, function()
-if _G.AceAntiBypassAimbot then _G.AceAntiBypassAimbot.swingCooldown = false end
-end)
+return _G.AceAutoSwingTick(_G.AceAntiBypassAimbot, targetPart)
 end
 function _G.AceAntiBypassGetClosest()
 local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -1933,9 +2070,9 @@ local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if not hum then return end
-if not char:FindFirstChildOfClass("Tool") then
-local bat = _G.AceAntiBypassFindBat()
-if bat then pcall(function() hum:EquipTool(bat) end) end
+local swingTool, swingEquipped = _G.AceResolveSwingTool()
+if swingTool and not swingEquipped then
+pcall(function() hum:EquipTool(swingTool) end)
 end
 local target, targetDist = _G.AceAntiBypassGetClosest()
 if not target then return end
@@ -1961,7 +2098,9 @@ ry = math.clamp(ry, -2.5, 2.5)
 rz = math.clamp(rz, -2.5, 2.5)
 root.AssemblyAngularVelocity = root.CFrame:VectorToWorldSpace(Vector3.new(rx * 42, ry * 42, rz * 42))
 end
-if autoSwingEnabled and targetDist <= 8 then _G.AceAntiBypassTrySwing() end
+if autoSwingEnabled then
+_G.AceAutoSwingTick(_G.AceAntiBypassAimbot, target)
+end
 end)
 if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
 end
@@ -1971,7 +2110,11 @@ if _G.AceAntiBypassAimbot and _G.AceAntiBypassAimbot.conn then
 _G.AceAntiBypassAimbot.conn:Disconnect()
 _G.AceAntiBypassAimbot.conn = nil
 end
-if _G.AceAntiBypassAimbot then _G.AceAntiBypassAimbot.swingCooldown = false end
+if _G.AceAntiBypassAimbot then
+_G.AceAntiBypassAimbot.swingCooldown = false
+_G.AceAntiBypassAimbot.nextSwingAt = 0
+end
+_G.AceAimbotSticky = {part = nil}
 local c = LP.Character
 local root = c and c:FindFirstChild("HumanoidRootPart")
 if root then
@@ -2093,23 +2236,11 @@ end
 end
 return nil
 end
-function _G.AceAntiDesyncTrySwing()
+-- This mode parks you on top of the target, so range is a given and the
+-- facing cone would only ever block a hit that would have landed.
+function _G.AceAntiDesyncTrySwing(targetPart)
 if not _G.AceAntiDesync then return end
-if _G.AceAntiDesync.hittingCooldown then return end
-_G.AceAntiDesync.hittingCooldown = true
-pcall(function()
-local bat = _G.AceAntiDesyncGetBat()
-if bat then
-bat:Activate()
-local ev = bat:FindFirstChildWhichIsA("RemoteEvent")
-if ev then ev:FireServer() end
-end
-end)
-task.delay(0.08, function()
-if _G.AceAntiDesync then
-_G.AceAntiDesync.hittingCooldown = false
-end
-end)
+return _G.AceAutoSwingTick(_G.AceAntiDesync, targetPart, true)
 end
 function _G.AceAntiDesyncGetClosestPlayer()
 local hrp = _G.AceAntiDesync and _G.AceAntiDesync.hrp
@@ -2185,7 +2316,7 @@ if cam then
 cam.CFrame = CFrame.new(cam.CFrame.Position, tr.Position)
 end
 if antiDesyncAutoSwingEnabled or autoSwingEnabled then
-_G.AceAntiDesyncTrySwing()
+_G.AceAntiDesyncTrySwing(tr)
 end
 end
 end
@@ -2196,6 +2327,10 @@ return true
 end
 function _G.AceStopAntiDesyncAimbot()
 _G.AceAntiDesyncAimbotOn = false
+if _G.AceAntiDesync then
+_G.AceAntiDesync.nextSwingAt = 0
+_G.AceAntiDesync.hittingCooldown = false
+end
 if _G.AceAntiDesync and _G.AceAntiDesync.conn then
 _G.AceAntiDesync.conn:Disconnect()
 _G.AceAntiDesync.conn = nil
@@ -3560,43 +3695,139 @@ Main.Size = FULL_MAIN_SIZE
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
 end
-local BackgroundIDs = {
-"99416158073201",
-"126860692354524",
-"73226092831324",
-"90280869222992",
-}
+-- ═══════════════════════════════════════════════════════════════
+-- BACKGROUND
+-- Drawn with gradients instead of uploaded images: nothing to fetch,
+-- no decal that can moderated away, and it scales to any window size.
+-- ═══════════════════════════════════════════════════════════════
+BACKGROUND_NAMES = {"Aurora"}
+-- Builds the full layer stack into `target`. Shared by the real
+-- background and the little preview swatch in Settings.
+function paintAceBackground(target, radius, animate)
+for _, old in ipairs(target:GetChildren()) do
+if old.Name == "BgLayer" then old:Destroy() end
+end
+local existingGradient = target:FindFirstChildOfClass("UIGradient")
+if existingGradient then existingGradient:Destroy() end
+target.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+target.BackgroundTransparency = 0
+-- Base: deep indigo falling away to near-black at the bottom, so
+-- rows near the bottom of the list keep their contrast.
+local base = Instance.new("UIGradient")
+base.Rotation = 90
+base.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 30, 58)),
+ColorSequenceKeypoint.new(0.45, Color3.fromRGB(14, 16, 32)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 6, 11)),
+})
+base.Parent = target
+local function layer()
+local f = Instance.new("Frame")
+f.Name = "BgLayer"
+f.BorderSizePixel = 0
+f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+f.ZIndex = target.ZIndex or 1
+f.Parent = target
+corner(f, radius)
+return f
+end
+-- Aurora: a wide diagonal band of colour sweeping across the panel.
+local aurora = layer()
+aurora.Size = UDim2.new(1, 0, 1, 0)
+aurora.BackgroundTransparency = 0.35
+local auroraGrad = Instance.new("UIGradient")
+auroraGrad.Rotation = -28
+auroraGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(12, 14, 30)),
+ColorSequenceKeypoint.new(0.35, Color3.fromRGB(58, 46, 130)),
+ColorSequenceKeypoint.new(0.55, Color3.fromRGB(38, 78, 150)),
+ColorSequenceKeypoint.new(0.78, Color3.fromRGB(20, 30, 70)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 12, 24)),
+})
+auroraGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.3, 0.35),
+NumberSequenceKeypoint.new(0.55, 0.2),
+NumberSequenceKeypoint.new(0.8, 0.45),
+NumberSequenceKeypoint.new(1, 1),
+})
+auroraGrad.Parent = aurora
+-- Bloom: an oversized soft disc tucked past the top-right corner,
+-- fading out toward the middle. Reads as a light source.
+local bloom = layer()
+bloom.AnchorPoint = Vector2.new(0.5, 0.5)
+bloom.Position = UDim2.new(0.88, 0, 0.06, 0)
+bloom.Size = UDim2.new(1.1, 0, 1.1, 0)
+bloom.BackgroundTransparency = 0.55
+local bloomCorner = bloom:FindFirstChildOfClass("UICorner")
+if bloomCorner then bloomCorner.CornerRadius = UDim.new(1, 0) end
+local bloomGrad = Instance.new("UIGradient")
+bloomGrad.Rotation = 115
+bloomGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 140, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 30, 90)),
+})
+bloomGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0.35),
+NumberSequenceKeypoint.new(0.55, 0.8),
+NumberSequenceKeypoint.new(1, 1),
+})
+bloomGrad.Parent = bloom
+-- Vignette: darkens the lower half so text never fights the colour.
+local vignette = layer()
+vignette.Size = UDim2.new(1, 0, 1, 0)
+vignette.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+vignette.BackgroundTransparency = 0.15
+local vignetteGrad = Instance.new("UIGradient")
+vignetteGrad.Rotation = 90
+vignetteGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.5, 0.75),
+NumberSequenceKeypoint.new(1, 0.35),
+})
+vignetteGrad.Parent = vignette
+if animate then
+task.spawn(function()
+while aurora.Parent and bloom.Parent do
+if target.Visible then
+local t = os.clock() * 0.06
+auroraGrad.Rotation = -28 + math.sin(t) * 12
+auroraGrad.Offset = Vector2.new(math.sin(t * 0.7) * 0.12, 0)
+bloomGrad.Rotation = 115 + math.sin(t * 0.8) * 20
+end
+task.wait(0.06)
+end
+end)
+end
+return target
+end
 currentBackground = tonumber(savedConfig.currentBackground) or currentBackground
-local BgImage = Instance.new("ImageLabel")
-BgImage.Name = "CustomBackground"
-BgImage.BackgroundTransparency = 1
-BgImage.ImageTransparency = 0
-BgImage.ScaleType = Enum.ScaleType.Crop
-BgImage.Size = UDim2.new(1, 0, 1, 0)
-BgImage.Position = UDim2.new(0, 0, 0, 0)
-BgImage.Visible = false
-BgImage.ZIndex = 1
-BgImage.Parent = Main
-corner(BgImage, 14)
+local BgHolder = Instance.new("Frame")
+BgHolder.Name = "CustomBackground"
+BgHolder.BorderSizePixel = 0
+BgHolder.Size = UDim2.new(1, 0, 1, 0)
+BgHolder.Position = UDim2.new(0, 0, 0, 0)
+BgHolder.ClipsDescendants = true
+BgHolder.Visible = false
+BgHolder.ZIndex = 1
+BgHolder.Parent = Main
+corner(BgHolder, 14)
+paintAceBackground(BgHolder, 14, true)
 function applyBackground(index)
-currentBackground = index or 0
+currentBackground = tonumber(index) or 0
+-- Older configs stored one of four image indexes; they all map onto
+-- the single drawn background now.
+if currentBackground > #BACKGROUND_NAMES then currentBackground = 1 end
+if currentBackground < 0 then currentBackground = 0 end
 if currentBackground == 0 then
 Main.BackgroundColor3 = COLORS.bg
-BgImage.Visible = false
+BgHolder.Visible = false
 saveAceConfig()
 return "None"
 end
-local id = BackgroundIDs[currentBackground]
-if id then
-BgImage.Image = "rbxassetid://" .. id
-BgImage.Visible = true
+BgHolder.Visible = true
 saveAceConfig()
-return "Image " .. tostring(currentBackground)
-end
-currentBackground = 0
-BgImage.Visible = false
-saveAceConfig()
-return "None"
+return BACKGROUND_NAMES[currentBackground] or "None"
 end
 applyBackground(currentBackground)
 
@@ -5339,6 +5570,22 @@ task.delay(0.12, function() _G.AceAutoSwingClickBusy = false end)
 end)
 end
 end
+do
+local _, swingRangeBox = textboxRow(Combat, "Swing Range", tostring(_G.AceSwingRange), 7.02)
+swingRangeBox.FocusLost:Connect(function()
+local v = tonumber(swingRangeBox.Text)
+if v then _G.AceSwingRange = math.clamp(v, 4, 60) end
+swingRangeBox.Text = tostring(_G.AceSwingRange)
+saveAceConfig()
+end)
+local _, swingDelayBox = textboxRow(Combat, "Swing Delay", tostring(_G.AceSwingDelay), 7.04)
+swingDelayBox.FocusLost:Connect(function()
+local v = tonumber(swingDelayBox.Text)
+if v then _G.AceSwingDelay = math.clamp(v, 0.05, 3) end
+swingDelayBox.Text = tostring(_G.AceSwingDelay)
+saveAceConfig()
+end)
+end
 _G.AceMirrorTPDownRow, _G.AceMirrorTPDownSetVisual, _G.AceMirrorTPDownBtn = _G.AceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 7.1)
 local mirrorTPDownLabel = _G.AceMirrorTPDownRow and _G.AceMirrorTPDownRow:FindFirstChild("Label")
 if mirrorTPDownLabel then mirrorTPDownLabel.TextSize = 10 end
@@ -6448,7 +6695,7 @@ end)
 end
 end
 local bgRow = Instance.new("Frame")
-bgRow.Name = "Background Image Picker"
+bgRow.Name = "Background"
 bgRow.BackgroundColor3 = COLORS.row
 bgRow.BackgroundTransparency = 0.3
 bgRow.Size = UDim2.new(1, -4, 0, 58)
@@ -6495,29 +6742,43 @@ applyBackground(index)
 updateBackgroundButtons()
 end)
 end
-function makeImageButton(index, x)
+function makeThemeButton(index, x, width)
 local holder = Instance.new("Frame")
-holder.Name = "Image " .. tostring(index)
+holder.Name = BACKGROUND_NAMES[index] or ("Theme " .. tostring(index))
 holder.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
 holder.BackgroundTransparency = 0.35
 holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, 58, 0, 40)
+holder.Size = UDim2.new(0, width or 96, 0, 40)
 holder.Position = UDim2.new(0, x, 0.5, -20)
 holder.ZIndex = 6
 holder.ClipsDescendants = true
 holder.Parent = bgRow
 corner(holder, 8)
 stroke(holder, COLORS.strokeSoft, 1, 0.45)
-local img = Instance.new("ImageLabel")
-img.Name = "Preview"
-img.BackgroundTransparency = 1
-img.Image = "rbxassetid://" .. BackgroundIDs[index]
-img.ScaleType = Enum.ScaleType.Crop
-img.Size = UDim2.new(1, 0, 1, 0)
-img.Position = UDim2.new(0, 0, 0, 0)
-img.ZIndex = 6
-img.Parent = holder
-corner(img, 8)
+-- Live swatch: the same layer stack the real background uses, so the
+-- preview can never drift out of sync with what you get.
+local preview = Instance.new("Frame")
+preview.Name = "Preview"
+preview.BorderSizePixel = 0
+preview.Size = UDim2.new(1, 0, 1, 0)
+preview.Position = UDim2.new(0, 0, 0, 0)
+preview.ClipsDescendants = true
+preview.ZIndex = 6
+preview.Parent = holder
+corner(preview, 8)
+paintAceBackground(preview, 8, false)
+local caption = Instance.new("TextLabel")
+caption.Name = "Caption"
+caption.BackgroundTransparency = 1
+caption.Text = BACKGROUND_NAMES[index] or "Theme"
+caption.TextColor3 = COLORS.white
+caption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+caption.TextStrokeTransparency = 0.3
+caption.TextSize = 9
+caption.Font = Enum.Font.GothamBold
+caption.Size = UDim2.new(1, 0, 1, 0)
+caption.ZIndex = 7
+caption.Parent = holder
 local click = Instance.new("TextButton")
 click.Name = "Click"
 click.BackgroundTransparency = 1
@@ -6525,7 +6786,7 @@ click.Text = ""
 click.AutoButtonColor = false
 click.Size = UDim2.new(1, 0, 1, 0)
 click.Position = UDim2.new(0, 0, 0, 0)
-click.ZIndex = 7
+click.ZIndex = 8
 click.Parent = holder
 bgButtons[index] = holder
 click.MouseButton1Click:Connect(function()
@@ -6622,10 +6883,7 @@ end)
 return row
 end
 makeNoneButton(0, 8)
-makeImageButton(1, 66)
-makeImageButton(2, 128)
-makeImageButton(3, 190)
-makeImageButton(4, 252)
+makeThemeButton(1, 66, 120)
 updateBackgroundButtons()
 stepperRow(Settings, "GUI Scale", aceGuiScaleValue, 3, function(v)
 aceGuiScaleValue = v
@@ -6860,6 +7118,7 @@ selectedAnimationPack = "OFF"; selectedAimbotMode = "Normal"
 AIMBOT_SPEED = 58; LAGGER_AIMBOT_SPEED = 40
 _G.AceAntiBypassAimbotSpeed = 58; _G.AceAntiBypassLaggerAimbotSpeed = 40; ANTI_DESYNC_AIMBOT_SPEED = 58
 autoSwingEnabled = false; mirrorTPDownEnabled = false; antiDesyncAutoSwingEnabled = false
+_G.AceSwingRange = 14; _G.AceSwingDelay = 0.32; _G.AceAimbotSticky = {part = nil}
 _G.AceNormalAimbotOn = false; _G.AceAntiBypassAimbotOn = false; _G.AceAntiDesyncAimbotOn = false
 antiRagdollEnabled = false; infJumpEnabled = false; autoTPEnabled = false
 batCounterEnabled = false; medCounterEnabled = false; antiKickEnabled = false; autoResetOnMedEnabled = false

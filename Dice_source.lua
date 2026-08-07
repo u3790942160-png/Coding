@@ -796,10 +796,12 @@ end
 return fallback
 end
 function collectDiceMobileButtonPositions()
+-- The buttons live in one draggable panel now, so only its position is
+-- worth storing. Older configs held a position per button; those keys
+-- are simply ignored.
 local out = {}
-for key, entry in pairs(_G.DiceMobileButtonRefs or {}) do
-local holder = entry and entry.holder
-if holder then out[key] = udim2ToTable(holder.Position) end
+if _G.DiceMobilePanel then
+out.panel = udim2ToTable(_G.DiceMobilePanel.Position)
 end
 if next(out) == nil and type(_G.DiceMobileButtonPositions) == "table" then
 return _G.DiceMobileButtonPositions
@@ -896,7 +898,6 @@ noPlayerCollisionEnabled = _G.DiceNoPlayerCollisionEnabled,
 antiBodylockEnabled = _G.DiceAntiBodylockEnabled == true,
 customFontVisualEnabled = false,
 skyTheme = skyTheme,
-lightningEnabled = _G.DiceLightningEnabled ~= false,
 autoLeftEnabled = autoLeftEnabled,
 autoRightEnabled = autoRightEnabled,
 diceGuiScaleValue = diceGuiScaleValue,
@@ -1022,7 +1023,6 @@ _G.DiceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
 _G.DiceAntiBodylockEnabled = data.antiBodylockEnabled == true
 customFontVisualEnabled = false
 skyTheme = (type(data.skyTheme) == "string" and data.skyTheme) or skyTheme
-if data.lightningEnabled ~= nil then _G.DiceLightningEnabled = data.lightningEnabled ~= false else _G.DiceLightningEnabled = true end
 autoLeftEnabled = data.autoLeftEnabled == true
 autoRightEnabled = data.autoRightEnabled == true
 if data.introEnabled ~= nil then _introEnabled = data.introEnabled == true end
@@ -3806,447 +3806,6 @@ end)
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- LIGHTNING STRIKES SYSTEM — detailed procedural lightning bolts
--- ═══════════════════════════════════════════════════════════════
-do
-	local LIGHTNING_COLORS = {
-		primary   = Color3.fromRGB(200, 210, 255),
-		core      = Color3.fromRGB(255, 255, 255),
-		glow      = Color3.fromRGB(130, 150, 255),
-		branch    = Color3.fromRGB(170, 185, 255),
-		spark     = Color3.fromRGB(220, 230, 255),
-		flash     = Color3.fromRGB(180, 195, 255),
-		ambient   = Color3.fromRGB(100, 120, 220),
-	}
-
-	local LightningContainer = Instance.new("Frame")
-	LightningContainer.Name = "LightningFX"
-	LightningContainer.BackgroundTransparency = 1
-	LightningContainer.Size = UDim2.new(1, 0, 1, 0)
-	LightningContainer.Position = UDim2.new(0, 0, 0, 0)
-	LightningContainer.ClipsDescendants = true
-	LightningContainer.ZIndex = 2
-	LightningContainer.Parent = Main
-	corner(LightningContainer, 14)
-
-	local FlashOverlay = Instance.new("Frame")
-	FlashOverlay.Name = "FlashOverlay"
-	FlashOverlay.BackgroundColor3 = LIGHTNING_COLORS.flash
-	FlashOverlay.BackgroundTransparency = 1
-	FlashOverlay.Size = UDim2.new(1, 0, 1, 0)
-	FlashOverlay.ZIndex = 2
-	FlashOverlay.Parent = LightningContainer
-	corner(FlashOverlay, 14)
-
-	local AmbientGlow = Instance.new("Frame")
-	AmbientGlow.Name = "AmbientGlow"
-	AmbientGlow.BackgroundColor3 = LIGHTNING_COLORS.ambient
-	AmbientGlow.BackgroundTransparency = 1
-	AmbientGlow.Size = UDim2.new(1, 0, 1, 0)
-	AmbientGlow.ZIndex = 2
-	AmbientGlow.Parent = LightningContainer
-	corner(AmbientGlow, 14)
-
-	local GlowGradient = Instance.new("UIGradient")
-	GlowGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 100, 200)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 50, 120)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 100, 200)),
-	})
-	GlowGradient.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.7),
-		NumberSequenceKeypoint.new(0.5, 0.3),
-		NumberSequenceKeypoint.new(1, 0.7),
-	})
-	GlowGradient.Parent = AmbientGlow
-
-	local rng = Random.new(tick())
-
-	local function createSegment(parent, x1, y1, x2, y2, thickness, color, transparency, zindex)
-		local dx = x2 - x1
-		local dy = y2 - y1
-		local length = math.sqrt(dx * dx + dy * dy)
-		local angle = math.atan2(dy, dx)
-
-		local seg = Instance.new("Frame")
-		seg.BackgroundColor3 = color or LIGHTNING_COLORS.primary
-		seg.BackgroundTransparency = transparency or 0
-		seg.BorderSizePixel = 0
-		seg.Size = UDim2.new(0, math.max(length, 1), 0, thickness or 2)
-		seg.Position = UDim2.new(0, x1, 0, y1)
-		seg.AnchorPoint = Vector2.new(0, 0.5)
-		seg.Rotation = math.deg(angle)
-		seg.ZIndex = zindex or 3
-		seg.Parent = parent
-
-		local segGlow = Instance.new("Frame")
-		segGlow.BackgroundColor3 = LIGHTNING_COLORS.glow
-		segGlow.BackgroundTransparency = 0.5
-		segGlow.BorderSizePixel = 0
-		segGlow.Size = UDim2.new(1, 4, 0, (thickness or 2) + 4)
-		segGlow.Position = UDim2.new(0, -2, 0.5, 0)
-		segGlow.AnchorPoint = Vector2.new(0, 0.5)
-		segGlow.ZIndex = (zindex or 3) - 1
-		segGlow.Parent = seg
-
-		return seg
-	end
-
-	local function generateBoltPath(startX, startY, endX, endY, segments, jitter)
-		local points = {}
-		segments = segments or 12
-		jitter = jitter or 18
-		for i = 0, segments do
-			local t = i / segments
-			local px = startX + (endX - startX) * t
-			local py = startY + (endY - startY) * t
-			if i > 0 and i < segments then
-				px = px + rng:NextNumber(-jitter, jitter)
-				py = py + rng:NextNumber(-jitter * 0.4, jitter * 0.4)
-			end
-			table.insert(points, {x = px, y = py})
-		end
-		return points
-	end
-
-	local function drawBolt(parent, points, thickness, color, transparency, zindex)
-		local segments = {}
-		for i = 1, #points - 1 do
-			local p1 = points[i]
-			local p2 = points[i + 1]
-			local seg = createSegment(parent, p1.x, p1.y, p2.x, p2.y, thickness, color, transparency, zindex)
-			table.insert(segments, seg)
-		end
-		return segments
-	end
-
-	local function drawBranch(parent, originX, originY, angle, length, depth, segments)
-		if depth <= 0 or length < 6 then return {} end
-		local endX = originX + math.cos(angle) * length
-		local endY = originY + math.sin(angle) * length
-		local branchSegs = math.max(3, math.floor(segments * 0.6))
-		local pts = generateBoltPath(originX, originY, endX, endY, branchSegs, length * 0.18)
-		local thickness = math.max(1, 3 - depth)
-		local allSegs = drawBolt(parent, pts, thickness, LIGHTNING_COLORS.branch, 0.15 + depth * 0.12, 3)
-		if depth > 0 and rng:NextNumber() > 0.4 then
-			local branchPt = pts[math.floor(#pts * rng:NextNumber(0.3, 0.7))]
-			if branchPt then
-				local subAngle = angle + rng:NextNumber(-0.8, 0.8)
-				local subLen = length * rng:NextNumber(0.35, 0.6)
-				local subSegs = drawBranch(parent, branchPt.x, branchPt.y, subAngle, subLen, depth - 1, branchSegs)
-				for _, s in ipairs(subSegs) do table.insert(allSegs, s) end
-			end
-		end
-		return allSegs
-	end
-
-	local function createSpark(parent, x, y)
-		local sparkSize = rng:NextInteger(2, 5)
-		local spark = Instance.new("Frame")
-		spark.BackgroundColor3 = LIGHTNING_COLORS.spark
-		spark.BackgroundTransparency = 0
-		spark.BorderSizePixel = 0
-		spark.Size = UDim2.new(0, sparkSize, 0, sparkSize)
-		spark.Position = UDim2.new(0, x - sparkSize / 2, 0, y - sparkSize / 2)
-		spark.ZIndex = 4
-		spark.Parent = parent
-		corner(spark, sparkSize)
-
-		local sparkGlow = Instance.new("Frame")
-		sparkGlow.BackgroundColor3 = LIGHTNING_COLORS.glow
-		sparkGlow.BackgroundTransparency = 0.3
-		sparkGlow.BorderSizePixel = 0
-		sparkGlow.Size = UDim2.new(0, sparkSize + 6, 0, sparkSize + 6)
-		sparkGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
-		sparkGlow.AnchorPoint = Vector2.new(0.5, 0.5)
-		sparkGlow.ZIndex = 3
-		sparkGlow.Parent = spark
-		corner(sparkGlow, sparkSize + 6)
-
-		return spark
-	end
-
-	local function clearLightningChildren(container)
-		for _, child in ipairs(container:GetChildren()) do
-			if child.Name ~= "FlashOverlay" and child.Name ~= "AmbientGlow"
-			   and not child:IsA("UICorner") and not child:IsA("UIGradient") then
-				child:Destroy()
-			end
-		end
-	end
-
-	local function fireStrike()
-		clearLightningChildren(LightningContainer)
-
-		local mainW = Main.AbsoluteSize.X
-		local mainH = Main.AbsoluteSize.Y
-		if mainW < 10 or mainH < 10 then return end
-
-		local strikeType = rng:NextInteger(1, 4)
-		local allSegments = {}
-		local allSparks = {}
-
-		if strikeType == 1 then
-			local startX = rng:NextNumber(mainW * 0.15, mainW * 0.85)
-			local pts = generateBoltPath(startX, -4, startX + rng:NextNumber(-40, 40), mainH + 4, 16, 22)
-			local segs = drawBolt(LightningContainer, pts, 2.5, LIGHTNING_COLORS.core, 0, 4)
-			for _, s in ipairs(segs) do table.insert(allSegments, s) end
-			local coreSegs = drawBolt(LightningContainer, pts, 1, LIGHTNING_COLORS.core, 0, 5)
-			for _, s in ipairs(coreSegs) do table.insert(allSegments, s) end
-			for i = 1, rng:NextInteger(2, 4) do
-				local branchIdx = math.floor(#pts * rng:NextNumber(0.15, 0.75))
-				local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
-				local angle = rng:NextNumber(-1.2, 1.2) + (math.pi / 2)
-				local branchLen = rng:NextNumber(30, 70)
-				local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 2, 8)
-				for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
-			end
-			for _, pt in ipairs(pts) do
-				if rng:NextNumber() > 0.7 then
-					local sp = createSpark(LightningContainer, pt.x + rng:NextNumber(-6, 6), pt.y + rng:NextNumber(-6, 6))
-					table.insert(allSparks, sp)
-				end
-			end
-
-		elseif strikeType == 2 then
-			local startY = rng:NextNumber(mainH * 0.1, mainH * 0.5)
-			local pts = generateBoltPath(-4, startY, mainW + 4, startY + rng:NextNumber(-30, 30), 14, 18)
-			local segs = drawBolt(LightningContainer, pts, 2, LIGHTNING_COLORS.primary, 0, 4)
-			for _, s in ipairs(segs) do table.insert(allSegments, s) end
-			local coreSegs = drawBolt(LightningContainer, pts, 1, LIGHTNING_COLORS.core, 0, 5)
-			for _, s in ipairs(coreSegs) do table.insert(allSegments, s) end
-			for i = 1, rng:NextInteger(1, 3) do
-				local branchIdx = math.floor(#pts * rng:NextNumber(0.2, 0.8))
-				local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
-				local angle = rng:NextNumber(-1.0, 1.0)
-				local branchLen = rng:NextNumber(25, 55)
-				local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 2, 6)
-				for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
-			end
-			for _, pt in ipairs(pts) do
-				if rng:NextNumber() > 0.75 then
-					local sp = createSpark(LightningContainer, pt.x + rng:NextNumber(-5, 5), pt.y + rng:NextNumber(-5, 5))
-					table.insert(allSparks, sp)
-				end
-			end
-
-		elseif strikeType == 3 then
-			local cx = mainW / 2
-			local cy = mainH * rng:NextNumber(0.25, 0.55)
-			local numArms = rng:NextInteger(3, 6)
-			for arm = 1, numArms do
-				local angle = (arm / numArms) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
-				local armLen = rng:NextNumber(50, 120)
-				local endX = cx + math.cos(angle) * armLen
-				local endY = cy + math.sin(angle) * armLen
-				local pts = generateBoltPath(cx, cy, endX, endY, 8, 14)
-				local segs = drawBolt(LightningContainer, pts, 2, LIGHTNING_COLORS.primary, 0.05, 4)
-				for _, s in ipairs(segs) do table.insert(allSegments, s) end
-				if rng:NextNumber() > 0.5 then
-					local midPt = pts[math.floor(#pts * 0.6)]
-					if midPt then
-						local subAngle = angle + rng:NextNumber(-0.6, 0.6)
-						local subLen = armLen * 0.4
-						local brSegs = drawBranch(LightningContainer, midPt.x, midPt.y, subAngle, subLen, 1, 5)
-						for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
-					end
-				end
-			end
-			local epicenterSpark = createSpark(LightningContainer, cx, cy)
-			epicenterSpark.Size = UDim2.new(0, 8, 0, 8)
-			table.insert(allSparks, epicenterSpark)
-
-		else
-			for bolt = 1, rng:NextInteger(2, 3) do
-				local sx = rng:NextNumber(0, mainW)
-				local sy = rng:NextNumber(-4, mainH * 0.15)
-				local ex = sx + rng:NextNumber(-60, 60)
-				local ey = rng:NextNumber(mainH * 0.6, mainH + 4)
-				local pts = generateBoltPath(sx, sy, ex, ey, 12, 16)
-				local segs = drawBolt(LightningContainer, pts, 1.8, LIGHTNING_COLORS.primary, 0.08 * bolt, 4)
-				for _, s in ipairs(segs) do table.insert(allSegments, s) end
-				for i = 1, rng:NextInteger(1, 2) do
-					local branchIdx = math.floor(#pts * rng:NextNumber(0.2, 0.7))
-					local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
-					local angle = rng:NextNumber(-1.0, 1.0) + (math.pi / 2)
-					local branchLen = rng:NextNumber(20, 45)
-					local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 1, 5)
-					for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
-				end
-			end
-		end
-
-		TweenService:Create(FlashOverlay, TweenInfo.new(0.04, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.82}):Play()
-		TweenService:Create(AmbientGlow, TweenInfo.new(0.06, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.88}):Play()
-
-		task.delay(0.06, function()
-			TweenService:Create(FlashOverlay, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {BackgroundTransparency = 1}):Play()
-			task.delay(0.09, function()
-				if rng:NextNumber() > 0.5 then
-					TweenService:Create(FlashOverlay, TweenInfo.new(0.03, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.88}):Play()
-					task.delay(0.04, function()
-						TweenService:Create(FlashOverlay, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {BackgroundTransparency = 1}):Play()
-					end)
-				end
-			end)
-		end)
-
-		task.delay(0.12, function()
-			for _, seg in ipairs(allSegments) do
-				if seg and seg.Parent then
-					TweenService:Create(seg, TweenInfo.new(rng:NextNumber(0.15, 0.35), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-					for _, child in ipairs(seg:GetChildren()) do
-						if child:IsA("Frame") then
-							TweenService:Create(child, TweenInfo.new(rng:NextNumber(0.2, 0.4), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-						end
-					end
-				end
-			end
-			for _, sp in ipairs(allSparks) do
-				if sp and sp.Parent then
-					task.delay(rng:NextNumber(0.05, 0.2), function()
-						if sp and sp.Parent then
-							TweenService:Create(sp, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0)}):Play()
-							for _, child in ipairs(sp:GetChildren()) do
-								if child:IsA("Frame") then
-									TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-								end
-							end
-						end
-					end)
-				end
-			end
-		end)
-
-		task.delay(0.5, function()
-			TweenService:Create(AmbientGlow, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-		end)
-
-		task.delay(0.8, function()
-			clearLightningChildren(LightningContainer)
-		end)
-	end
-
-	local function ambientCrackle()
-		local mainW = Main.AbsoluteSize.X
-		local mainH = Main.AbsoluteSize.Y
-		if mainW < 10 or mainH < 10 then return end
-
-		local sx = rng:NextNumber(mainW * 0.05, mainW * 0.95)
-		local sy = rng:NextNumber(mainH * 0.05, mainH * 0.95)
-		local numSegs = rng:NextInteger(2, 5)
-		local segs = {}
-		local cx, cy = sx, sy
-		for i = 1, numSegs do
-			local angle = rng:NextNumber(0, math.pi * 2)
-			local len = rng:NextNumber(6, 18)
-			local nx = cx + math.cos(angle) * len
-			local ny = cy + math.sin(angle) * len
-			local seg = createSegment(LightningContainer, cx, cy, nx, ny, 1, LIGHTNING_COLORS.spark, 0.2, 3)
-			table.insert(segs, seg)
-			cx, cy = nx, ny
-		end
-		local sp = createSpark(LightningContainer, sx, sy)
-		task.delay(0.15, function()
-			for _, seg in ipairs(segs) do
-				if seg and seg.Parent then
-					TweenService:Create(seg, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-					for _, child in ipairs(seg:GetChildren()) do
-						if child:IsA("Frame") then
-							TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-						end
-					end
-				end
-			end
-			if sp and sp.Parent then
-				TweenService:Create(sp, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0)}):Play()
-			end
-		end)
-		task.delay(0.4, function()
-			for _, seg in ipairs(segs) do if seg and seg.Parent then seg:Destroy() end end
-			if sp and sp.Parent then sp:Destroy() end
-		end)
-	end
-
-	local function edgeArc()
-		local mainW = Main.AbsoluteSize.X
-		local mainH = Main.AbsoluteSize.Y
-		if mainW < 10 or mainH < 10 then return end
-
-		local edge = rng:NextInteger(1, 4)
-		local sx, sy, ex, ey
-		if edge == 1 then
-			sx, sy = rng:NextNumber(0, mainW), 0
-			ex, ey = sx + rng:NextNumber(-30, 30), rng:NextNumber(15, 40)
-		elseif edge == 2 then
-			sx, sy = rng:NextNumber(0, mainW), mainH
-			ex, ey = sx + rng:NextNumber(-30, 30), mainH - rng:NextNumber(15, 40)
-		elseif edge == 3 then
-			sx, sy = 0, rng:NextNumber(0, mainH)
-			ex, ey = rng:NextNumber(15, 40), sy + rng:NextNumber(-30, 30)
-		else
-			sx, sy = mainW, rng:NextNumber(0, mainH)
-			ex, ey = mainW - rng:NextNumber(15, 40), sy + rng:NextNumber(-30, 30)
-		end
-
-		local pts = generateBoltPath(sx, sy, ex, ey, 5, 8)
-		local segs = drawBolt(LightningContainer, pts, 1.5, LIGHTNING_COLORS.glow, 0.1, 3)
-
-		local arcSpark = createSpark(LightningContainer, sx, sy)
-
-		task.delay(0.1, function()
-			for _, seg in ipairs(segs) do
-				if seg and seg.Parent then
-					TweenService:Create(seg, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-					for _, child in ipairs(seg:GetChildren()) do
-						if child:IsA("Frame") then
-							TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-						end
-					end
-				end
-			end
-			if arcSpark and arcSpark.Parent then
-				TweenService:Create(arcSpark, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-			end
-		end)
-		task.delay(0.35, function()
-			for _, seg in ipairs(segs) do if seg and seg.Parent then seg:Destroy() end end
-			if arcSpark and arcSpark.Parent then arcSpark:Destroy() end
-		end)
-	end
-
-	task.spawn(function()
-		task.wait(1.5)
-		while LightningContainer and LightningContainer.Parent do
-			if _G.DiceLightningEnabled ~= false then
-				fireStrike()
-				task.wait(rng:NextNumber(3.5, 7.0))
-
-				if _G.DiceLightningEnabled ~= false and rng:NextNumber() > 0.3 then
-					for _ = 1, rng:NextInteger(1, 3) do
-						if _G.DiceLightningEnabled == false then break end
-						ambientCrackle()
-						task.wait(rng:NextNumber(0.3, 0.8))
-					end
-				end
-
-				if _G.DiceLightningEnabled ~= false and rng:NextNumber() > 0.4 then
-					edgeArc()
-				end
-
-				task.wait(rng:NextNumber(1.0, 3.0))
-			else
-				task.wait(1)
-			end
-		end
-	end)
-
-	_G.DiceLightningEnabled = true
-	_G.DiceFireLightning = fireStrike
-end
--- ═══════════════════════════════════════════════════════════════
-
--- ═══════════════════════════════════════════════════════════════
 -- TOP BAR — inset title strip with the window controls on the right
 -- ═══════════════════════════════════════════════════════════════
 local TopBar = Instance.new("Frame")
@@ -6616,21 +6175,6 @@ saveDiceConfig()
 end)
 end
 end
-section(Utility, "EFFECTS", 15)
-do
-local lightningEnabled = (_G.DiceLightningEnabled == true)
-local row, setVisual = toggleRow(Utility, "Lightning Strikes", lightningEnabled, 16)
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
-_G.DiceLightningEnabled = not (_G.DiceLightningEnabled == true)
-if setVisual then setVisual(_G.DiceLightningEnabled == true) end
-local lc = Main and Main:FindFirstChild("LightningFX")
-if lc then lc.Visible = (_G.DiceLightningEnabled == true) end
-saveDiceConfig()
-end)
-end
-end
 end
 task.wait()
 __DiceDuelsSetupVisualsUI()
@@ -7933,6 +7477,40 @@ mobileGui.DisplayOrder = 1000
 mobileGui.Parent = PlayerGui
 _G.DiceMobileButtonRefs = {}
 local mobileButtons = _G.DiceMobileButtonRefs
+-- ═══════════════════════════════════════════════════════════════
+-- MOBILE PANEL
+-- One draggable grid rather than ten loose buttons. Each button is a
+-- die: dark face with light pips when off, white face with dark pips
+-- when on. Pips sit in the corners so the label never collides.
+-- ═══════════════════════════════════════════════════════════════
+local BTN_SIZE = 58
+local BTN_GAP = 14
+local PADDING = 6
+local COLS = 2
+local ROWS = 5
+local PANEL_W = PADDING * 2 + COLS * BTN_SIZE + (COLS - 1) * BTN_GAP
+local PANEL_H = PADDING * 2 + ROWS * BTN_SIZE + (ROWS - 1) * BTN_GAP
+local PANEL_DEFAULT = UDim2.new(1, -(PANEL_W + 20), 0.5, -(PANEL_H / 2))
+local FACE_OFF = Color3.fromRGB(8, 8, 10)
+local FACE_ON = Color3.fromRGB(248, 248, 252)
+local TEXT_OFF = Color3.fromRGB(238, 238, 244)
+local TEXT_ON = Color3.fromRGB(8, 8, 12)
+local FACE_FLASH = Color3.fromRGB(198, 198, 206)
+-- Corner-only pip spots keep the middle of the die clear for the label.
+local MOBILE_PIPS = {
+[2] = {{0.19, 0.18}, {0.81, 0.82}},
+[4] = {{0.19, 0.18}, {0.81, 0.18}, {0.19, 0.82}, {0.81, 0.82}},
+}
+local MobilePanel = Instance.new("Frame")
+MobilePanel.Name = "MobileButtonsPanel"
+MobilePanel.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
+MobilePanel.Position = tableToUDim2(_G.DiceMobileButtonPositions and _G.DiceMobileButtonPositions.panel, PANEL_DEFAULT)
+MobilePanel.BackgroundTransparency = 1
+MobilePanel.BorderSizePixel = 0
+MobilePanel.Active = true
+MobilePanel.ZIndex = 1000
+MobilePanel.Parent = mobileGui
+_G.DiceMobilePanel = MobilePanel
 function _G.DiceApplyMobileButtonsHidden()
 local g = PlayerGui:FindFirstChild("DiceMobileButtons")
 if g then g.Enabled = not (_G.DiceHideMobileButtons == true) end
@@ -7940,15 +7518,10 @@ if setHideMobileButtonsVisual then pcall(setHideMobileButtonsVisual, _G.DiceHide
 end
 function _G.DiceApplyMobileButtonSize()
 _G.DiceMobileButtonScale = math.clamp(tonumber(_G.DiceMobileButtonScale) or 0.75, 0.30, 1.35)
-for _, entry in pairs(mobileButtons) do
-local holder = entry and entry.holder
-if holder then
-local sc = holder:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
+local sc = MobilePanel:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
 sc.Name = "MobileButtonScale"
 sc.Scale = _G.DiceMobileButtonScale
-sc.Parent = holder
-end
-end
+sc.Parent = MobilePanel
 pcall(function()
 local gui = PlayerGui:FindFirstChild("DiceDuelsAdaptReconstruct") or PlayerGui:FindFirstChild("AdaptHubPolished") or PlayerGui:FindFirstChild("CyberHub")
 local root = gui or PlayerGui
@@ -7962,6 +7535,49 @@ end
 end
 end)
 end
+-- The whole grid drags as one unit. Buttons feed the same drag state, so
+-- you can grab the panel anywhere: a tap fires the button, a drag past
+-- the threshold moves the panel and cancels the tap.
+local panelDrag = {active = false, moved = false, start = nil, origin = nil}
+local DRAG_DEADZONE = 6
+local function beginPanelDrag(input)
+if _G.DiceGuiLocked == true then return end
+panelDrag.active = true
+panelDrag.moved = false
+panelDrag.start = input.Position
+panelDrag.origin = MobilePanel.Position
+end
+local function endPanelDrag()
+local moved = panelDrag.moved
+panelDrag.active = false
+panelDrag.moved = false
+if moved then task.defer(saveDiceConfig) end
+return moved
+end
+MobilePanel.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
+end
+end)
+MobilePanel.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+endPanelDrag()
+end
+end)
+UserInputService.InputChanged:Connect(function(input)
+if not panelDrag.active or _G.DiceGuiLocked == true then return end
+if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+local delta = input.Position - panelDrag.start
+if not panelDrag.moved and (math.abs(delta.X) > DRAG_DEADZONE or math.abs(delta.Y) > DRAG_DEADZONE) then
+panelDrag.moved = true
+end
+if panelDrag.moved then
+MobilePanel.Position = UDim2.new(
+panelDrag.origin.X.Scale, panelDrag.origin.X.Offset + delta.X,
+panelDrag.origin.Y.Scale, panelDrag.origin.Y.Offset + delta.Y
+)
+end
+end)
 local function setActive(btn, state)
 if not btn then return end
 local pressed = btn:GetAttribute("DiceMobilePressed") == true
@@ -7969,173 +7585,100 @@ state = (state == true) or pressed
 local visualState = state and "on" or "off"
 if btn:GetAttribute("DiceMobileVisualState") == visualState then return end
 btn:SetAttribute("DiceMobileVisualState", visualState)
-local holder = btn.Parent
-local glow = holder and holder:FindFirstChild("Glow")
+TS:Create(btn, TweenInfo.new(0.15), {
+BackgroundColor3 = state and FACE_ON or FACE_OFF,
+TextColor3 = state and TEXT_ON or TEXT_OFF,
+}):Play()
 local st = btn:FindFirstChildOfClass("UIStroke")
-TS:Create(btn, TweenInfo.new(0.18), {
-BackgroundColor3 = state and Color3.fromRGB(238,238,238) or Color3.fromRGB(8,8,8),
-TextColor3 = state and Color3.fromRGB(0,0,0) or Color3.fromRGB(225,225,225),
-TextTransparency = 0,
-}):Play()
 if st then
-TS:Create(st, TweenInfo.new(0.18), {
-Color = state and Color3.fromRGB(190,190,190) or Color3.fromRGB(85,85,85),
-Thickness = 1,
-Transparency = state and 0 or 0.4,
+TS:Create(st, TweenInfo.new(0.15), {
+Color = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(85, 85, 95),
+Transparency = state and 0.1 or 0.45,
 }):Play()
 end
-if glow then
-glow.Visible = false
-glow.BackgroundTransparency = 1
-local gs = glow:FindFirstChildOfClass("UIStroke")
-if gs then gs.Transparency = 1 end
+local pipHolder = btn:FindFirstChild("Pips")
+if pipHolder then
+for _, pip in ipairs(pipHolder:GetChildren()) do
+TS:Create(pip, TweenInfo.new(0.15), {
+BackgroundColor3 = state and TEXT_ON or TEXT_OFF,
+BackgroundTransparency = state and 0 or 0.35,
+}):Play()
 end
 end
+end
+-- Momentary feedback for the buttons that fire an action rather than latch.
 local function pulse(btn)
 if not btn then return end
 btn:SetAttribute("DiceMobilePressed", true)
 setActive(btn, true)
-task.delay(0.18, function()
+task.delay(0.2, function()
 if btn and btn.Parent then
 btn:SetAttribute("DiceMobilePressed", false)
 setActive(btn, false)
 end
 end)
 end
-local function makeButton(key, label, pos, onPress)
-local holder = Instance.new("Frame")
-holder.Name = "MBH_" .. key
-holder.Size = UDim2.new(0, 78, 0, 58)
-holder.Position = tableToUDim2(_G.DiceMobileButtonPositions[key], pos)
-holder.BackgroundTransparency = 1
-holder.BorderSizePixel = 0
-holder.ZIndex = 1000
-holder.Active = true
-holder.Parent = mobileGui
-local glow = Instance.new("Frame", holder)
-glow.Name = "Glow"
-glow.Size = UDim2.new(1, 4, 1, 4)
-glow.Position = UDim2.new(0, -2, 0, -2)
-glow.BackgroundColor3 = Color3.fromRGB(255,255,255)
-glow.BackgroundTransparency = 1
-glow.BorderSizePixel = 0
-glow.ZIndex = 1000
-Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 13)
-local glowStroke = Instance.new("UIStroke", glow)
-glowStroke.Color = Color3.fromRGB(255,255,255)
-glowStroke.Thickness = 0.8
-glowStroke.Transparency = 1
-glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local btn = Instance.new("TextButton", holder)
+local function makeButton(key, label, col, row, face, onPress)
+local btn = Instance.new("TextButton")
 btn.Name = "MB_" .. key
-btn.Size = UDim2.new(1, 0, 1, 0)
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.BackgroundColor3 = Color3.fromRGB(8,8,8)
-btn.BackgroundTransparency = 0
+btn.Size = UDim2.new(0, BTN_SIZE, 0, BTN_SIZE)
+btn.Position = UDim2.new(0, PADDING + col * (BTN_SIZE + BTN_GAP), 0, PADDING + row * (BTN_SIZE + BTN_GAP))
+btn.BackgroundColor3 = FACE_OFF
 btn.BorderSizePixel = 0
 btn.Text = label
-btn.TextColor3 = Color3.fromRGB(225,225,225)
-btn.Font = Enum.Font.GothamBlack
+btn.TextColor3 = TEXT_OFF
+btn.Font = Enum.Font.GothamBold
 btn.TextSize = 10
 btn.TextWrapped = true
+btn.LineHeight = 1.15
 btn.AutoButtonColor = false
 btn.ZIndex = 1002
 btn.Active = true
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", btn)
-stroke.Color = Color3.fromRGB(85,85,85)
-stroke.Thickness = 1
-stroke.Transparency = 0.4
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local pressing, dragging = false, false
-local pressPos, holderStart = nil, nil
-btn.InputBegan:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-pressing = true
-dragging = false
-pressPos = i.Position
-holderStart = holder.Position
-btn:SetAttribute("DiceMobilePressed", true)
-setActive(btn, true)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 4),
-Size = UDim2.new(1, 0, 1, -4)
-}):Play()
-end)
+btn.Parent = MobilePanel
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+local st = Instance.new("UIStroke", btn)
+st.Color = Color3.fromRGB(85, 85, 95)
+st.Thickness = 1
+st.Transparency = 0.45
+st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local pipHolder = Instance.new("Frame", btn)
+pipHolder.Name = "Pips"
+pipHolder.Size = UDim2.new(1, 0, 1, 0)
+pipHolder.BackgroundTransparency = 1
+pipHolder.ZIndex = 1003
+for _, spot in ipairs(MOBILE_PIPS[face] or MOBILE_PIPS[4]) do
+local pip = Instance.new("Frame")
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, 5, 0, 5)
+pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
+pip.BackgroundColor3 = TEXT_OFF
+pip.BackgroundTransparency = 0.35
+pip.BorderSizePixel = 0
+pip.ZIndex = 1003
+pip.Parent = pipHolder
+Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+end
+btn.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
 end
 end)
-btn.InputEnded:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-if pressing and not dragging then pcall(onPress, btn) end
-if dragging then saveDiceConfig() end
-pressing = false
-dragging = false
-btn:SetAttribute("DiceMobilePressed", false)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 0),
-Size = UDim2.new(1, 0, 1, 0)
-}):Play()
+btn.InputEnded:Connect(function(input)
+if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+if not endPanelDrag() then pcall(onPress, btn) end
 end)
-task.delay(0.08, function()
-if btn and btn.Parent then
-local keepOn = false
-if key == "autoLeft" then keepOn = autoLeftEnabled == true
-elseif key == "autoRight" then keepOn = autoRightEnabled == true
-elseif key == "aimbot" then keepOn = (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true)
-elseif key == "antiDesync" then keepOn = _G.DiceAntiDesyncAimbotOn == true
-elseif key == "carry" then keepOn = currentSpeedMode == "Carry"
-elseif key == "laggerNormal" then keepOn = currentSpeedMode == "Lagger"
-elseif key == "laggerCarry" then keepOn = currentSpeedMode == "Lagger Carry"
-end
-setActive(btn, keepOn)
-end
-end)
-end
-end)
-UserInputService.InputChanged:Connect(function(i)
-if _G.DiceGuiLocked == true or not pressing then return end
-if i.UserInputType ~= Enum.UserInputType.MouseMovement and i.UserInputType ~= Enum.UserInputType.Touch then return end
-local delta = i.Position - pressPos
-if not dragging and (math.abs(delta.X) > 6 or math.abs(delta.Y) > 6) then dragging = true end
-if dragging then
-holder.Position = UDim2.new(holderStart.X.Scale, holderStart.X.Offset + delta.X, holderStart.Y.Scale, holderStart.Y.Offset + delta.Y)
-end
-end)
-mobileButtons[key] = {holder = holder, btn = btn, setActive = function(state) setActive(btn, state) end}
+mobileButtons[key] = {holder = MobilePanel, btn = btn, setActive = function(state) setActive(btn, state) end}
 return btn
 end
-local x1, x2, x3 = -218, -154, -90
-local y1, y2, y3, y4 = -150, -102, -54, -6
-local defaults = {
-insta        = UDim2.new(1, x1, 0.5, y1),
-drop         = UDim2.new(1, x2, 0.5, y1),
-autoLeft     = UDim2.new(1, x3, 0.5, y1),
-antiDesync   = UDim2.new(1, x1, 0.5, y2),
-aimbot       = UDim2.new(1, x2, 0.5, y2),
-autoRight    = UDim2.new(1, x3, 0.5, y2),
-tp           = UDim2.new(1, x2, 0.5, y3),
-carry        = UDim2.new(1, x3, 0.5, y3),
-laggerNormal = UDim2.new(1, x2, 0.5, y4),
-laggerCarry  = UDim2.new(1, x3, 0.5, y4),
-}
 function _G.DiceResetMobileButtons()
 _G.DiceMobileButtonScale = 0.75
 _G.DiceHideMobileButtons = false
-for key, defaultPos in pairs(defaults) do
-local entry = mobileButtons[key]
-local holder = entry and entry.holder
-if holder then
-holder.Position = defaultPos
-holder.Size = UDim2.new(0, 78, 0, 58)
-local btn = entry.btn
+MobilePanel.Position = PANEL_DEFAULT
+for _, entry in pairs(mobileButtons) do
+local btn = entry and entry.btn
 if btn then
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.Size = UDim2.new(1, 0, 1, 0)
 btn:SetAttribute("DiceMobilePressed", false)
 btn:SetAttribute("DiceMobileVisualState", nil)
-end
 end
 end
 if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end
@@ -8143,22 +7686,41 @@ if _G.DiceApplyMobileButtonsHidden then _G.DiceApplyMobileButtonsHidden() end
 if showActionNotification then pcall(function() showActionNotification("MOBILE BUTTONS RESET") end) end
 saveDiceConfig()
 end
-makeButton("insta", "INSTA\nRESET", defaults.insta, function(btn)
+-- Two pips mark the momentary actions, four the latching toggles.
+makeButton("insta", "INSTA\nRESET", 0, 0, 2, function(btn)
 if _G.DiceCursedInstaReset then _G.DiceCursedInstaReset() elseif cursedInstaReset then cursedInstaReset() end
 pulse(btn)
 end)
-makeButton("drop", "DROP\nBR", defaults.drop, function(btn)
+makeButton("drop", "DROP\nBR", 1, 0, 2, function(btn)
 if runDropBrainrot then runDropBrainrot() elseif runDrop then runDrop() end
 pulse(btn)
 end)
-makeButton("autoLeft", "AUTO\nLEFT", defaults.autoLeft, function(btn)
+makeButton("autoLeft", "AUTO\nLEFT", 0, 1, 4, function(btn)
 if _G.DiceSetAutoLeft then _G.DiceSetAutoLeft(not autoLeftEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 end)
 end)
-makeButton("antiDesync", "ANTI\nDESYNC", defaults.antiDesync, function(btn)
+makeButton("autoRight", "AUTO\nRIGHT", 1, 1, 4, function(btn)
+if _G.DiceSetAutoRight then _G.DiceSetAutoRight(not autoRightEnabled) end
+task.delay(0.03, function()
+if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
+if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
+end)
+end)
+makeButton("aimbot", "BAT\nBOT", 0, 2, 4, function(btn)
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
+return
+end
+if _G.DiceToggleSelectedAimbot then _G.DiceToggleSelectedAimbot() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
+task.delay(0.03, function()
+setActive(btn, (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true))
+end)
+end)
+makeButton("antiDesync", "ANTI\nDESYNC", 1, 2, 4, function(btn)
 if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
 if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -8170,29 +7732,11 @@ if _G.DiceAntiDesyncAimbotOn then _G.DiceStopAntiDesyncAimbot() else _G.DiceStar
 end
 task.delay(0.03, function() setActive(btn, _G.DiceAntiDesyncAimbotOn == true) end)
 end)
-makeButton("aimbot", "BAT\nBOT", defaults.aimbot, function(btn)
-if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
-if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
-return
-end
-if _G.DiceToggleSelectedAimbot then _G.DiceToggleSelectedAimbot() end
-if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
-task.delay(0.03, function()
-setActive(btn, (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true))
-end)
-end)
-makeButton("autoRight", "AUTO\nRIGHT", defaults.autoRight, function(btn)
-if _G.DiceSetAutoRight then _G.DiceSetAutoRight(not autoRightEnabled) end
-task.delay(0.03, function()
-if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
-if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
-end)
-end)
-makeButton("tp", "TP\nDOWN", defaults.tp, function(btn)
+makeButton("tp", "TP\nDOWN", 0, 3, 2, function(btn)
 if runTPFloor then runTPFloor() end
 pulse(btn)
 end)
-makeButton("carry", "CARRY\nSPEED", defaults.carry, function(btn)
+makeButton("carry", "CARRY\nSPEED", 1, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Carry" and "Normal" or "Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -8200,7 +7744,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerNormal", "LAGGER\nNORMAL", defaults.laggerNormal, function(btn)
+makeButton("laggerNormal", "LAGGER\nNORMAL", 0, 4, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger" and "Normal" or "Lagger") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -8208,7 +7752,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerCarry", "LAGGER\nCARRY", defaults.laggerCarry, function(btn)
+makeButton("laggerCarry", "LAGGER\nCARRY", 1, 4, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger Carry" and "Normal" or "Lagger Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end

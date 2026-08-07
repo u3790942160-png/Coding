@@ -625,7 +625,7 @@ end
 end
 local currentBackground = 0
 local aceGuiScaleValue = 0.52
-local aceProgressBarScaleValue = 0.83
+local aceProgressBarScaleValue = 1
 CONFIG_FILE = "AceDuels_MainGUI_Config_DefaultsV2.json"
 KEYBINDS_CONFIG_FILE = "AceDuels_Keybinds_DefaultsV2.json"
 _ace_isfile = isfile or (syn and syn.isfile) or function(path)
@@ -7002,7 +7002,10 @@ applyBackground(index)
 updateBackgroundButtons()
 end)
 end
-function stepperRow(parent, labelText, defaultValue, order, callback, minValue, maxValue)
+function stepperRow(parent, labelText, defaultValue, order, callback, minValue, maxValue, step, decimals)
+step = tonumber(step) or 0.05
+decimals = tonumber(decimals) or 2
+local valueFormat = "%." .. tostring(math.floor(decimals)) .. "f"
 local row = Instance.new("Frame")
 row.Name = labelText
 row.BackgroundColor3 = COLORS.row
@@ -7050,7 +7053,7 @@ valueBox.Name = "Value"
 valueBox.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 valueBox.BackgroundTransparency = 0.05
 valueBox.BorderSizePixel = 0
-valueBox.Text = string.format("%.2f", value)
+valueBox.Text = string.format(valueFormat, value)
 valueBox.TextColor3 = Color3.fromRGB(245, 245, 255)
 valueBox.TextSize = 13
 valueBox.Font = Enum.Font.GothamBlack
@@ -7079,14 +7082,14 @@ corner(plus, 7)
 stroke(plus, COLORS.strokeSoft, 1, 0.5)
 local function setValue(nextValue)
 value = math.clamp(math.floor((nextValue * 100) + 0.5) / 100, minValue or 0.50, maxValue or 1.50)
-valueBox.Text = string.format("%.2f", value)
+valueBox.Text = string.format(valueFormat, value)
 if callback then callback(value) end
 end
 minus.MouseButton1Click:Connect(function()
-setValue(value - 0.05)
+setValue(value - step)
 end)
 plus.MouseButton1Click:Connect(function()
-setValue(value + 0.05)
+setValue(value + step)
 end)
 return row
 end
@@ -7099,11 +7102,11 @@ aceGuiScaleValue = v
 aceMainScale.Scale = v
 saveAceConfig()
 end)
-stepperRow(Settings, "Progress Bar Size", aceProgressBarScaleValue, 4, function(v)
-aceProgressBarScaleValue = v
+stepperRow(Settings, "Progress Bar Size", (tonumber(aceProgressBarScaleValue) or 1) * 100, 4, function(v)
+aceProgressBarScaleValue = (tonumber(v) or 100) / 100
 applyAceProgressBarScale()
 saveAceConfig()
-end)
+end, 50, 200, 5, 0)
 speedKeybindRow(Settings, "Toggle UI", "ToggleUI", 5)
 section(Settings, "MOBILE BUTTONS", 6)
 stepperRow(Settings, "Mobile Buttons Size", tonumber(_G.AceMobileButtonScale) or 0.75, 9, function(v)
@@ -7316,7 +7319,7 @@ end
 end)
 pcall(function()
 aceGuiScaleValue = 0.52
-aceProgressBarScaleValue = 0.83
+aceProgressBarScaleValue = 1
 NS = 59.5; CS = 28.8; LAGGER_SPEED = 29; LAGGER_CARRY_SPEED = 15
 currentSpeedMode = "Normal"
 autoCarrySpeedEnabled = false
@@ -7539,96 +7542,128 @@ end)
 end
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
-pbFrame.Size = UDim2.new(0, 372, 0, 42)
-pbFrame.Position = UDim2.new(0.5, -186, 1, -92)
-pbFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+pbFrame.Size = UDim2.new(0, 392, 0, 58)
+pbFrame.Position = UDim2.new(0.5, -196, 1, -100)
+pbFrame.BackgroundColor3 = Color3.fromRGB(6, 6, 9)
+pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
 pbFrame.ClipsDescendants = true
-Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 16)
 local pbSt = Instance.new("UIStroke", pbFrame)
 pbSt.Color = THEME_ACCENT
-pbSt.Thickness = 1.4
-pbSt.Transparency = 0.2
+pbSt.Thickness = 1.5
+pbSt.Transparency = 0.25
 drag(pbFrame)
 local pbScale = Instance.new("UIScale")
 pbScale.Name = "AceProgressBarScale"
 pbScale.Scale = aceProgressBarScaleValue or 1
 pbScale.Parent = pbFrame
-local fillRegion = Instance.new("Frame", pbFrame)
-fillRegion.Size = UDim2.new(0, 214, 1, -10)
-fillRegion.Position = UDim2.new(0, 6, 0, 5)
-fillRegion.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-fillRegion.BorderSizePixel = 0
-fillRegion.ClipsDescendants = true
-fillRegion.ZIndex = 2
-Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(1, 0)
-local fillRegGradient = Instance.new("UIGradient", fillRegion)
-fillRegGradient.Color = ColorSequence.new(Color3.fromRGB(30, 30, 30), Color3.fromRGB(14, 14, 14))
-fillRegGradient.Rotation = 90
-local fillRegStroke = Instance.new("UIStroke", fillRegion)
-fillRegStroke.Color = THEME_ACCENT
-fillRegStroke.Thickness = 1
-fillRegStroke.Transparency = 0.6
-local progressFill = Instance.new("Frame", fillRegion)
+-- Percentage sits outside the track on the left.
+local progressPct = Instance.new("TextLabel", pbFrame)
+progressPct.Name = "Percent"
+progressPct.Size = UDim2.new(0, 46, 0, 30)
+progressPct.Position = UDim2.new(0, 16, 0, 6)
+progressPct.BackgroundTransparency = 1
+progressPct.Text = "0%"
+progressPct.TextColor3 = THEME_ACCENT_BRIGHT
+progressPct.Font = Enum.Font.GothamBold
+progressPct.TextSize = 14
+progressPct.TextXAlignment = Enum.TextXAlignment.Left
+progressPct.ZIndex = 4
+-- Track. Left unclipped so the knob can overhang it top and bottom.
+local track = Instance.new("Frame", pbFrame)
+track.Name = "Track"
+track.Size = UDim2.new(0, 200, 0, 18)
+track.Position = UDim2.new(0, 70, 0, 12)
+track.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+track.BorderSizePixel = 0
+track.ZIndex = 2
+Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+local trackStroke = Instance.new("UIStroke", track)
+trackStroke.Color = THEME_ACCENT
+trackStroke.Thickness = 1.2
+trackStroke.Transparency = 0.45
+-- The fill needs clipping to stay inside the rounded track; the knob does not.
+local fillClip = Instance.new("Frame", track)
+fillClip.Name = "FillClip"
+fillClip.Size = UDim2.new(1, 0, 1, 0)
+fillClip.BackgroundTransparency = 1
+fillClip.BorderSizePixel = 0
+fillClip.ClipsDescendants = true
+fillClip.ZIndex = 2
+Instance.new("UICorner", fillClip).CornerRadius = UDim.new(1, 0)
+local progressFill = Instance.new("Frame", fillClip)
 progressFill.Name = "Fill"
 progressFill.Size = UDim2.new(0, 0, 1, 0)
 progressFill.Position = UDim2.new(0, 0, 0, 0)
 progressFill.BackgroundColor3 = THEME_ACCENT
+progressFill.BackgroundTransparency = 0.5
 progressFill.BorderSizePixel = 0
 progressFill.ZIndex = 3
 Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
 local fillGradient = Instance.new("UIGradient", progressFill)
 fillGradient.Color = ColorSequence.new(THEME_ACCENT_BRIGHT, THEME_ACCENT_DIM)
 fillGradient.Rotation = 90
-local stealLbl = Instance.new("TextLabel", fillRegion)
-stealLbl.Size = UDim2.new(0, 50, 1, 0)
-stealLbl.Position = UDim2.new(0, 10, 0, 0)
-stealLbl.BackgroundTransparency = 1
-stealLbl.Text = "STEAL"
-stealLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-stealLbl.Font = Enum.Font.GothamSemibold
-stealLbl.TextSize = 13
-stealLbl.TextXAlignment = Enum.TextXAlignment.Left
-stealLbl.ZIndex = 5
-local progressPct = Instance.new("TextLabel", fillRegion)
-progressPct.Size = UDim2.new(0, 50, 1, 0)
-progressPct.Position = UDim2.new(1, -55, 0, 0)
-progressPct.BackgroundTransparency = 1
-progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(230, 230, 230)
-progressPct.Font = Enum.Font.GothamSemibold
-progressPct.TextSize = 12
-progressPct.TextXAlignment = Enum.TextXAlignment.Right
-progressPct.ZIndex = 5
+local KNOB_SIZE = 24
+local knob = Instance.new("Frame", track)
+knob.Name = "Knob"
+knob.AnchorPoint = Vector2.new(0.5, 0.5)
+knob.Size = UDim2.new(0, KNOB_SIZE, 0, KNOB_SIZE)
+knob.Position = UDim2.new(0, KNOB_SIZE / 2, 0.5, 0)
+knob.BackgroundColor3 = THEME_ACCENT_BRIGHT
+knob.BorderSizePixel = 0
+knob.ZIndex = 5
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+local knobStroke = Instance.new("UIStroke", knob)
+knobStroke.Color = Color3.fromRGB(0, 0, 0)
+knobStroke.Thickness = 1
+knobStroke.Transparency = 0.65
+local knobShine = Instance.new("Frame", knob)
+knobShine.Name = "Shine"
+knobShine.Size = UDim2.new(0, 14, 0, 6)
+knobShine.Position = UDim2.new(0.5, -7, 0, 4)
+knobShine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knobShine.BackgroundTransparency = 0.55
+knobShine.BorderSizePixel = 0
+knobShine.ZIndex = 6
+Instance.new("UICorner", knobShine).CornerRadius = UDim.new(1, 0)
 local progressRadLbl = Instance.new("TextLabel", pbFrame)
-progressRadLbl.Size = UDim2.new(0, 144, 1, 0)
-progressRadLbl.Position = UDim2.new(0, 222, 0, 0)
+progressRadLbl.Name = "Radius"
+progressRadLbl.Size = UDim2.new(0, 92, 0, 30)
+progressRadLbl.Position = UDim2.new(0, 284, 0, 6)
 progressRadLbl.BackgroundTransparency = 1
-progressRadLbl.Text = "0 FPS | 0ms"
-progressRadLbl.TextColor3 = Color3.fromRGB(230, 230, 230)
-progressRadLbl.Font = Enum.Font.GothamSemibold
-progressRadLbl.TextSize = 13
-progressRadLbl.TextScaled = false
-progressRadLbl.TextWrapped = false
-progressRadLbl.TextXAlignment = Enum.TextXAlignment.Center
+progressRadLbl.Text = "Radius: 0"
+progressRadLbl.TextColor3 = THEME_ACCENT_BRIGHT
+progressRadLbl.Font = Enum.Font.GothamBold
+progressRadLbl.TextSize = 14
+progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
 progressRadLbl.ZIndex = 4
+local statsLbl = Instance.new("TextLabel", pbFrame)
+statsLbl.Name = "Stats"
+statsLbl.Size = UDim2.new(1, 0, 0, 18)
+statsLbl.Position = UDim2.new(0, 0, 0, 36)
+statsLbl.BackgroundTransparency = 1
+statsLbl.Text = "FPS: 0  discord.gg/aceduels  PING: 0ms"
+statsLbl.TextColor3 = Color3.fromRGB(196, 196, 208)
+statsLbl.Font = Enum.Font.GothamSemibold
+statsLbl.TextSize = 10
+statsLbl.TextXAlignment = Enum.TextXAlignment.Center
+statsLbl.ZIndex = 4
 local barState = "IDLE"
 function setBarState(state)
 barState = state
-if state == "STEALING" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 22, 26)}):Play()
-elseif state == "READY" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}):Play()
+local active = (state == "STEALING" or state == "READY")
+TS:Create(progressPct, TweenInfo.new(0.2), {
+TextColor3 = active and THEME_ACCENT_BRIGHT or THEME_ACCENT_DIM
+}):Play()
+TS:Create(knob, TweenInfo.new(0.2), {
+BackgroundColor3 = active and THEME_ACCENT_BRIGHT or Color3.fromRGB(148, 148, 160)
+}):Play()
+TS:Create(trackStroke, TweenInfo.new(0.2), {Transparency = active and 0.25 or 0.55}):Play()
+TS:Create(progressFill, TweenInfo.new(0.2), {BackgroundTransparency = active and 0.45 or 0.78}):Play()
+if not active then
 progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(235, 235, 235)
-else
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 22, 26)}):Play()
-progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(150, 150, 150)
 end
 end
 task.spawn(function()
@@ -7653,14 +7688,25 @@ pcall(function()
 local stat = Stats.Network.ServerStatsItem["Data Ping"]
 if stat then ping = tonumber(stat:GetValue()) or 0 end
 end)
-progressRadLbl.Text = string.format("FPS:%d | PING:%dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+statsLbl.Text = string.format("FPS: %d  discord.gg/aceduels  PING: %dms",
+math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+local radius = 0
+pcall(function()
+radius = (_G.AceStealRadii and _G.AceStealRadii[selectedStealMode]) or autoStealRadius or 0
+end)
+progressRadLbl.Text = "Radius: " .. tostring(math.floor(tonumber(radius) or 0))
 task.wait(0.5)
 end
 end)
 local StealBar = {}
 function StealBar.SetProgress(p)
 p = math.clamp(p, 0, 1)
-progressFill.Size = UDim2.new(p, 0, 1, 0)
+-- Nudge the knob inward at both ends so it never hangs off the track,
+-- and run the fill out to the knob centre so the two stay joined.
+-- Uses the design size, not AbsoluteSize, which the UIScale would skew.
+local inset = (0.5 - p) * KNOB_SIZE
+knob.Position = UDim2.new(p, inset, 0.5, 0)
+progressFill.Size = UDim2.new(p, inset, 1, 0)
 progressPct.Text = math.floor(p * 100 + 0.5) .. "%"
 end
 function StealBar.Reset()
@@ -7671,6 +7717,7 @@ function StealBar.SetState(state)
 setBarState(state)
 end
 setBarState("IDLE")
+StealBar.SetProgress(0)
 _G.StealBar = StealBar
 end
 _G.__AceDuelsSetupStealBar()

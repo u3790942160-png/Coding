@@ -108,6 +108,9 @@ function methods:TweenPosition() end
 function methods:ApplyImpulse() end
 function methods:Move() end
 function methods:ChangeState() end
+function methods:GetState()
+    return self._props.State or M.Enum.HumanoidStateType.Running
+end
 function methods:BreakJoints() end
 function methods:PivotTo() end
 function methods:GetPivot() return M.CFrame.new() end
@@ -184,8 +187,15 @@ function Vector3mt:Lerp() return self end
 M.Vector3 = {
     new = function(x, y, z)
         local v = setmetatable({X = x or 0, Y = y or 0, Z = z or 0}, Vector3mt)
-        v.Magnitude = math.sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)
-        v.Unit = setmetatable({X = 0, Y = 0, Z = 0, Magnitude = 1}, Vector3mt)
+        local m = math.sqrt(v.X * v.X + v.Y * v.Y + v.Z * v.Z)
+        v.Magnitude = m
+        -- Built directly rather than through Vector3.new, which would recurse.
+        if m > 0 then
+            v.Unit = setmetatable({X = v.X / m, Y = v.Y / m, Z = v.Z / m, Magnitude = 1}, Vector3mt)
+        else
+            v.Unit = setmetatable({X = 0, Y = 0, Z = 0, Magnitude = 0}, Vector3mt)
+        end
+        v.Unit.Unit = v.Unit
         return v
     end,
 }
@@ -200,9 +210,15 @@ function CFramemt:ToWorldSpace() return self end
 function CFramemt:ToObjectSpace() return self end
 function CFramemt:Lerp() return self end
 function CFramemt:Inverse() return self end
+-- CFrame + Vector3 has to produce a real translation: the speed bypass walks
+-- the root part forward that way, and the test asserts on where it ends up.
+CFramemt.__add = function(a, v) return M.CFrame.new(a.Position + v) end
+CFramemt.__sub = function(a, v) return M.CFrame.new(a.Position - v) end
 M.CFrame = {
-    new = function()
-        return setmetatable({p = M.Vector3.new(), Position = M.Vector3.new(),
+    new = function(x, y, z)
+        local pos
+        if type(x) == "table" then pos = x else pos = M.Vector3.new(x, y, z) end
+        return setmetatable({p = pos, Position = pos,
             LookVector = M.Vector3.new(), RightVector = M.Vector3.new(), UpVector = M.Vector3.new()}, CFramemt)
     end,
     Angles = function() return M.CFrame.new() end,
@@ -276,8 +292,18 @@ function UIS:GetMouseLocation() return vec2(0, 0) end
 UIS.TouchEnabled = true
 
 local TweenService = service("TweenService")
-function TweenService:Create()
-    return {Play = function() end, Cancel = function() end, Completed = signal()}
+-- Playing a tween snaps straight to its end state. Nothing here models time,
+-- and the end state is what a test wants to assert on.
+function TweenService:Create(obj, _, props)
+    return {
+        Play = function()
+            if obj and type(props) == "table" then
+                for k, v in pairs(props) do obj[k] = v end
+            end
+        end,
+        Cancel = function() end,
+        Completed = signal(),
+    }
 end
 
 local RunService = service("RunService")

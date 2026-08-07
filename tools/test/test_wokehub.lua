@@ -60,6 +60,12 @@ local function clickToggle(pageName, rowName)
     local btn = assert(area:FindFirstChild("ToggleButton"), "missing ToggleButton on " .. rowName)
     btn.MouseButton1Click:Fire()
 end
+-- Toggles have no readable state property; the knob slides right when on.
+local function toggleIsOn(pageName, rowName)
+    local r = assert(row(pageName, rowName), "missing row " .. rowName)
+    local knob = r:FindFirstChild("ToggleArea"):FindFirstChild("Track"):FindFirstChild("Knob")
+    return knob.Position.X.Scale == 1
+end
 local function setValue(pageName, rowName, text)
     local r = assert(row(pageName, rowName), "missing row " .. rowName)
     local box = assert(r:FindFirstChild("ValueBox"), "missing ValueBox on " .. rowName)
@@ -363,6 +369,165 @@ dropMobile.InputBegan:Fire(press)
 dropMobile.InputEnded:Fire(press)
 check("mobile drop jumps in JUMP mode", jumped == true)
 env.runDropBrainrot = realDrop
+
+print("\n-- speed bypass --")
+local bypassGui = mock.services.Players.LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("WokeSpeedBypass")
+check("bypass panel exists", bypassGui ~= nil)
+local panel = bypassGui:FindFirstChild("Panel")
+local bypassRows = panel:FindFirstChild("Rows")
+local stateBtn = bypassRows:FindFirstChild("Main Feature"):FindFirstChild("StateButton")
+local powerBox = bypassRows:FindFirstChild("Power"):FindFirstChild("ValueBox")
+local speedOut = bypassRows:FindFirstChild("Speed"):FindFirstChild("ReadoutValue")
+
+check("panel starts disabled", stateBtn.Text == "DISABLED", stateBtn.Text)
+stateBtn.MouseButton1Click:Fire()
+check("panel button enables bypass", env.WokeBypassEnabled == true)
+check("panel button reads ENABLED", stateBtn.Text == "ENABLED", stateBtn.Text)
+check("movement toggle mirrors the panel", toggleIsOn("Movement", "Speed Bypass"))
+
+-- The hub row and the panel drive the same state.
+clickToggle("Movement", "Speed Bypass")
+check("movement toggle disables bypass", env.WokeBypassEnabled == false)
+check("panel button follows the hub row", stateBtn.Text == "DISABLED", stateBtn.Text)
+
+-- Power: more power, more speed.
+env.currentSpeedMode = "Normal"
+env.NS = 60
+powerBox.Text = "200000"
+powerBox.FocusLost:Fire()
+check("power box sets power", env.WokeBypassPower == 200000, env.WokeBypassPower)
+check("power reaches the hub row",
+    row("Movement", "Bypass Power"):FindFirstChild("ValueBox").Text == "200000",
+    row("Movement", "Bypass Power"):FindFirstChild("ValueBox").Text)
+check("200000 power is +100 studs/s", math.abs(env.WokeBypassSpeed() - 60) < 1e-6, env.WokeBypassSpeed())
+env.WokeSetBypass(true)
+check("bypass on adds the bonus to base speed", math.abs(env.WokeBypassSpeed() - 160) < 1e-6, env.WokeBypassSpeed())
+check("speed readout shows the boost", speedOut.Text:find("160") ~= nil, speedOut.Text)
+powerBox.Text = "100000"
+powerBox.FocusLost:Fire()
+check("half the power is half the bonus", math.abs(env.WokeBypassSpeed() - 110) < 1e-6, env.WokeBypassSpeed())
+
+-- Out-of-range power is clamped rather than accepted.
+powerBox.Text = "99999999"
+powerBox.FocusLost:Fire()
+check("power clamps to the maximum", env.WokeBypassPower == 1000000, env.WokeBypassPower)
+powerBox.Text = "100000"
+powerBox.FocusLost:Fire()
+powerBox.Text = "banana"
+powerBox.FocusLost:Fire()
+check("nonsense power is rejected", env.WokeBypassPower == 100000, env.WokeBypassPower)
+check("nonsense power reverts the box", powerBox.Text == "100000", powerBox.Text)
+
+-- The engine: one step must actually move the root part forward.
+local char = mock.Instance.new("Model")
+char.Name = "TestChar"
+local hum = mock.Instance.new("Humanoid", char)
+hum.Health = 100
+hum.MoveDirection = mock.Vector3.new(1, 0, 0)
+local hrp = mock.Instance.new("Part", char)
+hrp.Name = "HumanoidRootPart"
+hrp.CFrame = mock.CFrame.new(0, 0, 0)
+mock.services.Players.LocalPlayer.Character = char
+
+-- Ramp-in means the first frames are short; run a second of them.
+for _ = 1, 60 do env.WokeBypassStep(1 / 60) end
+local travelled = hrp.CFrame.Position.X
+check("bypass moves the character forward", travelled > 20, travelled)
+check("bypass stays under the full bonus while ramping", travelled < 50, travelled)
+
+-- A wall in front stops it dead.
+local before = hrp.CFrame.Position.X
+mock.services.Workspace.Raycast = function() return {Position = mock.Vector3.new()} end
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("a wall blocks the bypass", hrp.CFrame.Position.X == before, hrp.CFrame.Position.X)
+mock.services.Workspace.Raycast = function() return nil end
+
+-- Standing still must not slide the character.
+before = hrp.CFrame.Position.X
+hum.MoveDirection = mock.Vector3.new(0, 0, 0)
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("no drift when standing still", hrp.CFrame.Position.X == before)
+hum.MoveDirection = mock.Vector3.new(1, 0, 0)
+
+-- Ragdolled or dead, it stays off.
+before = hrp.CFrame.Position.X
+hum.State = mock.Enum.HumanoidStateType.Ragdoll
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("ragdoll suspends the bypass", hrp.CFrame.Position.X == before)
+hum.State = mock.Enum.HumanoidStateType.Running
+
+before = hrp.CFrame.Position.X
+hum.Health = 0
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("death suspends the bypass", hrp.CFrame.Position.X == before)
+hum.Health = 100
+
+-- An aimbot steers the character itself, so the bypass must yield to it.
+before = hrp.CFrame.Position.X
+env.AceNormalAimbotOn = true
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("aimbot suspends the bypass", hrp.CFrame.Position.X == before)
+env.AceNormalAimbotOn = false
+
+-- Off means off.
+env.WokeSetBypass(false)
+before = hrp.CFrame.Position.X
+for _ = 1, 10 do env.WokeBypassStep(1 / 60) end
+check("disabled bypass does not move the character", hrp.CFrame.Position.X == before)
+
+-- Keybind: default CapsLock, editable from both the panel and the Keybinds tab.
+check("default bind is CapsLock", env.speedKeybinds.SpeedBypass == mock.Enum.KeyCode.CapsLock,
+    tostring(env.speedKeybinds.SpeedBypass))
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.CapsLock}, false)
+check("CapsLock toggles the bypass", env.WokeBypassEnabled == true)
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.CapsLock}, false)
+check("CapsLock toggles it back off", env.WokeBypassEnabled == false)
+
+local panelKeyBtn = bypassRows:FindFirstChild("Keybind"):FindFirstChild("KeybindButton")
+local tabKeyBtn = row("Keybinds", "Speed Bypass Key"):FindFirstChild("KeybindButton")
+check("panel shows the bind", panelKeyBtn.Text == "CapsLock", panelKeyBtn.Text)
+check("keybinds tab shows the same bind", tabKeyBtn.Text == "CapsLock", tabKeyBtn.Text)
+panelKeyBtn.MouseButton1Click:Fire()
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.V}, false)
+check("rebinding from the panel takes", env.speedKeybinds.SpeedBypass == mock.Enum.KeyCode.V)
+check("keybinds tab picked up the rebind", tabKeyBtn.Text == "V", tabKeyBtn.Text)
+
+-- Mobile button.
+local bypassMobile = mobileHolder:FindFirstChild("Speed Bypass")
+check("bypass mobile button exists", bypassMobile ~= nil)
+local bypassPress = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector2.new(0, 0)}
+bypassMobile.InputBegan:Fire(bypassPress)
+bypassMobile.InputEnded:Fire(bypassPress)
+check("mobile button toggles the bypass", env.WokeBypassEnabled == true)
+env.WokeSetBypass(false)
+
+-- Closing the panel from its × hides it and clears the hub's show-panel row.
+panel.Visible = true
+env.WokeBypassPanelOpen = true
+panel:FindFirstChild("BypassClose").MouseButton1Click:Fire()
+check("close button hides the panel", panel.Visible == false)
+check("close button clears the show-panel row", not toggleIsOn("Movement", "Bypass Panel"))
+clickToggle("Movement", "Bypass Panel")
+check("show-panel row brings it back", panel.Visible == true)
+
+-- The panel drags by its header.
+local panelStart = panel.Position
+local panelDrag = {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(300, 300, 0)}
+panel:FindFirstChild("Header").InputBegan:Fire(panelDrag)
+mock.services.UserInputService.InputChanged:Fire(
+    {UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector3.new(350, 330, 0)})
+check("panel drags", panel.Position.X.Offset == panelStart.X.Offset + 50, panel.Position.X.Offset)
+mock.services.UserInputService.InputEnded:Fire(panelDrag)
+
+-- Config round trip.
+local bypassCfg = env.collectAceConfig()
+check("config carries bypass power", bypassCfg.wokeBypassPower == env.WokeBypassPower, bypassCfg.wokeBypassPower)
+check("config carries panel visibility", bypassCfg.wokeBypassPanel == true)
+check("config carries the bypass bind", bypassCfg.keybinds.SpeedBypass == "V", tostring(bypassCfg.keybinds.SpeedBypass))
+check("config carries the panel position", type(bypassCfg.wokeBypassPosition) == "table")
 
 print("\n-- deferred startup work --")
 local errs = mock.pump(6)

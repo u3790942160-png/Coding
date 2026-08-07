@@ -4656,6 +4656,73 @@ local function createKeybindRow(name, label, defaultKey, parent)
     return {row = row, button = btn, clear = clearBtn}
 end
 
+-- A row whose right-hand side is a wide ENABLED / DISABLED pill. Used by the
+-- speed bypass panel, where one big obvious state readout beats a small switch.
+local function createStateRow(name, label, parent)
+    local row = createRow(name, parent)
+    addRowBorder(row)
+    addRowLabel(row, label)
+
+    local btn = new("TextButton", {
+        Name = "StateButton",
+        ZIndex = 25,
+        Position = UDim2.new(1, -104, 0.5, -12),
+        Size = UDim2.new(0, 94, 0, 24),
+        BackgroundColor3 = INPUT_BG,
+        BackgroundTransparency = 0.18,
+        Text = "DISABLED",
+        TextColor3 = MUTED_TEXT,
+        TextSize = 11,
+        Font = Enum.Font.GothamBlack,
+        AutoButtonColor = false,
+        Parent = row,
+    })
+    local stroke = addInputBorder(btn)
+    local strokeGradient = stroke:FindFirstChildWhichIsA("UIGradient")
+
+    local api = {row = row, button = btn, state = false}
+    function api.setVisual(state)
+        state = state == true
+        if api.state == state then return end
+        api.state = state
+        btn.Text = state and "ENABLED" or "DISABLED"
+        uiTween(btn, 0.15, {
+            BackgroundTransparency = state and 0 or 0.18,
+            TextColor3 = state and WHITE or MUTED_TEXT,
+        })
+        if strokeGradient then
+            local grad = state and BORDER_GRAD_LIGHT or BORDER_GRAD_DARK
+            strokeGradient.Color = grad.Color
+            strokeGradient.Transparency = grad.Transparency
+        end
+    end
+    return api
+end
+
+-- A read-only row: label on the left, a value the wiring keeps up to date on
+-- the right. No input of any kind.
+local function createReadoutRow(name, label, parent)
+    local row = createRow(name, parent)
+    addRowBorder(row)
+    addRowLabel(row, label)
+
+    local value = new("TextLabel", {
+        Name = "ReadoutValue",
+        ZIndex = 5,
+        Position = UDim2.new(1, -142, 0, 0),
+        Size = UDim2.new(0, 130, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "--",
+        TextColor3 = WHITE,
+        TextSize = 12,
+        Font = Enum.Font.GothamBlack,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = row,
+    })
+
+    return {row = row, value = value}
+end
+
 local function createActionButton(name, label, parent)
     local row = createRow(name, parent)
     addRowBorder(row)
@@ -5226,7 +5293,7 @@ end
 --------------------------------------------------------------------------------
 -- Clear a hub left over from an earlier execution, otherwise running the
 -- script twice stacks two menus on top of each other.
-for _, name in ipairs({"WokeHub", "AdaptHubPolished", "AceDuelsAdaptReconstruct", "CyberHub"}) do
+for _, name in ipairs({"WokeHub", "WokeSpeedBypass", "AdaptHubPolished", "AceDuelsAdaptReconstruct", "CyberHub"}) do
     local old = PlayerGui:FindFirstChild(name)
     if old then pcall(function() old:Destroy() end) end
 end
@@ -5623,8 +5690,11 @@ local Utility    = createTabPage("Utility", Content, false)
 local Settings   = createTabPage("Settings", Content, false)
 
 -- Every control handle lives here so the wiring section can find it by name.
+-- `altKey` holds a second row bound to the same keybind id as one in `key`
+-- (the speed bypass panel shows its own copy of the bypass bind). Both rows
+-- edit and display the one underlying bind.
 local UI = {
-    toggle = {}, value = {}, mode = {}, key = {}, ctrlKey = {},
+    toggle = {}, value = {}, mode = {}, key = {}, ctrlKey = {}, altKey = {},
     expand = {}, pick = {}, action = {}, mobile = {}, gallery = {},
 }
 
@@ -5636,6 +5706,11 @@ UI.value["Normal Speed"]        = createValueRow("Normal Speed", "Normal Speed",
 UI.value["Carry Speed"]         = createValueRow("Carry Speed", "Carry Speed", "28.8", Movement)
 UI.mode["Speed Mode"]           = createModeRow("Speed Mode", "MODE", "NORMAL", Movement)
 UI.toggle["Auto Carry Speed"]   = createToggle("Auto Carry Speed", "Auto Carry Speed", Movement, false)
+
+createSection("Speed Bypass", "SPEED BYPASS", Movement)
+UI.toggle["Speed Bypass"]       = createToggle("Speed Bypass", "Speed Bypass", Movement, false)
+UI.value["Bypass Power"]        = createValueRow("Bypass Power", "Power", "100000", Movement)
+UI.toggle["Bypass Panel"]       = createToggle("Bypass Panel", "Show Bypass Panel", Movement, false)
 
 createSection("Lagger Configuration", "LAGGER CONFIGURATION", Movement)
 UI.value["Lagger Normal Speed"] = createValueRow("Lagger Normal Speed", "Lagger Normal Speed", "24.5", Movement)
@@ -5701,6 +5776,7 @@ UI.toggle["No Player Collision"] = createToggle("No Player Collision", "No Playe
 local KEYBIND_LAYOUT = {
     {"MOVEMENT KEYBINDS", {
         {"Speed Key", "SpeedToggle"},
+        {"Speed Bypass Key", "SpeedBypass"},
         {"Lagger Mode Key", "LaggerToggle"},
         {"Drop Key", "DropBrainrot"},
         {"TP Down Key", "TPDown"},
@@ -5882,11 +5958,112 @@ local MOBILE_DEFAULTS = {
     {"TP Bat",         "TP BAT",         UDim2.new(1, -132, 0.5, 37),   UDim2.new(0, 58, 0, 58)},
     {"Carry Speed",    "CARRY SPEED",    UDim2.new(1, -66,  0.5, 37),   UDim2.new(0, 58, 0, 58)},
     {"Instant Reset",  "INSTANT RESET",  UDim2.new(1, -132, 0.5, 103),  UDim2.new(0, 124, 0, 58)},
+    {"Speed Bypass",   "SPEED BYPASS",   UDim2.new(1, -132, 0.5, -227), UDim2.new(0, 124, 0, 58)},
 }
 
 for _, def in ipairs(MOBILE_DEFAULTS) do
     UI.mobile[def[1]] = createMobileButton(def[1], def[2], def[3], def[4], MobileButtons)
 end
+
+--------------------------------------------------------------------------------
+-- SPEED BYPASS PANEL
+--
+-- Its own ScreenGui rather than a frame inside the hub, so it can stay on
+-- screen with the main window closed and be dragged wherever it suits.
+--------------------------------------------------------------------------------
+local BypassGui = new("ScreenGui", {
+    Name = "WokeSpeedBypass",
+    IgnoreGuiInset = true,
+    ResetOnSpawn = false,
+    DisplayOrder = 1001,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    Parent = PlayerGui,
+})
+
+local BypassPanel = new("Frame", {
+    Name = "Panel",
+    Active = true,
+    ClipsDescendants = true,
+    Position = UDim2.new(0.5, -134, 0, 56),
+    Size = UDim2.new(0, 268, 0, 232),
+    BackgroundColor3 = DARK_BG,
+    BackgroundTransparency = 0.12,
+    BorderSizePixel = 0,
+    Parent = BypassGui,
+})
+new("UICorner", {CornerRadius = UDim.new(0, 13), Parent = BypassPanel})
+addDarkBorderGradient(new("UIStroke", {
+    Color = WHITE, Thickness = 1.2,
+    ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    Parent = BypassPanel,
+}))
+local BypassScale = new("UIScale", {Scale = 0.9, Parent = BypassPanel})
+
+-- The header doubles as the drag handle.
+local BypassHeader = new("TextButton", {
+    Name = "Header",
+    ZIndex = 2,
+    Size = UDim2.new(1, 0, 0, 58),
+    BackgroundTransparency = 1,
+    Text = "",
+    AutoButtonColor = false,
+    Parent = BypassPanel,
+})
+
+createWordmark("BypassTitle", "SPEED BYPASS", BypassHeader,
+    UDim2.new(0, 12, 0, 8), UDim2.new(1, -58, 0, 30), 3, 21)
+
+new("TextLabel", {
+    Name = "BypassSubtitle",
+    ZIndex = 5,
+    Position = UDim2.new(0, 14, 0, 36),
+    Size = UDim2.new(1, -58, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "WOKE  ·  discord.gg/adaptt",
+    TextColor3 = MUTED_TEXT,
+    TextSize = 10,
+    Font = Enum.Font.GothamBlack,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = BypassHeader,
+})
+
+local BypassClose = new("TextButton", {
+    Name = "BypassClose",
+    ZIndex = 6,
+    Position = UDim2.new(1, -38, 0, 12),
+    Size = UDim2.new(0, 26, 0, 26),
+    BackgroundColor3 = DARK_BG,
+    BackgroundTransparency = 0.28,
+    Text = "×",
+    TextColor3 = WHITE,
+    TextSize = 18,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+    Parent = BypassPanel,
+})
+new("UICorner", {CornerRadius = UDim.new(1, 0), Parent = BypassClose})
+addDarkBorderGradient(new("UIStroke", {
+    Color = WHITE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = BypassClose,
+}))
+
+local BypassRows = new("Frame", {
+    Name = "Rows",
+    ZIndex = 3,
+    Position = UDim2.new(0, 8, 0, 60),
+    Size = UDim2.new(1, -16, 1, -68),
+    BackgroundTransparency = 1,
+    Parent = BypassPanel,
+})
+new("UIListLayout", {
+    Padding = UDim.new(0, 7),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Parent = BypassRows,
+})
+
+local BypassState  = createStateRow("Main Feature", "Main Feature", BypassRows)
+local BypassPower  = createValueRow("Power", "Power", "100000", BypassRows)
+UI.altKey["SpeedBypass"] = createKeybindRow("Keybind", "Keybind", "NONE", BypassRows)
+local BypassSpeed  = createReadoutRow("Speed", "Speed", BypassRows)
 
 --============================================================================--
 --                                  WIRING                                    --
@@ -5977,6 +6154,180 @@ local function bindExpandable(api, read, apply)
 end
 
 --------------------------------------------------------------------------------
+-- SPEED BYPASS
+--
+-- The speed modes drive the humanoid, so they are limited by how fast the
+-- humanoid is allowed to walk — that is why Normal tops out around 59.5. The
+-- bypass does not touch that loop. It leaves the humanoid walking at its
+-- normal speed and moves the root part the *extra* distance itself, one frame
+-- at a time, along whatever direction the player is already holding.
+--
+-- Each frame's extra distance is walked in short hops with a raycast in front
+-- of every hop, so the character slides along the ground instead of punching
+-- through walls, and it ramps in and out instead of snapping.
+--
+-- POWER is the dial: POWER_PER_STUD power buys one extra stud/second, so the
+-- default 100000 is +50 studs/s on top of the current speed mode.
+--------------------------------------------------------------------------------
+local BYPASS_POWER_DEFAULT = 100000
+local BYPASS_POWER_MIN     = 1000
+local BYPASS_POWER_MAX     = 1000000
+local BYPASS_POWER_PER_STUD = 2000
+local BYPASS_DEFAULT_KEY   = Enum.KeyCode.CapsLock
+local BYPASS_MAX_HOP       = 3.5   -- studs per raycast-checked hop
+local BYPASS_MAX_HOPS      = 16
+local BYPASS_WALL_SKIN     = 1.6   -- clearance kept in front of the root part
+local BYPASS_RAMP          = 7     -- how quickly the boost eases in and out
+
+_G.WokeBypassPower = tonumber(_G.WokeBypassPower) or BYPASS_POWER_DEFAULT
+_G.WokeBypassEnabled = _G.WokeBypassEnabled == true
+if speedKeybinds.SpeedBypass == nil then
+    speedKeybinds.SpeedBypass = BYPASS_DEFAULT_KEY
+end
+
+local bypassBoost = 0          -- ramped bonus speed, studs/second
+local bypassRayParams = RaycastParams.new()
+bypassRayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local refreshBypassPanel   -- assigned below, once the readouts are bound
+
+local function bypassPower()
+    return math.clamp(tonumber(_G.WokeBypassPower) or BYPASS_POWER_DEFAULT,
+        BYPASS_POWER_MIN, BYPASS_POWER_MAX)
+end
+
+local function bypassBonusSpeed()
+    return bypassPower() / BYPASS_POWER_PER_STUD
+end
+
+local function bypassBaseSpeed()
+    local base = 0
+    pcall(function() base = getCurrentSpeedValue() or 0 end)
+    return base
+end
+
+-- Anything that steers the character itself has to win: running both would
+-- tear the root part between two positions on every frame.
+local function bypassSuspended()
+    if _G.AceNormalAimbotOn == true then return true end
+    if _G.AceAntiBypassAimbotOn == true then return true end
+    if _G.AceAntiDesyncAimbotOn == true then return true end
+    if autoLeftEnabled == true or autoRightEnabled == true then return true end
+    if dropBrainrotActive == true then return true end
+    -- Safe Mode holds everything else back during a duel countdown or while
+    -- carrying, and a sudden speed jump is the loudest thing in this hub.
+    if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then return true end
+    return false
+end
+
+-- One frame of bypass movement. Exposed so it can be driven directly in tests.
+local function bypassStep(dt)
+    if not (_G.WokeBypassEnabled == true) then bypassBoost = 0 return end
+
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root or (hum.Health or 0) <= 0 then bypassBoost = 0 return end
+    if bypassSuspended() then bypassBoost = 0 return end
+
+    local state = hum:GetState()
+    if hum.PlatformStand
+        or state == Enum.HumanoidStateType.Physics
+        or state == Enum.HumanoidStateType.Ragdoll
+        or state == Enum.HumanoidStateType.FallingDown
+        or state == Enum.HumanoidStateType.Seated then
+        bypassBoost = 0
+        return
+    end
+
+    local move = hum.MoveDirection
+    local flat = move and Vector3.new(move.X, 0, move.Z) or Vector3.zero
+    if flat.Magnitude < 0.05 then bypassBoost = 0 return end
+    local dir = flat.Unit
+
+    local target = bypassBonusSpeed()
+    bypassBoost = bypassBoost + (target - bypassBoost) * math.min((dt or 0) * BYPASS_RAMP, 1)
+
+    -- Cap the frame delta: after a hitch, dt can be large enough that one
+    -- frame's catch-up would read as a teleport.
+    local distance = bypassBoost * math.min(dt or 0, 1 / 30)
+    if distance <= 0.001 then return end
+
+    bypassRayParams.FilterDescendantsInstances = {char}
+    local hops = math.clamp(math.ceil(distance / BYPASS_MAX_HOP), 1, BYPASS_MAX_HOPS)
+    local hop = distance / hops
+    for _ = 1, hops do
+        if workspace:Raycast(root.Position, dir * (hop + BYPASS_WALL_SKIN), bypassRayParams) then
+            break
+        end
+        root.CFrame = root.CFrame + dir * hop
+    end
+end
+
+local function setBypass(state)
+    state = state == true
+    if _G.WokeBypassEnabled == state then return end
+    _G.WokeBypassEnabled = state
+    if not state then bypassBoost = 0 end
+    if refreshBypassPanel then refreshBypassPanel() end
+    if UI.toggle["Speed Bypass"] then UI.toggle["Speed Bypass"].setVisual(state) end
+    saveSoon()
+end
+
+local function setBypassPower(value)
+    _G.WokeBypassPower = math.clamp(tonumber(value) or BYPASS_POWER_DEFAULT,
+        BYPASS_POWER_MIN, BYPASS_POWER_MAX)
+    if refreshBypassPanel then refreshBypassPanel() end
+end
+
+_G.WokeSetBypass = setBypass
+_G.WokeToggleBypass = function() setBypass(not (_G.WokeBypassEnabled == true)) end
+_G.WokeBypassStep = bypassStep
+_G.WokeBypassSpeed = function() return bypassBaseSpeed() + (_G.WokeBypassEnabled and bypassBonusSpeed() or 0) end
+
+RunService.RenderStepped:Connect(bypassStep)
+
+-- Panel controls.
+do
+    refreshBypassPanel = function()
+        local on = _G.WokeBypassEnabled == true
+        BypassState.setVisual(on)
+        -- Never stomp the box the player is typing into.
+        if UserInputService:GetFocusedTextBox() ~= BypassPower.box then
+            BypassPower.box.Text = tostring(math.floor(bypassPower() + 0.5))
+        end
+        local base = bypassBaseSpeed()
+        BypassSpeed.value.Text = on
+            and string.format("%.1f → %.1f", base, base + bypassBonusSpeed())
+            or string.format("%.1f", base)
+    end
+
+    BypassState.button.MouseButton1Click:Connect(function()
+        setBypass(not (_G.WokeBypassEnabled == true))
+    end)
+
+    BypassPower.box.FocusLost:Connect(function()
+        -- Anything that is not a number leaves the power where it was; the
+        -- refresh below puts the old value back in the box.
+        local typed = tonumber(BypassPower.box.Text)
+        if typed then setBypassPower(typed) else refreshBypassPanel() end
+        if UI.value["Bypass Power"] then
+            UI.value["Bypass Power"].box.Text = tostring(math.floor(bypassPower() + 0.5))
+        end
+        saveSoon()
+    end)
+
+    BypassClose.MouseButton1Click:Connect(function()
+        _G.WokeBypassPanelOpen = false
+        BypassPanel.Visible = false
+        if UI.toggle["Bypass Panel"] then UI.toggle["Bypass Panel"].setVisual(false) end
+        saveSoon()
+    end)
+
+    refreshBypassPanel()
+end
+
+--------------------------------------------------------------------------------
 -- MOVEMENT wiring
 --------------------------------------------------------------------------------
 do
@@ -6030,6 +6381,24 @@ do
             end
         end)
     setAutoCarrySpeedVisual = function(state) UI.toggle["Auto Carry Speed"].setVisual(state) end
+
+    -- The bypass controls exist twice: here and on the standalone panel. Both
+    -- read and write the same globals, and each refreshes the other.
+    bindToggle(UI.toggle["Speed Bypass"],
+        function() return _G.WokeBypassEnabled == true end,
+        function(state) setBypass(state) end)
+
+    bindValue(UI.value["Bypass Power"],
+        function() return math.floor(bypassPower() + 0.5) end,
+        function(v) setBypassPower(v) end,
+        BYPASS_POWER_MIN, BYPASS_POWER_MAX)
+
+    bindToggle(UI.toggle["Bypass Panel"],
+        function() return _G.WokeBypassPanelOpen == true end,
+        function(state)
+            _G.WokeBypassPanelOpen = state
+            BypassPanel.Visible = state
+        end)
 
     bindExpandable(UI.expand["Drop"], function() return _G.WokeDropMode == "Stand" and 2 or 1 end,
         function(idx) _G.WokeDropMode = (idx == 2) and "Stand" or "Jump" end)
@@ -6385,6 +6754,11 @@ local function refreshKeybindButtons()
             handle.button.Text = keyText(currentBind(keyId, false))
         end
     end
+    for keyId, handle in pairs(UI.altKey) do
+        if not (listeningRow and listeningRow.handle == handle) then
+            handle.button.Text = keyText(currentBind(keyId, false))
+        end
+    end
     for keyId, handle in pairs(UI.ctrlKey) do
         if not (listeningRow and listeningRow.handle == handle) then
             handle.button.Text = keyText(currentBind(keyId, true))
@@ -6416,6 +6790,7 @@ do
     end
 
     for keyId, handle in pairs(UI.key) do hookKeyRow(keyId, handle, false) end
+    for keyId, handle in pairs(UI.altKey) do hookKeyRow(keyId, handle, false) end
     for keyId, handle in pairs(UI.ctrlKey) do hookKeyRow(keyId, handle, true) end
 end
 
@@ -6544,6 +6919,7 @@ do
         function(v)
             _G.WokeUiScale = v / 100
             MainScale.Scale = _G.WokeUiScale
+            BypassScale.Scale = _G.WokeUiScale
         end, 50, 150)
 
     bindValue(UI.value["Steal Bar Size"],
@@ -6616,6 +6992,10 @@ do
         ["Lagger Mode"]   = {
             press = function() toggleLaggerMode() end,
             state = function() return currentSpeedMode == "Lagger" or currentSpeedMode == "Lagger Carry" end,
+        },
+        ["Speed Bypass"]  = {
+            press = function() setBypass(not (_G.WokeBypassEnabled == true)) end,
+            state = function() return _G.WokeBypassEnabled == true end,
         },
     }
 
@@ -6759,6 +7139,11 @@ makeDraggable(Main, Main, function()
 end)
 local floatWasDragged = makeDraggable(WokeFloatOpen, FloatButton)
 
+-- The bypass panel drags by its header, so the rows underneath stay clickable.
+makeDraggable(BypassPanel, BypassHeader, function()
+    _G.WokeBypassPosition = udim2ToTable(BypassPanel.Position)
+end)
+
 FloatButton.MouseButton1Click:Connect(function()
     if floatWasDragged() then return end
     setMenuOpen(true)
@@ -6769,6 +7154,7 @@ end)
 --------------------------------------------------------------------------------
 local HOTKEY_ACTIONS = {
     SpeedToggle = function() toggleCarryMode() end,
+    SpeedBypass = function() setBypass(not (_G.WokeBypassEnabled == true)) end,
     LaggerToggle = function() toggleLaggerMode() end,
     DropBrainrot = function() runDrop() end,
     TPDown = function() runTPFloor() end,
@@ -6856,6 +7242,7 @@ local function syncAll()
         if api.refresh then api.refresh() end
     end
     if refreshSpeedModeRows then refreshSpeedModeRows() end
+    if refreshBypassPanel then refreshBypassPanel() end
     refreshKeybindButtons()
     for _, api in pairs(UI.mobile) do
         if api.stateFn then api.setActive(api.stateFn()) end
@@ -6874,6 +7261,8 @@ task.spawn(function()
             end
         end
         if refreshSpeedModeRows then refreshSpeedModeRows() end
+        -- Keeps the panel's live speed readout moving as the speed mode changes.
+        if refreshBypassPanel then refreshBypassPanel() end
     end
 end)
 
@@ -6947,7 +7336,17 @@ UI.action["RESET ALL SETTINGS"].button.MouseButton1Click:Connect(function()
     if type(applyCustomSky) == "function" then pcall(applyCustomSky, "Off") end
     selectedAnimationPack = "OFF"
     pcall(applyAnimationPack, "OFF")
+    setBypass(false)
+    setBypassPower(BYPASS_POWER_DEFAULT)
+    _G.WokeBypassPanelOpen = true
+    BypassPanel.Visible = true
+    BypassPanel.Position = UDim2.new(0.5, -134, 0, 56)
+    _G.WokeBypassPosition = nil
+
     applyDefaultAceKeybinds()
+    -- Not in DEFAULT_SPEED_KEYBINDS (that table lives in the Ace source), so
+    -- applyDefaultAceKeybinds leaves it alone.
+    speedKeybinds.SpeedBypass = BYPASS_DEFAULT_KEY
     _G.WokeControllerBinds = {}
     _G.WokeUiScale = 0.85
     MainScale.Scale = _G.WokeUiScale
@@ -6976,6 +7375,10 @@ do
         -- them would load this UI at the wrong size with the wrong picture.
         t.wokeUiScale = _G.WokeUiScale
         t.wokeBackground = _G.WokeBackground
+        t.wokeBypassEnabled = _G.WokeBypassEnabled == true
+        t.wokeBypassPower = bypassPower()
+        t.wokeBypassPanel = _G.WokeBypassPanelOpen == true
+        t.wokeBypassPosition = _G.WokeBypassPosition
         t.wokeMobilePositions = (function()
             local out = {}
             for name, api in pairs(UI.mobile) do out[name] = udim2ToTable(api.button.Position) end
@@ -7005,6 +7408,20 @@ do
     _G.WokeButtonImage = saved("wokeButtonImage", "adaptButtonImage") or ""
     _G.WokeUiScale = math.clamp(tonumber(data.wokeUiScale) or 0.85, 0.5, 1.5)
     _G.WokeBackground = tonumber(data.wokeBackground) or 0
+
+    -- Speed bypass. Its keybind lives in the Ace `speedKeybinds` table, but it
+    -- is added by this file — the Ace loader had already run by then and
+    -- skipped the key, so restore it here. An explicitly cleared bind saves as
+    -- "None" and must stay cleared, which is why the nil check comes first.
+    _G.WokeBypassEnabled = data.wokeBypassEnabled == true
+    _G.WokeBypassPower = math.clamp(tonumber(data.wokeBypassPower) or BYPASS_POWER_DEFAULT,
+        BYPASS_POWER_MIN, BYPASS_POWER_MAX)
+    _G.WokeBypassPanelOpen = data.wokeBypassPanel ~= false
+    _G.WokeBypassPosition = data.wokeBypassPosition
+    local savedKeys = type(data.keybinds) == "table" and data.keybinds or nil
+    if savedKeys and savedKeys.SpeedBypass ~= nil then
+        speedKeybinds.SpeedBypass = stringToKeyCode(savedKeys.SpeedBypass)
+    end
 
     local positions = saved("wokeMobilePositions", "adaptMobilePositions")
     if type(positions) == "table" then
@@ -7060,6 +7477,13 @@ local function applySavedState()
     pcall(function()
         if syncAnimationPackIndex then syncAnimationPackIndex() end
         if applySavedAnimationPackToCharacter then applySavedAnimationPackToCharacter(LocalPlayer.Character) end
+    end)
+    pcall(function()
+        BypassPanel.Visible = _G.WokeBypassPanelOpen == true
+        if _G.WokeBypassPosition then
+            BypassPanel.Position = tableToUDim2(_G.WokeBypassPosition, BypassPanel.Position)
+        end
+        BypassScale.Scale = math.clamp(tonumber(_G.WokeUiScale) or 0.85, 0.5, 1.5)
     end)
     pcall(function()
         MainScale.Scale = math.clamp(tonumber(_G.WokeUiScale) or 0.85, 0.5, 1.5)

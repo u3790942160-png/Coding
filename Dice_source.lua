@@ -3559,6 +3559,63 @@ end
 function tween(obj, props, time)
 TweenService:Create(obj, TweenInfo.new(time or 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
+-- ═══════════════════════════════════════════════════════════════
+-- DICE
+-- Drawn from frames, so there is no image asset to load and the faces
+-- can be repainted at will. Returns the die and a face setter.
+-- ═══════════════════════════════════════════════════════════════
+local DIE_PIPS = {
+[1] = {{0.5, 0.5}},
+[2] = {{0.28, 0.28}, {0.72, 0.72}},
+[3] = {{0.26, 0.26}, {0.5, 0.5}, {0.74, 0.74}},
+[4] = {{0.28, 0.28}, {0.72, 0.28}, {0.28, 0.72}, {0.72, 0.72}},
+[5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
+[6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
+}
+function makeDie(parent, sizePx, value, dark, fade)
+fade = tonumber(fade) or 0
+local die = Instance.new("Frame")
+die.Name = "Die"
+die.Size = UDim2.new(0, sizePx, 0, sizePx)
+die.BackgroundColor3 = dark and Color3.fromRGB(16, 16, 22) or Color3.fromRGB(244, 244, 250)
+die.BackgroundTransparency = fade
+die.BorderSizePixel = 0
+die.ZIndex = (parent.ZIndex or 1) + 1
+die.Parent = parent
+corner(die, math.max(3, math.floor(sizePx * 0.22)))
+stroke(die, dark and COLORS.stroke or Color3.fromRGB(255, 255, 255), 1, 0.4 + fade * 0.55)
+local pipColor = dark and Color3.fromRGB(240, 240, 248) or Color3.fromRGB(18, 18, 26)
+local pipSize = math.max(2, math.floor(sizePx * 0.19))
+-- Six pips is the most any face needs; the rest are hidden per value.
+local pips = {}
+for i = 1, 6 do
+local pip = Instance.new("Frame")
+pip.Name = "Pip" .. i
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, pipSize, 0, pipSize)
+pip.BackgroundColor3 = pipColor
+pip.BackgroundTransparency = fade
+pip.BorderSizePixel = 0
+pip.Visible = false
+pip.ZIndex = die.ZIndex + 1
+pip.Parent = die
+corner(pip, 999)
+pips[i] = pip
+end
+local function setFace(v)
+v = math.clamp(math.floor(tonumber(v) or 1), 1, 6)
+local layout = DIE_PIPS[v]
+for i = 1, 6 do
+local spot = layout[i]
+pips[i].Visible = spot ~= nil
+if spot then
+pips[i].Position = UDim2.new(spot[1], 0, spot[2], 0)
+end
+end
+end
+setFace(value or 1)
+return die, setFace
+end
 function makeDraggable(frame, handle)
 handle = handle or frame
 local dragging = false
@@ -3616,6 +3673,48 @@ Main.Parent = Gui
 corner(Main, 14)
 stroke(Main, COLORS.stroke, 1.1, 0.35)
 makeDraggable(Main)
+-- ═══════════════════════════════════════════════════════════════
+-- BACKDROP — faded dice scattered behind the panels. Sits at ZIndex 1
+-- so the translucent sidebar and content pane read over the top of it.
+-- ═══════════════════════════════════════════════════════════════
+local DiceBackdrop = Instance.new("Frame")
+DiceBackdrop.Name = "DiceBackdrop"
+DiceBackdrop.BackgroundTransparency = 1
+DiceBackdrop.Size = UDim2.new(1, 0, 1, 0)
+DiceBackdrop.Position = UDim2.new(0, 0, 0, 0)
+DiceBackdrop.ClipsDescendants = true
+DiceBackdrop.ZIndex = 1
+DiceBackdrop.Parent = Main
+corner(DiceBackdrop, 14)
+local backdropDieSetters = {}
+do
+-- All light faced: a dark die on a near-black panel reads as nothing.
+local layout = {
+{x = 0.09, y = 0.16, size = 62, rot = -14, face = 5},
+{x = 0.29, y = 0.62, size = 46, rot = 12, face = 3},
+{x = 0.54, y = 0.13, size = 72, rot = -7, face = 6},
+{x = 0.80, y = 0.42, size = 52, rot = 18, face = 2},
+{x = 0.93, y = 0.78, size = 64, rot = -12, face = 4},
+{x = 0.16, y = 0.89, size = 40, rot = 23, face = 1},
+{x = 0.65, y = 0.87, size = 44, rot = -20, face = 5},
+{x = 0.42, y = 0.34, size = 36, rot = 7, face = 2},
+{x = 0.71, y = 0.63, size = 34, rot = -25, face = 3},
+{x = 0.35, y = 0.10, size = 30, rot = 15, face = 4},
+}
+for _, spec in ipairs(layout) do
+local die, setFace = makeDie(DiceBackdrop, spec.size, spec.face, false, 0.74)
+die.AnchorPoint = Vector2.new(0.5, 0.5)
+die.Position = UDim2.new(spec.x, 0, spec.y, 0)
+die.Rotation = spec.rot
+table.insert(backdropDieSetters, setFace)
+end
+end
+-- Re-rolled alongside the title pair whenever you change tab.
+function rollBackdropDice()
+for _, setFace in ipairs(backdropDieSetters) do
+setFace(math.random(1, 6))
+end
+end
 Main:GetPropertyChangedSignal("Position"):Connect(function()
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
@@ -4148,60 +4247,6 @@ end
 -- ═══════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════
--- DICE
--- Drawn from frames, so there is no image asset to load and the faces
--- can be repainted at will. Returns the die and a face setter.
--- ═══════════════════════════════════════════════════════════════
-local DIE_PIPS = {
-[1] = {{0.5, 0.5}},
-[2] = {{0.28, 0.28}, {0.72, 0.72}},
-[3] = {{0.26, 0.26}, {0.5, 0.5}, {0.74, 0.74}},
-[4] = {{0.28, 0.28}, {0.72, 0.28}, {0.28, 0.72}, {0.72, 0.72}},
-[5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
-[6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
-}
-function makeDie(parent, sizePx, value, dark)
-local die = Instance.new("Frame")
-die.Name = "Die"
-die.Size = UDim2.new(0, sizePx, 0, sizePx)
-die.BackgroundColor3 = dark and Color3.fromRGB(16, 16, 22) or Color3.fromRGB(244, 244, 250)
-die.BorderSizePixel = 0
-die.ZIndex = (parent.ZIndex or 1) + 1
-die.Parent = parent
-corner(die, math.max(3, math.floor(sizePx * 0.22)))
-stroke(die, dark and COLORS.stroke or Color3.fromRGB(255, 255, 255), 1, 0.4)
-local pipColor = dark and Color3.fromRGB(240, 240, 248) or Color3.fromRGB(18, 18, 26)
-local pipSize = math.max(2, math.floor(sizePx * 0.19))
--- Six pips is the most any face needs; the rest are hidden per value.
-local pips = {}
-for i = 1, 6 do
-local pip = Instance.new("Frame")
-pip.Name = "Pip" .. i
-pip.AnchorPoint = Vector2.new(0.5, 0.5)
-pip.Size = UDim2.new(0, pipSize, 0, pipSize)
-pip.BackgroundColor3 = pipColor
-pip.BorderSizePixel = 0
-pip.Visible = false
-pip.ZIndex = die.ZIndex + 1
-pip.Parent = die
-corner(pip, 999)
-pips[i] = pip
-end
-local function setFace(v)
-v = math.clamp(math.floor(tonumber(v) or 1), 1, 6)
-local layout = DIE_PIPS[v]
-for i = 1, 6 do
-local spot = layout[i]
-pips[i].Visible = spot ~= nil
-if spot then
-pips[i].Position = UDim2.new(spot[1], 0, spot[2], 0)
-end
-end
-end
-setFace(value or 1)
-return die, setFace
-end
--- ═══════════════════════════════════════════════════════════════
 -- TOP BAR — inset title strip with the window controls on the right
 -- ═══════════════════════════════════════════════════════════════
 local TopBar = Instance.new("Frame")
@@ -4451,6 +4496,7 @@ page.Visible = pageName == name
 end
 if PageTitle then PageTitle.Text = name end
 if rollTitleDice then rollTitleDice() end
+if rollBackdropDice then rollBackdropDice() end
 for tabName, btn in pairs(tabButtons) do
 local on = tabName == name
 btn.TextColor3 = on and COLORS.white or Color3.fromRGB(166, 166, 178)
@@ -7174,14 +7220,14 @@ end)
 end
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
-pbFrame.Size = UDim2.new(0, 392, 0, 58)
-pbFrame.Position = UDim2.new(0.5, -196, 1, -100)
+pbFrame.Size = UDim2.new(0, 340, 0, 50)
+pbFrame.Position = UDim2.new(0.5, -170, 1, -92)
 pbFrame.BackgroundColor3 = Color3.fromRGB(6, 6, 9)
 pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
 pbFrame.ClipsDescendants = true
-Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 16)
+Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 14)
 local pbSt = Instance.new("UIStroke", pbFrame)
 pbSt.Color = THEME_ACCENT
 pbSt.Thickness = 1.5
@@ -7194,20 +7240,20 @@ pbScale.Parent = pbFrame
 -- Percentage sits outside the track on the left.
 local progressPct = Instance.new("TextLabel", pbFrame)
 progressPct.Name = "Percent"
-progressPct.Size = UDim2.new(0, 46, 0, 30)
-progressPct.Position = UDim2.new(0, 16, 0, 6)
+progressPct.Size = UDim2.new(0, 40, 0, 26)
+progressPct.Position = UDim2.new(0, 14, 0, 5)
 progressPct.BackgroundTransparency = 1
 progressPct.Text = "0%"
 progressPct.TextColor3 = THEME_ACCENT_BRIGHT
 progressPct.Font = Enum.Font.GothamBold
-progressPct.TextSize = 14
+progressPct.TextSize = 12
 progressPct.TextXAlignment = Enum.TextXAlignment.Left
 progressPct.ZIndex = 4
 -- Track. Left unclipped so the knob can overhang it top and bottom.
 local track = Instance.new("Frame", pbFrame)
 track.Name = "Track"
-track.Size = UDim2.new(0, 200, 0, 18)
-track.Position = UDim2.new(0, 70, 0, 12)
+track.Size = UDim2.new(0, 172, 0, 16)
+track.Position = UDim2.new(0, 60, 0, 10)
 track.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
 track.BorderSizePixel = 0
 track.ZIndex = 2
@@ -7237,7 +7283,7 @@ Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
 local fillGradient = Instance.new("UIGradient", progressFill)
 fillGradient.Color = ColorSequence.new(THEME_ACCENT_BRIGHT, THEME_ACCENT_DIM)
 fillGradient.Rotation = 90
-local KNOB_SIZE = 24
+local KNOB_SIZE = 20
 local knob = Instance.new("Frame", track)
 knob.Name = "Knob"
 knob.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -7253,8 +7299,8 @@ knobStroke.Thickness = 1
 knobStroke.Transparency = 0.65
 local knobShine = Instance.new("Frame", knob)
 knobShine.Name = "Shine"
-knobShine.Size = UDim2.new(0, 14, 0, 6)
-knobShine.Position = UDim2.new(0.5, -7, 0, 4)
+knobShine.Size = UDim2.new(0, 12, 0, 5)
+knobShine.Position = UDim2.new(0.5, -6, 0, 3)
 knobShine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 knobShine.BackgroundTransparency = 0.55
 knobShine.BorderSizePixel = 0
@@ -7262,24 +7308,24 @@ knobShine.ZIndex = 6
 Instance.new("UICorner", knobShine).CornerRadius = UDim.new(1, 0)
 local progressRadLbl = Instance.new("TextLabel", pbFrame)
 progressRadLbl.Name = "Radius"
-progressRadLbl.Size = UDim2.new(0, 92, 0, 30)
-progressRadLbl.Position = UDim2.new(0, 284, 0, 6)
+progressRadLbl.Size = UDim2.new(0, 84, 0, 26)
+progressRadLbl.Position = UDim2.new(0, 242, 0, 5)
 progressRadLbl.BackgroundTransparency = 1
 progressRadLbl.Text = "Radius: 0"
 progressRadLbl.TextColor3 = THEME_ACCENT_BRIGHT
 progressRadLbl.Font = Enum.Font.GothamBold
-progressRadLbl.TextSize = 14
+progressRadLbl.TextSize = 12
 progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
 progressRadLbl.ZIndex = 4
 local statsLbl = Instance.new("TextLabel", pbFrame)
 statsLbl.Name = "Stats"
-statsLbl.Size = UDim2.new(1, 0, 0, 18)
-statsLbl.Position = UDim2.new(0, 0, 0, 36)
+statsLbl.Size = UDim2.new(1, 0, 0, 16)
+statsLbl.Position = UDim2.new(0, 0, 0, 31)
 statsLbl.BackgroundTransparency = 1
 statsLbl.Text = "FPS: 0  discord.gg/diceduels  PING: 0ms"
 statsLbl.TextColor3 = Color3.fromRGB(196, 196, 208)
 statsLbl.Font = Enum.Font.GothamSemibold
-statsLbl.TextSize = 10
+statsLbl.TextSize = 9
 statsLbl.TextXAlignment = Enum.TextXAlignment.Center
 statsLbl.ZIndex = 4
 local barState = "IDLE"

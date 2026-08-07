@@ -26,42 +26,84 @@ return oldFire(self, ...)
 end))
 end
 end)
+-- ═══════════════════════════════════════════════════════════════
+-- INSTA RESET — physics burst
+-- Spams an illegal velocity plus a local kill for a fraction of a
+-- second until the server gives up and respawns you, with WalkSpeed
+-- reads spoofed back to default so speed checks stay quiet meanwhile.
+-- ═══════════════════════════════════════════════════════════════
+_G.DiceBurstReset = _G.DiceBurstReset or {running = false}
+local BURST_DURATION = 0.15
+local BURST_TIMEOUT = 3
+local function diceBurstMaskWalkSpeed()
+-- Executor-only. Without them the burst still runs, just unmasked.
+if not (getrawmetatable and setreadonly and newcclosure) then return nil end
+local ok, restore = pcall(function()
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+local hooked
+hooked = newcclosure(function(self, key)
+if key == "WalkSpeed" and _G.DiceBurstReset.running then return 16 end
+return oldIndex(self, key)
+end)
+setreadonly(mt, false)
+mt.__index = hooked
+setreadonly(mt, true)
+return function()
+pcall(function()
+setreadonly(mt, false)
+-- Only unwind if nothing else hooked __index on top of us.
+if mt.__index == hooked then mt.__index = oldIndex end
+setreadonly(mt, true)
+end)
+end
+end)
+return ok and restore or nil
+end
 function _G.DiceCursedInstaReset()
-if not _G.DiceCursedResetRemote then
-for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
-if desc:IsA("RemoteEvent") and desc.Name:sub(1,3) == "RE/" then
-_G.DiceCursedResetRemote = desc
-break
+local state = _G.DiceBurstReset
+if state.running then return end
+local char = LP.Character
+local root = char and char:FindFirstChild("HumanoidRootPart")
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if not root or not hum then return end
+state.running = true
+local restore = diceBurstMaskWalkSpeed()
+local burstConn, respawnConn
+local finished = false
+local function finish()
+if finished then return end
+finished = true
+state.running = false
+if burstConn then pcall(function() burstConn:Disconnect() end) end
+if respawnConn then pcall(function() respawnConn:Disconnect() end) end
+if restore then restore() end
 end
-end
-end
-if not _G.DiceCursedResetRemote then return end
-local character = LP.Character
-local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-if humanoid and humanoid.Health <= 0 then
-pcall(function() _G.DiceCursedResetRemote:FireServer(_G.DiceCursedResetGuid, LP, "balloon") end)
+local startedAt = tick()
+burstConn = RunService.Heartbeat:Connect(function()
+if not state.running or tick() - startedAt > BURST_DURATION or not char.Parent then
+if burstConn then burstConn:Disconnect() end
 return
 end
-local resetDetected = false
-local resetConns = {}
-if humanoid then
-table.insert(resetConns, humanoid.Died:Connect(function() resetDetected = true end))
-table.insert(resetConns, humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-if humanoid.Health <= 0 then resetDetected = true end
-end))
-end
-if character then
-table.insert(resetConns, character.AncestryChanged:Connect(function(_, parent)
-if not parent then resetDetected = true end
-end))
-end
+pcall(function()
+-- Server-only API, so this throws on the client and is swallowed.
+-- Kept because it is part of the burst as written.
+root:SetNetworkOwner(LP)
+end)
+pcall(function()
+root.AssemblyLinearVelocity = Vector3.new(1e7, 1e7, 1e7)
+hum.Health = 0
+end)
+end)
+local respawned = false
+respawnConn = LP.CharacterAdded:Connect(function() respawned = true end)
 task.spawn(function()
-for _ = 1, 10 do
-if resetDetected then break end
-pcall(function() _G.DiceCursedResetRemote:FireServer(_G.DiceCursedResetGuid, LP, "balloon") end)
+-- Never leave the metatable hooked just because a respawn never came.
+local deadline = tick() + BURST_TIMEOUT
+while not respawned and tick() < deadline do
 task.wait(0.05)
 end
-for _, conn in ipairs(resetConns) do pcall(function() conn:Disconnect() end) end
+finish()
 end)
 end
 function cursedInstaReset()

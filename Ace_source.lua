@@ -7651,6 +7651,15 @@ statsLbl.TextSize = 10
 statsLbl.TextXAlignment = Enum.TextXAlignment.Center
 statsLbl.ZIndex = 4
 local barState = "IDLE"
+local function applyProgress(p)
+p = math.clamp(tonumber(p) or 0, 0, 1)
+-- Fill spans the true percentage: empty at 0, the whole track at 100.
+progressFill.Size = UDim2.new(p, 0, 1, 0)
+-- The knob is inset by half its width at each end so it stays on the
+-- track. Design size, not AbsoluteSize, which the UIScale would skew.
+knob.Position = UDim2.new(p, (0.5 - p) * KNOB_SIZE, 0.5, 0)
+progressPct.Text = math.floor(p * 100 + 0.5) .. "%"
+end
 function setBarState(state)
 barState = state
 local active = (state == "STEALING" or state == "READY")
@@ -7663,7 +7672,7 @@ BackgroundColor3 = active and THEME_ACCENT_BRIGHT or Color3.fromRGB(148, 148, 16
 TS:Create(trackStroke, TweenInfo.new(0.2), {Transparency = active and 0.25 or 0.55}):Play()
 TS:Create(progressFill, TweenInfo.new(0.2), {BackgroundTransparency = active and 0.45 or 0.78}):Play()
 if not active then
-progressPct.Text = "0%"
+applyProgress(0)
 end
 end
 task.spawn(function()
@@ -7700,14 +7709,7 @@ end
 end)
 local StealBar = {}
 function StealBar.SetProgress(p)
-p = math.clamp(p, 0, 1)
--- Nudge the knob inward at both ends so it never hangs off the track,
--- and run the fill out to the knob centre so the two stay joined.
--- Uses the design size, not AbsoluteSize, which the UIScale would skew.
-local inset = (0.5 - p) * KNOB_SIZE
-knob.Position = UDim2.new(p, inset, 0.5, 0)
-progressFill.Size = UDim2.new(p, inset, 1, 0)
-progressPct.Text = math.floor(p * 100 + 0.5) .. "%"
+applyProgress(p)
 end
 function StealBar.Reset()
 StealBar.SetProgress(0)

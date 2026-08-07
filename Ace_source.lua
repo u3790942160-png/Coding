@@ -3414,12 +3414,13 @@ end
 function tween(obj, props, time)
 TweenService:Create(obj, TweenInfo.new(time or 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
-function makeDraggable(frame)
+function makeDraggable(frame, handle)
+handle = handle or frame
 local dragging = false
 local dragStart
 local startPos
 local dragInput
-frame.InputBegan:Connect(function(input)
+handle.InputBegan:Connect(function(input)
 if _G.AceGuiLocked == true then return end
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 dragging = true
@@ -3432,7 +3433,7 @@ end
 end)
 end
 end)
-frame.InputChanged:Connect(function(input)
+handle.InputChanged:Connect(function(input)
 if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 dragInput = input
 end
@@ -3455,7 +3456,7 @@ Gui.Name = "AceDuelsAdaptReconstruct"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
-local FULL_MAIN_SIZE = UDim2.new(0, 356, 0, 536)
+local FULL_MAIN_SIZE = UDim2.new(0, 520, 0, 470)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0, 0.5)
@@ -4040,71 +4041,66 @@ do
 end
 -- ═══════════════════════════════════════════════════════════════
 
-local LogoIcon = Instance.new("ImageLabel")
-LogoIcon.Name = "LogoIcon"
-LogoIcon.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
-LogoIcon.BackgroundTransparency = 0.12
-LogoIcon.BorderSizePixel = 0
-LogoIcon.Image = "rbxassetid://84453255265251"
-LogoIcon.ScaleType = Enum.ScaleType.Fit
-LogoIcon.Size = UDim2.new(0, 58, 0, 58)
-LogoIcon.Position = UDim2.new(0, 16, 0, 17)
-LogoIcon.ZIndex = 6
-LogoIcon.Parent = Main
-corner(LogoIcon, 12)
-stroke(LogoIcon, COLORS.strokeSoft, 1, 0.35)
+-- ═══════════════════════════════════════════════════════════════
+-- TOP BAR — inset title strip with the window controls on the right
+-- ═══════════════════════════════════════════════════════════════
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.BackgroundColor3 = Color3.fromRGB(4, 4, 7)
+TopBar.BackgroundTransparency = 0.12
+TopBar.BorderSizePixel = 0
+TopBar.Position = UDim2.new(0, 10, 0, 10)
+TopBar.Size = UDim2.new(1, -20, 0, 42)
+TopBar.Active = true
+TopBar.ZIndex = 5
+TopBar.Parent = Main
+corner(TopBar, 10)
+stroke(TopBar, COLORS.strokeSoft, 1, 0.5)
+-- The title strip now covers the old bare-Main drag area, so make it a handle.
+makeDraggable(Main, TopBar)
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, -118, 0, 30)
-Title.Position = UDim2.new(0, 86, 0, 24)
-Title.Text = "ACE DUELS"
+Title.Size = UDim2.new(0, 46, 1, 0)
+Title.Position = UDim2.new(0, 16, 0, 0)
+Title.Text = "ACE"
 Title.TextColor3 = COLORS.white
-Title.TextStrokeTransparency = 0.65
+Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 27
+Title.TextSize = 17
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 6
-Title.Parent = Main
-local Discord = Instance.new("TextLabel")
-Discord.Name = "Discord"
-Discord.BackgroundTransparency = 1
-Discord.Size = UDim2.new(1, -118, 0, 18)
-Discord.Position = UDim2.new(0, 87, 0, 55)
-Discord.Text = "discord.gg/aceduels"
-Discord.TextColor3 = Color3.fromRGB(235, 235, 245)
-Discord.Font = Enum.Font.GothamSemibold
-Discord.TextSize = 14
-Discord.TextXAlignment = Enum.TextXAlignment.Left
-Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Discord.TextStrokeTransparency = 0.25
-Discord.ZIndex = 6
-Discord.Parent = Main
-local HeaderDivider = Instance.new("Frame")
-HeaderDivider.Name = "HeaderDivider"
-HeaderDivider.BackgroundColor3 = Color3.fromRGB(70, 70, 82)
-HeaderDivider.BackgroundTransparency = 0.45
-HeaderDivider.BorderSizePixel = 0
-HeaderDivider.Size = UDim2.new(1, -34, 0, 1)
-HeaderDivider.Position = UDim2.new(0, 17, 0, 96)
-HeaderDivider.ZIndex = 6
-HeaderDivider.Parent = Main
+Title.Parent = TopBar
+local TitleSub = Instance.new("TextLabel")
+TitleSub.Name = "TitleSub"
+TitleSub.BackgroundTransparency = 1
+TitleSub.Size = UDim2.new(0, 90, 1, 0)
+TitleSub.Position = UDim2.new(0, 58, 0, 0)
+TitleSub.Text = "DUELS"
+TitleSub.TextColor3 = Color3.fromRGB(146, 146, 160)
+TitleSub.TextStrokeTransparency = 0.7
+TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+TitleSub.Font = Enum.Font.GothamBlack
+TitleSub.TextSize = 17
+TitleSub.TextXAlignment = Enum.TextXAlignment.Left
+TitleSub.ZIndex = 6
+TitleSub.Parent = TopBar
 local Close = Instance.new("TextButton")
 Close.Name = "Close"
-Close.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Close.BackgroundTransparency = 0.28
-Close.Text = "-"
-Close.TextColor3 = COLORS.white
-Close.TextSize = 22
-Close.Font = Enum.Font.GothamSemibold
-Close.Size = UDim2.new(0, 32, 0, 28)
-Close.Position = UDim2.new(1, -42, 0, 14)
+Close.BackgroundColor3 = Color3.fromRGB(246, 246, 252)
+Close.BackgroundTransparency = 0.04
+Close.Text = "–"
+Close.TextColor3 = Color3.fromRGB(14, 14, 20)
+Close.TextSize = 20
+Close.Font = Enum.Font.GothamBold
+Close.Size = UDim2.new(0, 30, 0, 26)
+Close.Position = UDim2.new(1, -38, 0.5, -13)
 Close.AutoButtonColor = false
-Close.ZIndex = 5
-Close.Parent = Main
-corner(Close, 8)
-stroke(Close, COLORS.stroke, 1, 0.35)
+Close.ZIndex = 6
+Close.Parent = TopBar
+corner(Close, 7)
+stroke(Close, Color3.fromRGB(255, 255, 255), 1, 0.45)
 AceLockTopButton = Instance.new("TextButton")
 AceLockTopButton.Name = "LockGUI"
 AceLockTopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -4112,12 +4108,12 @@ AceLockTopButton.BackgroundTransparency = 0.28
 AceLockTopButton.TextColor3 = COLORS.white
 AceLockTopButton.TextSize = 8
 AceLockTopButton.Font = Enum.Font.GothamBlack
-AceLockTopButton.Size = UDim2.new(0, 32, 0, 28)
-AceLockTopButton.Position = UDim2.new(1, -78, 0, 14)
+AceLockTopButton.Size = UDim2.new(0, 46, 0, 26)
+AceLockTopButton.Position = UDim2.new(1, -90, 0.5, -13)
 AceLockTopButton.AutoButtonColor = false
-AceLockTopButton.ZIndex = 5
-AceLockTopButton.Parent = Main
-corner(AceLockTopButton, 8)
+AceLockTopButton.ZIndex = 6
+AceLockTopButton.Parent = TopBar
+corner(AceLockTopButton, 7)
 stroke(AceLockTopButton, COLORS.stroke, 1, 0.35)
 function AceUpdateGuiLockVisual()
 if AceLockTopButton then
@@ -4137,26 +4133,123 @@ AceUpdateGuiLockVisual()
 saveAceConfig()
 end)
 AceUpdateGuiLockVisual()
-local Content = Instance.new("Frame")
-Content.Name = "Content"
-Content.BackgroundTransparency = 1
-Content.Position = UDim2.new(0, 13, 0, 145)
-Content.Size = UDim2.new(1, -26, 1, -157)
-Content.ZIndex = 3
-Content.Parent = Main
+-- ═══════════════════════════════════════════════════════════════
+-- SIDEBAR — vertical navigation rail with the credit card pinned
+-- to the bottom, and the scrolling content pane beside it
+-- ═══════════════════════════════════════════════════════════════
+local SIDEBAR_WIDTH = 140
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.BackgroundColor3 = Color3.fromRGB(6, 6, 9)
+Sidebar.BackgroundTransparency = 0.34
+Sidebar.BorderSizePixel = 0
+Sidebar.Position = UDim2.new(0, 10, 0, 60)
+Sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -70)
+Sidebar.ZIndex = 3
+Sidebar.Parent = Main
+corner(Sidebar, 12)
+stroke(Sidebar, COLORS.strokeSoft, 1, 0.5)
+local NavCaption = Instance.new("TextLabel")
+NavCaption.Name = "NavCaption"
+NavCaption.BackgroundTransparency = 1
+NavCaption.Position = UDim2.new(0, 13, 0, 10)
+NavCaption.Size = UDim2.new(1, -26, 0, 12)
+NavCaption.Text = "NAVIGATION"
+NavCaption.TextColor3 = Color3.fromRGB(148, 148, 162)
+NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+NavCaption.TextStrokeTransparency = 0.5
+NavCaption.Font = Enum.Font.GothamBold
+NavCaption.TextSize = 9
+NavCaption.TextXAlignment = Enum.TextXAlignment.Left
+NavCaption.ZIndex = 4
+NavCaption.Parent = Sidebar
 local Tabs = Instance.new("Frame")
 Tabs.Name = "Tabs"
 Tabs.BackgroundTransparency = 1
-Tabs.Position = UDim2.new(0, 12, 0, 103)
-Tabs.Size = UDim2.new(1, -24, 0, 34)
+Tabs.Position = UDim2.new(0, 9, 0, 30)
+Tabs.Size = UDim2.new(1, -18, 1, -104)
 Tabs.ZIndex = 3
-Tabs.Parent = Main
+Tabs.Parent = Sidebar
 local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection = Enum.FillDirection.Horizontal
-TabLayout.Padding = UDim.new(0, 5)
+TabLayout.FillDirection = Enum.FillDirection.Vertical
+TabLayout.Padding = UDim.new(0, 6)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TabLayout.Parent = Tabs
+local ProfileCard = Instance.new("Frame")
+ProfileCard.Name = "ProfileCard"
+ProfileCard.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+ProfileCard.BackgroundTransparency = 0.22
+ProfileCard.BorderSizePixel = 0
+ProfileCard.AnchorPoint = Vector2.new(0.5, 1)
+ProfileCard.Position = UDim2.new(0.5, 0, 1, -9)
+ProfileCard.Size = UDim2.new(1, -18, 0, 54)
+ProfileCard.ZIndex = 4
+ProfileCard.Parent = Sidebar
+corner(ProfileCard, 10)
+stroke(ProfileCard, COLORS.strokeSoft, 1, 0.42)
+local LogoIcon = Instance.new("ImageLabel")
+LogoIcon.Name = "LogoIcon"
+LogoIcon.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
+LogoIcon.BackgroundTransparency = 0.12
+LogoIcon.BorderSizePixel = 0
+LogoIcon.Image = "rbxassetid://84453255265251"
+LogoIcon.ScaleType = Enum.ScaleType.Crop
+LogoIcon.Size = UDim2.new(0, 32, 0, 32)
+LogoIcon.Position = UDim2.new(0, 8, 0.5, -16)
+LogoIcon.ZIndex = 5
+LogoIcon.Parent = ProfileCard
+corner(LogoIcon, 999)
+stroke(LogoIcon, COLORS.stroke, 1, 0.3)
+local MadeBy = Instance.new("TextLabel")
+MadeBy.Name = "MadeBy"
+MadeBy.BackgroundTransparency = 1
+MadeBy.Position = UDim2.new(0, 46, 0.5, -14)
+MadeBy.Size = UDim2.new(1, -52, 0, 14)
+MadeBy.Text = "Made By Ace"
+MadeBy.TextColor3 = COLORS.white
+MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+MadeBy.TextStrokeTransparency = 0.35
+MadeBy.Font = Enum.Font.GothamBold
+MadeBy.TextSize = 10
+MadeBy.TextXAlignment = Enum.TextXAlignment.Left
+MadeBy.ZIndex = 5
+MadeBy.Parent = ProfileCard
+local Discord = Instance.new("TextLabel")
+Discord.Name = "Discord"
+Discord.BackgroundTransparency = 1
+Discord.Position = UDim2.new(0, 46, 0.5, 1)
+Discord.Size = UDim2.new(1, -52, 0, 13)
+Discord.Text = "discord.gg/aceduels"
+Discord.TextColor3 = Color3.fromRGB(168, 168, 182)
+Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+Discord.TextStrokeTransparency = 0.45
+Discord.Font = Enum.Font.GothamSemibold
+Discord.TextSize = 8
+Discord.TextXAlignment = Enum.TextXAlignment.Left
+Discord.ZIndex = 5
+Discord.Parent = ProfileCard
+local PageTitle = Instance.new("TextLabel")
+PageTitle.Name = "PageTitle"
+PageTitle.BackgroundTransparency = 1
+PageTitle.Position = UDim2.new(0, SIDEBAR_WIDTH + 20, 0, 62)
+PageTitle.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 30), 0, 22)
+PageTitle.Text = "MOVEMENT"
+PageTitle.TextColor3 = COLORS.white
+PageTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PageTitle.TextStrokeTransparency = 0.4
+PageTitle.Font = Enum.Font.GothamBlack
+PageTitle.TextSize = 16
+PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+PageTitle.ZIndex = 6
+PageTitle.Parent = Main
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, SIDEBAR_WIDTH + 18, 0, 92)
+Content.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 28), 1, -102)
+Content.ZIndex = 3
+Content.Parent = Main
 local pages = {}
 local tabButtons = {}
 local tabNames = {"MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
@@ -4166,8 +4259,9 @@ local page = Instance.new("ScrollingFrame")
 page.Name = name
 page.BackgroundTransparency = 1
 page.BorderSizePixel = 0
-page.ScrollBarThickness = 0
-page.ScrollBarImageTransparency = 1
+page.ScrollBarThickness = 3
+page.ScrollBarImageColor3 = Color3.fromRGB(215, 215, 230)
+page.ScrollBarImageTransparency = 0.35
 page.CanvasSize = UDim2.new(0, 0, 0, 0)
 page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 page.Size = UDim2.new(1, 0, 1, 0)
@@ -4186,14 +4280,22 @@ activeTab = name
 for pageName, page in pairs(pages) do
 page.Visible = pageName == name
 end
+if PageTitle then PageTitle.Text = name end
 for tabName, btn in pairs(tabButtons) do
 local on = tabName == name
-btn.TextColor3 = on and COLORS.white or Color3.fromRGB(170, 170, 180)
-btn.BackgroundTransparency = on and 0.28 or 0.72
+btn.TextColor3 = on and COLORS.white or Color3.fromRGB(166, 166, 178)
+tween(btn, {BackgroundTransparency = on and 0.22 or 0.68})
 local st = btn:FindFirstChildOfClass("UIStroke")
 if st then
-st.Transparency = on and 0.05 or 0.52
+st.Transparency = on and 0.18 or 0.6
 st.Color = on and Color3.fromRGB(245, 245, 255) or COLORS.stroke
+end
+local accent = btn:FindFirstChild("Accent")
+if accent then
+tween(accent, {
+BackgroundTransparency = on and 0 or 1,
+Size = on and UDim2.new(0, 3, 0, 22) or UDim2.new(0, 3, 0, 0)
+})
 end
 end
 end
@@ -4201,29 +4303,51 @@ for _, name in ipairs(tabNames) do
 addPage(name)
 local btn = Instance.new("TextButton")
 btn.Name = name
-btn.Size = UDim2.new(0, 62, 0, 34)
+btn.Size = UDim2.new(1, 0, 0, 48)
 btn.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
-btn.BackgroundTransparency = 0.72
+btn.BackgroundTransparency = 0.68
 btn.BorderSizePixel = 0
 btn.Text = name
-btn.TextColor3 = Color3.fromRGB(170, 170, 180)
+btn.TextColor3 = Color3.fromRGB(166, 166, 178)
 btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 btn.TextStrokeTransparency = 0.35
-btn.TextSize = 8
+btn.TextSize = 10
 btn.Font = Enum.Font.GothamBlack
+btn.TextXAlignment = Enum.TextXAlignment.Left
 btn.AutoButtonColor = false
 btn.ZIndex = 4
 btn.Parent = Tabs
-corner(btn, 7)
-stroke(btn, COLORS.stroke, 1, 0.52)
+corner(btn, 9)
+stroke(btn, COLORS.stroke, 1, 0.6)
+local pad = Instance.new("UIPadding")
+pad.PaddingLeft = UDim.new(0, 20)
+pad.Parent = btn
+local accent = Instance.new("Frame")
+accent.Name = "Accent"
+accent.BackgroundColor3 = COLORS.white
+accent.BackgroundTransparency = 1
+accent.BorderSizePixel = 0
+accent.AnchorPoint = Vector2.new(0, 0.5)
+accent.Position = UDim2.new(0, -13, 0.5, 0)
+accent.Size = UDim2.new(0, 3, 0, 0)
+accent.ZIndex = 5
+accent.Parent = btn
+corner(accent, 2)
 tabButtons[name] = btn
 btn.MouseButton1Click:Connect(function()
 setTab(name)
 end)
 end
 function section(parent, text, order)
+local holder = Instance.new("Frame")
+holder.Name = text
+holder.BackgroundTransparency = 1
+holder.Size = UDim2.new(1, -6, 0, 24)
+holder.LayoutOrder = order
+holder.ZIndex = 8
+holder.Parent = parent
 local label = Instance.new("TextLabel")
-label.Name = text
+label.Name = "Label"
 label.BackgroundTransparency = 1
 label.Text = text
 label.TextColor3 = Color3.fromRGB(245, 245, 255)
@@ -4232,23 +4356,39 @@ label.TextStrokeTransparency = 0.22
 label.TextSize = 11
 label.Font = Enum.Font.GothamBlack
 label.TextXAlignment = Enum.TextXAlignment.Left
-label.Size = UDim2.new(1, -6, 0, 15)
-label.LayoutOrder = order
+label.Position = UDim2.new(0, 2, 0, 0)
+label.Size = UDim2.new(1, -2, 0, 15)
 label.ZIndex = 8
-label.Parent = parent
-return label
+label.Parent = holder
+local underline = Instance.new("Frame")
+underline.Name = "Underline"
+underline.BackgroundColor3 = Color3.fromRGB(160, 160, 178)
+underline.BackgroundTransparency = 0.3
+underline.BorderSizePixel = 0
+underline.Size = UDim2.new(1, -2, 0, 1)
+underline.Position = UDim2.new(0, 2, 0, 20)
+underline.ZIndex = 8
+underline.Parent = holder
+local fade = Instance.new("UIGradient")
+fade.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(0.75, 0.5),
+NumberSequenceKeypoint.new(1, 1),
+})
+fade.Parent = underline
+return holder
 end
 function baseRow(parent, labelText, order)
 local row = Instance.new("Frame")
 row.Name = labelText
 row.BackgroundColor3 = COLORS.row
 row.BackgroundTransparency = 0.3
-row.Size = UDim2.new(1, -4, 0, 34)
+row.Size = UDim2.new(1, -4, 0, 36)
 row.BorderSizePixel = 0
 row.LayoutOrder = order
 row.ZIndex = 4
 row.Parent = parent
-corner(row, 9)
+corner(row, 10)
 stroke(row, COLORS.strokeSoft, 1.15, 0.38)
 local label = Instance.new("TextLabel")
 label.Name = "Label"
@@ -4283,12 +4423,12 @@ box.TextColor3 = COLORS.white
 box.TextSize = 12
 box.Font = Enum.Font.GothamSemibold
 box.ClearTextOnFocus = false
-box.Size = UDim2.new(0, 58, 0, 24)
-box.Position = UDim2.new(1, -68, 0.5, -12)
+box.Size = UDim2.new(0, 62, 0, 26)
+box.Position = UDim2.new(1, -72, 0.5, -13)
 box.BorderSizePixel = 0
 box.ZIndex = 6
 box.Parent = row
-corner(box, 7)
+corner(box, 8)
 stroke(box, COLORS.strokeSoft, 1, 0.45)
 return row, box
 end

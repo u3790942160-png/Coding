@@ -3425,7 +3425,7 @@ ragdollCountdownLabel.Visible = false
 ragdollCountdownLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 ragdollCountdownLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 ragdollCountdownLabel.TextStrokeTransparency = 0
-ragdollCountdownLabel.Font = Enum.Font.GothamBlack
+ragdollCountdownLabel.Font = Enum.Font.Oswald
 ragdollCountdownLabel.TextSize = 22
 ragdollCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 ragdollCountdownLabel.ZIndex = 10
@@ -3439,7 +3439,7 @@ discordLbl.Text = "discord.gg/diceduels"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 discordLbl.TextStrokeTransparency = 0
-discordLbl.Font = Enum.Font.GothamBlack
+discordLbl.Font = Enum.Font.Oswald
 discordLbl.TextSize = 21
 discordLbl.TextXAlignment = Enum.TextXAlignment.Center
 discordLbl.ZIndex = 10
@@ -3453,7 +3453,7 @@ overheadSpeedLabel.Text = "Speed: 0"
 overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 overheadSpeedLabel.TextStrokeTransparency = 0
-overheadSpeedLabel.Font = Enum.Font.GothamBlack
+overheadSpeedLabel.Font = Enum.Font.Oswald
 overheadSpeedLabel.TextSize = 19
 overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
 overheadSpeedLabel.ZIndex = 10
@@ -3560,16 +3560,21 @@ overheadSpeedLabel.Text = string.format("Speed: %.1f", rounded)
 end
 end
 end)
+-- Slate base with a crimson accent rather than the flat monochrome the
+-- panel used to run; the accent does the work white used to.
 local COLORS = {
-bg = Color3.fromRGB(0, 0, 0),
-row = Color3.fromRGB(6, 6, 9),
-row2 = Color3.fromRGB(8, 8, 12),
-stroke = Color3.fromRGB(90, 90, 105),
-strokeSoft = Color3.fromRGB(60, 60, 72),
-white = Color3.fromRGB(255, 255, 255),
-textDim = Color3.fromRGB(180, 180, 190),
-toggleBg = Color3.fromRGB(18, 18, 26),
-knob = Color3.fromRGB(238, 238, 245),
+bg = Color3.fromRGB(12, 12, 17),
+row = Color3.fromRGB(22, 23, 31),
+row2 = Color3.fromRGB(28, 29, 38),
+stroke = Color3.fromRGB(62, 64, 80),
+strokeSoft = Color3.fromRGB(44, 46, 58),
+white = Color3.fromRGB(240, 241, 247),
+textDim = Color3.fromRGB(146, 149, 165),
+toggleBg = Color3.fromRGB(30, 31, 40),
+knob = Color3.fromRGB(242, 243, 250),
+accent = Color3.fromRGB(228, 58, 68),
+accentDim = Color3.fromRGB(128, 34, 42),
+accentSoft = Color3.fromRGB(60, 24, 30),
 }
 function corner(parent, radius)
 local c = Instance.new("UICorner")
@@ -3584,18 +3589,8 @@ s.Color = color or COLORS.stroke
 s.Thickness = thickness or 1
 s.Transparency = transparency or 0.35
 s.Parent = parent
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-ColorSequenceKeypoint.new(0.5, Color3.fromRGB(155, 160, 185)),
-ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-})
-g.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 0.55),
-NumberSequenceKeypoint.new(0.5, 0.1),
-NumberSequenceKeypoint.new(1, 0.55),
-})
-g.Parent = s
+-- Flat border. The shimmering white gradient that used to live here was
+-- the most recognisable thing about the old panel.
 return s
 end
 function tween(obj, props, time)
@@ -3767,7 +3762,7 @@ MiniFrame.Size = UDim2.new(0, 78, 0, 28)
 local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
 MiniFrame.Position = MINI_DEFAULT_POSITION
 savedMiniPositionTable = nil
-MiniFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MiniFrame.BackgroundColor3 = Color3.fromRGB(17, 18, 25)
 MiniFrame.BackgroundTransparency = 0
 MiniFrame.BorderSizePixel = 0
 MiniFrame.Visible = false
@@ -3775,7 +3770,7 @@ MiniFrame.Active = true
 MiniFrame.ZIndex = 20
 MiniFrame.Parent = Gui
 corner(MiniFrame, 8)
-stroke(MiniFrame, Color3.fromRGB(120, 120, 130), 1, 0.22)
+stroke(MiniFrame, COLORS.accent, 1.2, 0.15)
 local MiniButton = Instance.new("TextButton")
 MiniButton.Name = "MiniButton"
 MiniButton.Size = UDim2.new(1, 0, 1, 0)
@@ -3785,7 +3780,7 @@ MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 MiniButton.TextStrokeTransparency = 0.18
 MiniButton.TextSize = 17
-MiniButton.Font = Enum.Font.GothamBlack
+MiniButton.Font = Enum.Font.Oswald
 MiniButton.AutoButtonColor = false
 MiniButton.ZIndex = 21
 MiniButton.Parent = MiniFrame
@@ -3852,7 +3847,7 @@ end
 -- ═══════════════════════════════════════════════════════════════
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.BackgroundColor3 = Color3.fromRGB(4, 4, 7)
+TopBar.BackgroundColor3 = Color3.fromRGB(17, 18, 25)
 TopBar.BackgroundTransparency = 0.12
 TopBar.BorderSizePixel = 0
 TopBar.Position = UDim2.new(0, 10, 0, 10)
@@ -3891,7 +3886,7 @@ Title.Text = "DICE"
 Title.TextColor3 = COLORS.white
 Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Title.Font = Enum.Font.GothamBlack
+Title.Font = Enum.Font.Oswald
 Title.TextSize = 17
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 6
@@ -3902,10 +3897,10 @@ TitleSub.BackgroundTransparency = 1
 TitleSub.Size = UDim2.new(0, 90, 1, 0)
 TitleSub.Position = UDim2.new(0, 112, 0, 0)
 TitleSub.Text = "DUELS"
-TitleSub.TextColor3 = Color3.fromRGB(146, 146, 160)
+TitleSub.TextColor3 = COLORS.accent
 TitleSub.TextStrokeTransparency = 0.7
 TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-TitleSub.Font = Enum.Font.GothamBlack
+TitleSub.Font = Enum.Font.Oswald
 TitleSub.TextSize = 17
 TitleSub.TextXAlignment = Enum.TextXAlignment.Left
 TitleSub.ZIndex = 6
@@ -3917,7 +3912,7 @@ Close.BackgroundTransparency = 0.04
 Close.Text = "–"
 Close.TextColor3 = Color3.fromRGB(14, 14, 20)
 Close.TextSize = 20
-Close.Font = Enum.Font.GothamBold
+Close.Font = Enum.Font.Kanit
 Close.Size = UDim2.new(0, 30, 0, 26)
 Close.Position = UDim2.new(1, -38, 0.5, -13)
 Close.AutoButtonColor = false
@@ -3931,7 +3926,7 @@ DiceLockTopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 DiceLockTopButton.BackgroundTransparency = 0.28
 DiceLockTopButton.TextColor3 = COLORS.white
 DiceLockTopButton.TextSize = 8
-DiceLockTopButton.Font = Enum.Font.GothamBlack
+DiceLockTopButton.Font = Enum.Font.Oswald
 DiceLockTopButton.Size = UDim2.new(0, 46, 0, 26)
 DiceLockTopButton.Position = UDim2.new(1, -90, 0.5, -13)
 DiceLockTopButton.AutoButtonColor = false
@@ -3964,7 +3959,7 @@ DiceUpdateGuiLockVisual()
 local SIDEBAR_WIDTH = 140
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
-Sidebar.BackgroundColor3 = Color3.fromRGB(6, 6, 9)
+Sidebar.BackgroundColor3 = Color3.fromRGB(17, 18, 25)
 Sidebar.BackgroundTransparency = 0.34
 Sidebar.BorderSizePixel = 0
 Sidebar.Position = UDim2.new(0, 10, 0, 60)
@@ -3979,10 +3974,10 @@ NavCaption.BackgroundTransparency = 1
 NavCaption.Position = UDim2.new(0, 13, 0, 10)
 NavCaption.Size = UDim2.new(1, -26, 0, 12)
 NavCaption.Text = "NAVIGATION"
-NavCaption.TextColor3 = Color3.fromRGB(148, 148, 162)
+NavCaption.TextColor3 = COLORS.textDim
 NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 NavCaption.TextStrokeTransparency = 0.5
-NavCaption.Font = Enum.Font.GothamBold
+NavCaption.Font = Enum.Font.Kanit
 NavCaption.TextSize = 9
 NavCaption.TextXAlignment = Enum.TextXAlignment.Left
 NavCaption.ZIndex = 4
@@ -4002,7 +3997,7 @@ TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TabLayout.Parent = Tabs
 local ProfileCard = Instance.new("Frame")
 ProfileCard.Name = "ProfileCard"
-ProfileCard.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+ProfileCard.BackgroundColor3 = COLORS.row2
 ProfileCard.BackgroundTransparency = 0.22
 ProfileCard.BorderSizePixel = 0
 ProfileCard.AnchorPoint = Vector2.new(0.5, 1)
@@ -4025,7 +4020,7 @@ MadeBy.Text = "Made By Dice"
 MadeBy.TextColor3 = COLORS.white
 MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 MadeBy.TextStrokeTransparency = 0.35
-MadeBy.Font = Enum.Font.GothamBold
+MadeBy.Font = Enum.Font.Kanit
 MadeBy.TextSize = 10
 MadeBy.TextXAlignment = Enum.TextXAlignment.Left
 MadeBy.ZIndex = 5
@@ -4039,7 +4034,7 @@ Discord.Text = "discord.gg/diceduels"
 Discord.TextColor3 = Color3.fromRGB(168, 168, 182)
 Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Discord.TextStrokeTransparency = 0.45
-Discord.Font = Enum.Font.GothamSemibold
+Discord.Font = Enum.Font.Kanit
 Discord.TextSize = 8
 Discord.TextXAlignment = Enum.TextXAlignment.Left
 Discord.ZIndex = 5
@@ -4053,7 +4048,7 @@ PageTitle.Text = "MOVEMENT"
 PageTitle.TextColor3 = COLORS.white
 PageTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 PageTitle.TextStrokeTransparency = 0.4
-PageTitle.Font = Enum.Font.GothamBlack
+PageTitle.Font = Enum.Font.Oswald
 PageTitle.TextSize = 16
 PageTitle.TextXAlignment = Enum.TextXAlignment.Left
 PageTitle.ZIndex = 6
@@ -4100,12 +4095,12 @@ if rollTitleDice then rollTitleDice() end
 if rollBackdropDice then rollBackdropDice() end
 for tabName, btn in pairs(tabButtons) do
 local on = tabName == name
-btn.TextColor3 = on and COLORS.white or Color3.fromRGB(166, 166, 178)
+btn.TextColor3 = on and COLORS.white or COLORS.textDim
 tween(btn, {BackgroundTransparency = on and 0.22 or 0.68})
 local st = btn:FindFirstChildOfClass("UIStroke")
 if st then
-st.Transparency = on and 0.18 or 0.6
-st.Color = on and Color3.fromRGB(245, 245, 255) or COLORS.stroke
+st.Transparency = on and 0.15 or 0.6
+st.Color = on and COLORS.accent or COLORS.stroke
 end
 local accent = btn:FindFirstChild("Accent")
 if accent then
@@ -4121,7 +4116,7 @@ addPage(name)
 local btn = Instance.new("TextButton")
 btn.Name = name
 btn.Size = UDim2.new(1, 0, 0, 48)
-btn.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+btn.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
 btn.BackgroundTransparency = 0.68
 btn.BorderSizePixel = 0
 btn.Text = name
@@ -4129,7 +4124,7 @@ btn.TextColor3 = Color3.fromRGB(166, 166, 178)
 btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 btn.TextStrokeTransparency = 0.35
 btn.TextSize = 10
-btn.Font = Enum.Font.GothamBlack
+btn.Font = Enum.Font.Oswald
 btn.TextXAlignment = Enum.TextXAlignment.Left
 btn.AutoButtonColor = false
 btn.ZIndex = 4
@@ -4141,7 +4136,7 @@ pad.PaddingLeft = UDim.new(0, 20)
 pad.Parent = btn
 local accent = Instance.new("Frame")
 accent.Name = "Accent"
-accent.BackgroundColor3 = COLORS.white
+accent.BackgroundColor3 = COLORS.accent
 accent.BackgroundTransparency = 1
 accent.BorderSizePixel = 0
 accent.AnchorPoint = Vector2.new(0, 0.5)
@@ -4171,7 +4166,7 @@ label.TextColor3 = Color3.fromRGB(245, 245, 255)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.22
 label.TextSize = 11
-label.Font = Enum.Font.GothamBlack
+label.Font = Enum.Font.Oswald
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 2, 0, 0)
 label.Size = UDim2.new(1, -2, 0, 15)
@@ -4179,7 +4174,7 @@ label.ZIndex = 8
 label.Parent = holder
 local underline = Instance.new("Frame")
 underline.Name = "Underline"
-underline.BackgroundColor3 = Color3.fromRGB(160, 160, 178)
+underline.BackgroundColor3 = COLORS.accent
 underline.BackgroundTransparency = 0.3
 underline.BorderSizePixel = 0
 underline.Size = UDim2.new(1, -2, 0, 1)
@@ -4215,7 +4210,7 @@ label.TextColor3 = Color3.fromRGB(245, 245, 255)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.25
 label.TextSize = 12
-label.Font = Enum.Font.GothamSemibold
+label.Font = Enum.Font.Kanit
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 12, 0, 0)
 label.Size = UDim2.new(1, -132, 1, 0)
@@ -4233,12 +4228,12 @@ function textboxRow(parent, labelText, value, order)
 local row = baseRow(parent, labelText, order)
 local box = Instance.new("TextBox")
 box.Name = "ValueBox"
-box.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+box.BackgroundColor3 = COLORS.accentSoft
 box.BackgroundTransparency = 0.18
 box.Text = tostring(value or "")
-box.TextColor3 = COLORS.white
+box.TextColor3 = COLORS.accent
 box.TextSize = 12
-box.Font = Enum.Font.GothamSemibold
+box.Font = Enum.Font.Kanit
 box.ClearTextOnFocus = false
 box.Size = UDim2.new(0, 62, 0, 26)
 box.Position = UDim2.new(1, -72, 0.5, -13)
@@ -4298,18 +4293,18 @@ state = on and true or false
 tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and Color3.fromRGB(36, 36, 46) or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and Color3.fromRGB(255, 255, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4377,18 +4372,18 @@ local state = on and true or false
 tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and Color3.fromRGB(36, 36, 46) or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and Color3.fromRGB(255, 255, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4407,7 +4402,7 @@ select.BackgroundTransparency = 0.18
 select.Text = tostring(value or "None") .. "  ▼"
 select.TextColor3 = COLORS.white
 select.TextSize = 11
-select.Font = Enum.Font.GothamSemibold
+select.Font = Enum.Font.Kanit
 select.Size = UDim2.new(0, 70, 0, 24)
 select.Position = UDim2.new(1, -80, 0.5, -12)
 select.BorderSizePixel = 0
@@ -4439,7 +4434,7 @@ left.BackgroundTransparency = 0.18
 left.Text = "<"
 left.TextColor3 = COLORS.white
 left.TextSize = 12
-left.Font = Enum.Font.GothamSemibold
+left.Font = Enum.Font.Kanit
 left.Size = UDim2.new(0, 42, 0, 28)
 left.Position = UDim2.new(1, -156, 0.5, -14)
 left.BorderSizePixel = 0
@@ -4455,7 +4450,7 @@ animationPackValueLabel.TextColor3 = COLORS.white
 animationPackValueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 animationPackValueLabel.TextStrokeTransparency = 0.25
 animationPackValueLabel.TextSize = 11
-animationPackValueLabel.Font = Enum.Font.GothamSemibold
+animationPackValueLabel.Font = Enum.Font.Kanit
 animationPackValueLabel.TextXAlignment = Enum.TextXAlignment.Center
 animationPackValueLabel.Size = UDim2.new(0, 62, 1, 0)
 animationPackValueLabel.Position = UDim2.new(1, -112, 0, 0)
@@ -4468,7 +4463,7 @@ right.BackgroundTransparency = 0.18
 right.Text = ">"
 right.TextColor3 = COLORS.white
 right.TextSize = 12
-right.Font = Enum.Font.GothamSemibold
+right.Font = Enum.Font.Kanit
 right.Size = UDim2.new(0, 42, 0, 28)
 right.Position = UDim2.new(1, -48, 0.5, -14)
 right.BorderSizePixel = 0
@@ -4529,7 +4524,7 @@ btn.BackgroundTransparency = 0.18
 btn.Text = keyName(tpDownKeybind)
 btn.TextColor3 = COLORS.white
 btn.TextSize = 11
-btn.Font = Enum.Font.GothamSemibold
+btn.Font = Enum.Font.Kanit
 btn.Size = UDim2.new(0, 56, 0, 24)
 btn.Position = UDim2.new(1, -64, 0.5, -12)
 btn.BorderSizePixel = 0
@@ -4545,7 +4540,7 @@ clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
 clearBtn.TextSize = 14
-clearBtn.Font = Enum.Font.GothamBlack
+clearBtn.Font = Enum.Font.Oswald
 clearBtn.Size = UDim2.new(0, 22, 0, 24)
 clearBtn.Position = UDim2.new(1, -90, 0.5, -12)
 clearBtn.BorderSizePixel = 0
@@ -4582,7 +4577,7 @@ btn.BackgroundTransparency = 0.18
 btn.Text = keyName(speedKeybinds[keyId])
 btn.TextColor3 = COLORS.white
 btn.TextSize = 11
-btn.Font = Enum.Font.GothamSemibold
+btn.Font = Enum.Font.Kanit
 btn.Size = UDim2.new(0, 56, 0, 24)
 btn.Position = UDim2.new(1, -64, 0.5, -12)
 btn.BorderSizePixel = 0
@@ -4598,7 +4593,7 @@ clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
 clearBtn.TextSize = 14
-clearBtn.Font = Enum.Font.GothamBlack
+clearBtn.Font = Enum.Font.Oswald
 clearBtn.Size = UDim2.new(0, 22, 0, 24)
 clearBtn.Position = UDim2.new(1, -90, 0.5, -12)
 clearBtn.BorderSizePixel = 0
@@ -4684,7 +4679,7 @@ value.TextColor3 = Color3.fromRGB(255, 255, 255)
 value.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 value.TextStrokeTransparency = 0.25
 value.TextSize = 12
-value.Font = Enum.Font.GothamSemibold
+value.Font = Enum.Font.Kanit
 value.TextXAlignment = Enum.TextXAlignment.Right
 value.Position = UDim2.new(1, -132, 0, 0)
 value.Size = UDim2.new(0, 120, 1, 0)
@@ -4776,7 +4771,7 @@ normalText.TextColor3 = COLORS.white
 normalText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 normalText.TextStrokeTransparency = 0.2
 normalText.TextSize = 11
-normalText.Font = Enum.Font.GothamSemibold
+normalText.Font = Enum.Font.Kanit
 normalText.TextXAlignment = Enum.TextXAlignment.Center
 normalText.Size = UDim2.new(0.5, 0, 1, 0)
 normalText.Position = UDim2.new(0, 0, 0, 0)
@@ -4790,7 +4785,7 @@ bypassText.TextColor3 = COLORS.white
 bypassText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 bypassText.TextStrokeTransparency = 0.2
 bypassText.TextSize = 10
-bypassText.Font = Enum.Font.GothamSemibold
+bypassText.Font = Enum.Font.Kanit
 bypassText.TextXAlignment = Enum.TextXAlignment.Center
 bypassText.Size = UDim2.new(0.5, 0, 1, 0)
 bypassText.Position = UDim2.new(0.5, 0, 0, 0)
@@ -4896,7 +4891,7 @@ normalText.TextColor3 = COLORS.white
 normalText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 normalText.TextStrokeTransparency = 0.2
 normalText.TextSize = 11
-normalText.Font = Enum.Font.GothamSemibold
+normalText.Font = Enum.Font.Kanit
 normalText.TextXAlignment = Enum.TextXAlignment.Center
 normalText.Size = UDim2.new(0.5, 0, 1, 0)
 normalText.Position = UDim2.new(0, 0, 0, 0)
@@ -4910,7 +4905,7 @@ semiText.TextColor3 = COLORS.white
 semiText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 semiText.TextStrokeTransparency = 0.2
 semiText.TextSize = 11
-semiText.Font = Enum.Font.GothamSemibold
+semiText.Font = Enum.Font.Kanit
 semiText.TextXAlignment = Enum.TextXAlignment.Center
 semiText.Size = UDim2.new(0.5, 0, 1, 0)
 semiText.Position = UDim2.new(0.5, 0, 0, 0)
@@ -5358,8 +5353,8 @@ local bb=Instance.new("BillboardGui")
 bb.Name="DiceDuelsESPTag"; bb.Adornee=head; bb.Size=UDim2.new(0,124,0,34); bb.StudsOffset=Vector3.new(0,2.7,0); bb.AlwaysOnTop=true; bb.LightInfluence=0; bb.Parent=head
 local box=Instance.new("Frame",bb); box.Size=UDim2.new(1,0,1,0); box.BackgroundTransparency=1; box.BorderSizePixel=0
 Instance.new("UICorner",box).CornerRadius=UDim.new(0,9)
-local n=Instance.new("TextLabel",box); n.Size=UDim2.new(1,-10,0,17); n.Position=UDim2.new(0,5,0,2); n.BackgroundTransparency=1; n.TextColor3=Color3.fromRGB(255,255,255); n.Font=Enum.Font.GothamBlack; n.TextSize=15; n.TextStrokeTransparency=0.38
-local sub=Instance.new("TextLabel",box); sub.Size=UDim2.new(1,-10,0,11); sub.Position=UDim2.new(0,5,0,19); sub.BackgroundTransparency=1; sub.TextColor3=Color3.fromRGB(180,180,180); sub.Font=Enum.Font.GothamBold; sub.TextSize=10; sub.TextStrokeTransparency=0.58
+local n=Instance.new("TextLabel",box); n.Size=UDim2.new(1,-10,0,17); n.Position=UDim2.new(0,5,0,2); n.BackgroundTransparency=1; n.TextColor3=Color3.fromRGB(255,255,255); n.Font=Enum.Font.Oswald; n.TextSize=15; n.TextStrokeTransparency=0.38
+local sub=Instance.new("TextLabel",box); sub.Size=UDim2.new(1,-10,0,11); sub.Position=UDim2.new(0,5,0,19); sub.BackgroundTransparency=1; sub.TextColor3=Color3.fromRGB(180,180,180); sub.Font=Enum.Font.Kanit; sub.TextSize=10; sub.TextStrokeTransparency=0.58
 local conn=RunService.Heartbeat:Connect(function()
 if not PlayerESP.enabled or not hrp.Parent then return end
 local v=hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -6010,7 +6005,7 @@ left.BackgroundTransparency = 0.04
 left.Text = "<"
 left.TextColor3 = COLORS.white
 left.TextSize = 12
-left.Font = Enum.Font.GothamSemibold
+left.Font = Enum.Font.Kanit
 left.Size = UDim2.new(0, 42, 0, 28)
 left.Position = UDim2.new(1, -186, 0.5, -14)
 left.BorderSizePixel = 0
@@ -6051,7 +6046,7 @@ skyValueLabel.TextColor3 = COLORS.white
 skyValueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 skyValueLabel.TextStrokeTransparency = 0.22
 skyValueLabel.TextSize = 11
-skyValueLabel.Font = Enum.Font.GothamSemibold
+skyValueLabel.Font = Enum.Font.Kanit
 skyValueLabel.TextXAlignment = Enum.TextXAlignment.Center
 skyValueLabel.Size = UDim2.new(1, 0, 1, 0)
 skyValueLabel.ZIndex = 9
@@ -6063,7 +6058,7 @@ right.BackgroundTransparency = 0.04
 right.Text = ">"
 right.TextColor3 = COLORS.white
 right.TextSize = 12
-right.Font = Enum.Font.GothamSemibold
+right.Font = Enum.Font.Kanit
 right.Size = UDim2.new(0, 42, 0, 28)
 right.Position = UDim2.new(1, -42, 0.5, -14)
 right.BorderSizePixel = 0
@@ -6288,7 +6283,7 @@ label.TextColor3 = Color3.fromRGB(245, 245, 255)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.25
 label.TextSize = 11
-label.Font = Enum.Font.GothamMedium
+label.Font = Enum.Font.Kanit
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 12, 0, 0)
 label.Size = UDim2.new(1, -155, 1, 0)
@@ -6303,7 +6298,7 @@ minus.BorderSizePixel = 0
 minus.Text = "-"
 minus.TextColor3 = Color3.fromRGB(245, 245, 255)
 minus.TextSize = 14
-minus.Font = Enum.Font.GothamBlack
+minus.Font = Enum.Font.Oswald
 minus.AutoButtonColor = false
 minus.Size = UDim2.new(0, 28, 0, 26)
 minus.Position = UDim2.new(1, -118, 0.5, -13)
@@ -6319,7 +6314,7 @@ valueBox.BorderSizePixel = 0
 valueBox.Text = string.format(valueFormat, value)
 valueBox.TextColor3 = Color3.fromRGB(245, 245, 255)
 valueBox.TextSize = 13
-valueBox.Font = Enum.Font.GothamBlack
+valueBox.Font = Enum.Font.Oswald
 valueBox.TextXAlignment = Enum.TextXAlignment.Center
 valueBox.Size = UDim2.new(0, 48, 0, 26)
 valueBox.Position = UDim2.new(1, -84, 0.5, -13)
@@ -6335,7 +6330,7 @@ plus.BorderSizePixel = 0
 plus.Text = "+"
 plus.TextColor3 = Color3.fromRGB(245, 245, 255)
 plus.TextSize = 14
-plus.Font = Enum.Font.GothamBlack
+plus.Font = Enum.Font.Oswald
 plus.AutoButtonColor = false
 plus.Size = UDim2.new(0, 28, 0, 26)
 plus.Position = UDim2.new(1, -30, 0.5, -13)
@@ -6383,7 +6378,7 @@ button.BorderSizePixel = 0
 button.Text = "RESET"
 button.TextColor3 = Color3.fromRGB(0, 0, 0)
 button.TextSize = 11
-button.Font = Enum.Font.GothamBlack
+button.Font = Enum.Font.Oswald
 button.AutoButtonColor = false
 button.Size = UDim2.new(0, 78, 0, 26)
 button.Position = UDim2.new(1, -88, 0.5, -13)
@@ -6439,7 +6434,7 @@ label.TextColor3 = Color3.fromRGB(245,245,255)
 label.TextStrokeColor3 = Color3.fromRGB(0,0,0)
 label.TextStrokeTransparency = 0.25
 label.TextSize = 11
-label.Font = Enum.Font.GothamMedium
+label.Font = Enum.Font.Kanit
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.Position = UDim2.new(0, 12, 0, 0)
 label.Size = UDim2.new(1, -145, 1, 0)
@@ -6453,7 +6448,7 @@ btn.BorderSizePixel = 0
 btn.Text = getIntroSongName()
 btn.TextColor3 = Color3.fromRGB(0,0,0)
 btn.TextSize = 12
-btn.Font = Enum.Font.GothamBlack
+btn.Font = Enum.Font.Oswald
 btn.AutoButtonColor = false
 btn.Size = UDim2.new(0, 118, 0, 28)
 btn.Position = UDim2.new(1, -128, 0.5, -14)
@@ -6491,7 +6486,7 @@ resetBtn.Text = "Reset All Settings"
 resetBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 resetBtn.TextStrokeTransparency = 1
 resetBtn.TextSize = 12
-resetBtn.Font = Enum.Font.GothamBlack
+resetBtn.Font = Enum.Font.Oswald
 resetBtn.AutoButtonColor = false
 resetBtn.Size = UDim2.new(1, -16, 0, 42)
 resetBtn.Position = UDim2.new(0, 8, 0, 1)
@@ -6775,9 +6770,9 @@ local TS = TweenService
 local Stats        = game:GetService("Stats")
 local existingStealBar = LP:FindFirstChild("PlayerGui") and LP.PlayerGui:FindFirstChild("StealBarGui")
 if existingStealBar then existingStealBar:Destroy() end
-local THEME_ACCENT        = Color3.fromRGB(235, 235, 245)
-local THEME_ACCENT_BRIGHT = Color3.fromRGB(255, 255, 255)
-local THEME_ACCENT_DIM    = Color3.fromRGB(120, 120, 130)
+local THEME_ACCENT        = Color3.fromRGB(228, 58, 68)
+local THEME_ACCENT_BRIGHT = Color3.fromRGB(240, 241, 247)
+local THEME_ACCENT_DIM    = Color3.fromRGB(128, 34, 42)
 local gui = Instance.new("ScreenGui")
 gui.Name = "StealBarGui"
 gui.ResetOnSpawn = false
@@ -6808,7 +6803,7 @@ local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
 pbFrame.Size = UDim2.new(0, 340, 0, 50)
 pbFrame.Position = UDim2.new(0.5, -170, 1, -92)
-pbFrame.BackgroundColor3 = Color3.fromRGB(6, 6, 9)
+pbFrame.BackgroundColor3 = Color3.fromRGB(14, 15, 21)
 pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
@@ -6831,7 +6826,7 @@ progressPct.Position = UDim2.new(0, 14, 0, 5)
 progressPct.BackgroundTransparency = 1
 progressPct.Text = "0%"
 progressPct.TextColor3 = THEME_ACCENT_BRIGHT
-progressPct.Font = Enum.Font.GothamBold
+progressPct.Font = Enum.Font.Kanit
 progressPct.TextSize = 12
 progressPct.TextXAlignment = Enum.TextXAlignment.Left
 progressPct.ZIndex = 4
@@ -6840,7 +6835,7 @@ local track = Instance.new("Frame", pbFrame)
 track.Name = "Track"
 track.Size = UDim2.new(0, 172, 0, 16)
 track.Position = UDim2.new(0, 60, 0, 10)
-track.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+track.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
 track.BorderSizePixel = 0
 track.ZIndex = 2
 Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
@@ -6899,7 +6894,7 @@ progressRadLbl.Position = UDim2.new(0, 242, 0, 5)
 progressRadLbl.BackgroundTransparency = 1
 progressRadLbl.Text = "Radius: 0"
 progressRadLbl.TextColor3 = THEME_ACCENT_BRIGHT
-progressRadLbl.Font = Enum.Font.GothamBold
+progressRadLbl.Font = Enum.Font.Kanit
 progressRadLbl.TextSize = 12
 progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
 progressRadLbl.ZIndex = 4
@@ -6910,7 +6905,7 @@ statsLbl.Position = UDim2.new(0, 0, 0, 31)
 statsLbl.BackgroundTransparency = 1
 statsLbl.Text = "FPS: 0  discord.gg/diceduels  PING: 0ms"
 statsLbl.TextColor3 = Color3.fromRGB(196, 196, 208)
-statsLbl.Font = Enum.Font.GothamSemibold
+statsLbl.Font = Enum.Font.Kanit
 statsLbl.TextSize = 9
 statsLbl.TextXAlignment = Enum.TextXAlignment.Center
 statsLbl.ZIndex = 4
@@ -7075,7 +7070,7 @@ skipBtn.BorderSizePixel = 0
 skipBtn.Text = "SKIP INTRO"
 skipBtn.TextColor3 = Color3.fromRGB(0,0,0)
 skipBtn.TextSize = 11
-skipBtn.Font = Enum.Font.GothamBlack
+skipBtn.Font = Enum.Font.Oswald
 skipBtn.AutoButtonColor = false
 skipBtn.ZIndex = 80
 Instance.new("UICorner", skipBtn).CornerRadius = UDim.new(0,10)
@@ -7103,15 +7098,15 @@ grad.Rotation = 125
 local a1 = Instance.new("TextLabel", card)
 a1.Size = UDim2.new(0.28,0,0.25,0); a1.Position = UDim2.new(0.06,0,0.04,0)
 a1.BackgroundTransparency = 1; a1.Text = "A\n♠"; a1.TextColor3 = Color3.fromRGB(0,0,0)
-a1.Font = Enum.Font.GothamBlack; a1.TextScaled = true; a1.TextTransparency = 1; a1.ZIndex = (z or 6) + 1
+a1.Font = Enum.Font.Oswald; a1.TextScaled = true; a1.TextTransparency = 1; a1.ZIndex = (z or 6) + 1
 local suit = Instance.new("TextLabel", card)
 suit.Size = UDim2.new(0.62,0,0.52,0); suit.Position = UDim2.new(0.19,0,0.25,0)
 suit.BackgroundTransparency = 1; suit.Text = "♠"; suit.TextColor3 = Color3.fromRGB(0,0,0)
-suit.Font = Enum.Font.GothamBlack; suit.TextScaled = true; suit.TextTransparency = 1; suit.ZIndex = (z or 6) + 1
+suit.Font = Enum.Font.Oswald; suit.TextScaled = true; suit.TextTransparency = 1; suit.ZIndex = (z or 6) + 1
 local a2 = Instance.new("TextLabel", card)
 a2.Size = UDim2.new(0.28,0,0.25,0); a2.Position = UDim2.new(0.66,0,0.71,0)
 a2.BackgroundTransparency = 1; a2.Text = "A\n♠"; a2.TextColor3 = Color3.fromRGB(0,0,0)
-a2.Font = Enum.Font.GothamBlack; a2.TextScaled = true; a2.TextTransparency = 1; a2.Rotation = 180; a2.ZIndex = (z or 6) + 1
+a2.Font = Enum.Font.Oswald; a2.TextScaled = true; a2.TextTransparency = 1; a2.Rotation = 180; a2.ZIndex = (z or 6) + 1
 return card, {a1, suit, a2}, stroke
 end
 local cards = {}
@@ -7153,15 +7148,15 @@ lineBot.AnchorPoint = Vector2.new(0.5,1); lineBot.Position = UDim2.new(0.5,0,1,-
 lineBot.BackgroundColor3 = Color3.fromRGB(225,225,225); lineBot.BorderSizePixel = 0; lineBot.ZIndex = 41
 local titleShadow = Instance.new("TextLabel", center)
 titleShadow.Size = UDim2.new(1,0,0,86); titleShadow.Position = UDim2.new(0,4,0,83); titleShadow.BackgroundTransparency = 1
-titleShadow.Text = "DICE DUELS"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.GothamBlack; titleShadow.TextSize = 72
+titleShadow.Text = "DICE DUELS"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.Oswald; titleShadow.TextSize = 72
 titleShadow.TextTransparency = 1; titleShadow.TextStrokeTransparency = 1; titleShadow.ZIndex = 42
 local title = Instance.new("TextLabel", center)
 title.Size = UDim2.new(1,0,0,86); title.Position = UDim2.new(0,0,0,78); title.BackgroundTransparency = 1
-title.Text = "DICE DUELS"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.GothamBlack; title.TextSize = 72
+title.Text = "DICE DUELS"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.Oswald; title.TextSize = 72
 title.TextTransparency = 1; title.TextStrokeTransparency = 1; title.TextStrokeColor3 = Color3.fromRGB(35,35,35); title.ZIndex = 43
 local subtitle = Instance.new("TextLabel", center)
 subtitle.Size = UDim2.new(1,0,0,26); subtitle.Position = UDim2.new(0,0,0,169); subtitle.BackgroundTransparency = 1
-subtitle.Text = "Eugene"; subtitle.TextColor3 = Color3.fromRGB(200,200,200); subtitle.Font = Enum.Font.GothamMedium; subtitle.TextSize = 19; subtitle.TextTransparency = 1; subtitle.ZIndex = 43
+subtitle.Text = "Eugene"; subtitle.TextColor3 = Color3.fromRGB(200,200,200); subtitle.Font = Enum.Font.Kanit; subtitle.TextSize = 19; subtitle.TextTransparency = 1; subtitle.ZIndex = 43
 TS:Create(darkBg, TweenInfo.new(0.65), {BackgroundTransparency = 0.22}):Play()
 for _, cd in ipairs(cards) do
 task.delay(math.random() * 0.9, function()
@@ -7533,11 +7528,11 @@ local ROWS = 4
 local PANEL_W = PADDING * 2 + COLS * BTN_SIZE + (COLS - 1) * BTN_GAP
 local PANEL_H = PADDING * 2 + ROWS * BTN_SIZE + (ROWS - 1) * BTN_GAP
 local PANEL_DEFAULT = UDim2.new(1, -(PANEL_W + 20), 0.5, -(PANEL_H / 2))
-local FACE_OFF = Color3.fromRGB(8, 8, 10)
-local FACE_ON = Color3.fromRGB(248, 248, 252)
-local TEXT_OFF = Color3.fromRGB(238, 238, 244)
-local TEXT_ON = Color3.fromRGB(8, 8, 12)
-local FACE_FLASH = Color3.fromRGB(198, 198, 206)
+local FACE_OFF = Color3.fromRGB(20, 21, 29)
+local FACE_ON = Color3.fromRGB(228, 58, 68)
+local TEXT_OFF = Color3.fromRGB(232, 233, 242)
+local TEXT_ON = Color3.fromRGB(255, 255, 255)
+local FACE_FLASH = Color3.fromRGB(128, 34, 42)
 -- Corner-only pip spots keep the middle of the die clear for the label.
 local MOBILE_PIPS = {
 [2] = {{0.19, 0.18}, {0.81, 0.82}},
@@ -7634,7 +7629,7 @@ TextColor3 = state and TEXT_ON or TEXT_OFF,
 local st = btn:FindFirstChildOfClass("UIStroke")
 if st then
 TS:Create(st, TweenInfo.new(0.15), {
-Color = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(85, 85, 95),
+Color = state and Color3.fromRGB(255, 140, 148) or Color3.fromRGB(62, 64, 80),
 Transparency = state and 0.1 or 0.45,
 }):Play()
 end
@@ -7669,7 +7664,7 @@ btn.BackgroundColor3 = FACE_OFF
 btn.BorderSizePixel = 0
 btn.Text = label
 btn.TextColor3 = TEXT_OFF
-btn.Font = Enum.Font.GothamBold
+btn.Font = Enum.Font.Kanit
 btn.TextSize = 10
 btn.TextWrapped = true
 btn.LineHeight = 1.15
@@ -7679,7 +7674,7 @@ btn.Active = true
 btn.Parent = MobilePanel
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
 local st = Instance.new("UIStroke", btn)
-st.Color = Color3.fromRGB(85, 85, 95)
+st.Color = Color3.fromRGB(62, 64, 80)
 st.Thickness = 1
 st.Transparency = 0.45
 st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border

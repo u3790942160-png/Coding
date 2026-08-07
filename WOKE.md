@@ -1,22 +1,22 @@
-# AdaptHub
+# WOKE
 
-`AdaptHub.lua` is the script to run: the AdaptHub polished UI with every button,
-toggle, slider and keybind wired to the feature logic from `Ace_source.lua`.
+`WokeHub.lua` is the script to run: the WOKE hub with every button, toggle,
+value box and keybind wired to the feature logic from `Ace_source.lua`.
 None of the Ace source's own GUI code is included — only its logic.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `AdaptHub.lua` | **Generated.** The single script to execute. Don't edit by hand. |
-| `AdaptHub_UI.lua` | The AdaptHub UI layout + the wiring that binds it to the logic. |
+| `WokeHub.lua` | **Generated.** The single script to execute. Don't edit by hand. |
+| `WokeHub_UI.lua` | The WOKE UI layout + the wiring that binds it to the logic. |
 | `Ace_source.lua` | Unchanged Ace source; the logic is extracted from it at build time. |
-| `tools/build_adapthub.py` | Builds `AdaptHub.lua` from the two files above. |
+| `tools/build_wokehub.py` | Builds `WokeHub.lua` from the two files above. |
 | `tools/test/` | Roblox API mock + a test that clicks the built UI and checks the logic reacts. |
 
 ```
-python3 tools/build_adapthub.py     # rebuild AdaptHub.lua
-lua5.1 tools/test/test_adapthub.lua # 62 checks over the wiring
+python3 tools/build_wokehub.py     # rebuild WokeHub.lua
+lua5.1 tools/test/test_wokehub.lua # 76 checks over the wiring
 ```
 
 ## What the build does
@@ -70,9 +70,37 @@ state, and drag to reposition when Move Buttons is on.
 
 ## Differences from the original AdaptHub mock-up
 
+The hub is named WOKE: the ScreenGui is `WokeHub`, and the banner and header
+wordmarks are drawn as WOKE text in the same slots and styling the logo art
+occupied. Colours, layout and animations are unchanged.
+
 * Arrows only appear on rows that actually have a selector under them.
 * Rows without an Ace counterpart were replaced with ones that have logic
   behind them: `Lock Radius` → `No Player Collision`, and `Safe Mode`,
   `Auto Carry Speed`, `Nuke Optimiser`, `No Cam Collision` were added.
 * Steal Bar Size is kept and saved, but the Ace steal-bar GUI isn't part of this
   script, so it only takes effect if a `StealBarGui` exists.
+
+## Fixed after the first build
+
+* Mobile buttons were scaled by a `UIScale` on their full-screen holder, which
+  scaled their screen positions too and pulled them off the right edge. Each
+  button now scales itself, so only its size changes.
+* A touch that started elsewhere and was released over a mobile button fired
+  that button's action; a press now has to start on the button.
+* The floating open button could not be dragged — its image button covered the
+  frame the drag handler was attached to — and a drag that ended over it
+  re-opened the menu. Dragging now runs off the button, with a deadzone.
+* The hub kept its window scale and background index under the Ace menu's
+  config keys, so an existing Ace config loaded this UI at that menu's scale
+  (0.52) with an index into a different image list. It now stores
+  `wokeUiScale` and `wokeBackground` of its own.
+* A gamepad press could match a keyboard binding; controller input now only
+  matches controller binds.
+* Re-running the script stacked a second menu; an existing hub is removed first.
+* A keybind row waiting for input lost its "..." prompt on any UI re-sync, and
+  Escape only cancelled for the matching device.
+* Mobile button labels had no size constraint and overflowed their 58px
+  buttons.
+* Button Size % accepted up to 200% while the saved config clamps at 135%, so
+  the value moved on its own after a reload.

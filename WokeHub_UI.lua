@@ -1,15 +1,15 @@
 --------------------------------------------------------------------------------
--- ADAPT HUB — UI layer + wiring
+-- WOKE — UI layer + wiring
 --
--- The layout below is the AdaptHub polished UI. Every control is wired to the
+-- The layout below is the WOKE hub. Every control is wired to the
 -- feature logic that was lifted out of the Ace source (speed modes, drop
 -- brainrot, TP down, aimbots, auto steal, counters, ESP, sky, performance,
 -- keybinds, config save/load). None of the Ace GUI code is used here.
 --
--- This file is concatenated after the extracted logic by tools/build_adapthub.py;
+-- This file is concatenated after the extracted logic by tools/build_wokehub.py;
 -- everything the logic exposes is a global at that point.
 --------------------------------------------------------------------------------
-local function AdaptHubMain()
+local function WokeHubMain()
 
 local Players            = game:GetService("Players")
 local TweenService       = game:GetService("TweenService")
@@ -885,10 +885,13 @@ local function createMobileButton(name, text, position, size, parent)
         BackgroundTransparency = 1,
         Text = text,
         TextColor3 = WHITE,
+        TextSize = 10,
+        TextScaled = true,
         Font = Enum.Font.GothamBlack,
         TextWrapped = true,
         Parent = btn,
     })
+    new("UITextSizeConstraint", {MinTextSize = 6, MaxTextSize = 11, Parent = lbl})
     new("UIStroke", {Thickness = 1.4, Parent = lbl})
 
     local borderStroke = new("UIStroke", {
@@ -903,7 +906,7 @@ local function createMobileButton(name, text, position, size, parent)
 
     local api = {
         button = btn, overlay = overlay, label = lbl, scale = scale,
-        stroke = borderStroke, active = false,
+        stroke = borderStroke, active = false, sizeScale = 1,
         corners = {btnCorner, bgCorner, overlayCorner},
     }
 
@@ -916,9 +919,17 @@ local function createMobileButton(name, text, position, size, parent)
         uiTween(overlay, 0.15, {ImageTransparency = (state and overlay.Image ~= "") and 0.15 or 1})
     end
 
+    -- Resizing happens per button rather than on the container: a UIScale on
+    -- the full-screen holder would scale the buttons' screen positions too and
+    -- drag them away from the edge they are anchored to.
+    function api.setScale(s)
+        api.sizeScale = s
+        scale.Scale = s
+    end
+
     function api.press()
-        uiTween(scale, 0.06, {Scale = 0.92})
-        task.delay(0.06, function() uiTween(scale, 0.1, {Scale = 1}) end)
+        uiTween(scale, 0.06, {Scale = api.sizeScale * 0.92})
+        task.delay(0.06, function() uiTween(scale, 0.1, {Scale = api.sizeScale}) end)
     end
 
     function api.pulse()
@@ -986,8 +997,15 @@ end
 --------------------------------------------------------------------------------
 -- ROOT GUI
 --------------------------------------------------------------------------------
-local AdaptHubPolished = new("ScreenGui", {
-    Name = "AdaptHubPolished",
+-- Clear a hub left over from an earlier execution, otherwise running the
+-- script twice stacks two menus on top of each other.
+for _, name in ipairs({"WokeHub", "AdaptHubPolished", "AceDuelsAdaptReconstruct", "CyberHub"}) do
+    local old = PlayerGui:FindFirstChild(name)
+    if old then pcall(function() old:Destroy() end) end
+end
+
+local WokeGui = new("ScreenGui", {
+    Name = "WokeHub",
     IgnoreGuiInset = true,
     ResetOnSpawn = false,
     DisplayOrder = 1000,
@@ -998,14 +1016,14 @@ local AdaptHubPolished = new("ScreenGui", {
 --------------------------------------------------------------------------------
 -- INTRO SCREEN
 --------------------------------------------------------------------------------
-local AdaptIntro = new("Frame", {
-    Name = "AdaptIntro",
+local WokeIntro = new("Frame", {
+    Name = "WokeIntro",
     ZIndex = 1000,
     Size = UDim2.new(1, 0, 1, 0),
     BackgroundColor3 = DARKER_BG,
     BackgroundTransparency = 0.5,
     BorderSizePixel = 0,
-    Parent = AdaptHubPolished,
+    Parent = WokeGui,
 })
 
 local IntroBackdropImage = new("ImageLabel", {
@@ -1019,7 +1037,7 @@ local IntroBackdropImage = new("ImageLabel", {
     Image = "rbxassetid://98541566010518",
     ImageTransparency = 1,
     ScaleType = Enum.ScaleType.Fit,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 new("UIScale", {Parent = IntroBackdropImage})
 
@@ -1030,7 +1048,7 @@ local ChainSpearStage = new("Frame", {
     Position = UDim2.new(0.5, 0, 0.42, 0),
     Size = UDim2.new(0.64, 0, 0.64, 0),
     BackgroundTransparency = 1,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 new("UIAspectRatioConstraint", {Parent = ChainSpearStage})
 new("UISizeConstraint", {MinSize = Vector2.new(200, 200), MaxSize = Vector2.new(280, 280), Parent = ChainSpearStage})
@@ -1081,7 +1099,7 @@ local TojiCutoutStage = new("Frame", {
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
     Rotation = -2,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 new("UIScale", {Parent = TojiCutoutStage})
 
@@ -1182,16 +1200,31 @@ do
     end
 end
 
-new("ImageLabel", {
+-- Wordmark: same slot and styling as the old banner art, drawn as text so it
+-- reads WOKE.
+local IntroBanner = new("TextLabel", {
     Name = "IntroBanner",
     ZIndex = 1002,
     AnchorPoint = Vector2.new(0.5, 0.5),
     Position = UDim2.new(0.5, 0, 0.42, 0),
     Size = UDim2.new(0.38, 0, 0, 78),
     BackgroundTransparency = 1,
-    Image = "rbxassetid://135088241492683",
-    ScaleType = Enum.ScaleType.Fit,
-    Parent = AdaptIntro,
+    Text = "WOKE",
+    TextColor3 = WHITE,
+    TextScaled = true,
+    Font = Enum.Font.GothamBlack,
+    Parent = WokeIntro,
+})
+new("UITextSizeConstraint", {MinTextSize = 18, MaxTextSize = 56, Parent = IntroBanner})
+new("UIStroke", {Color = DARKER_BG, Thickness = 2, Transparency = 0.35, Parent = IntroBanner})
+new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(178, 184, 210)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+    }),
+    Rotation = 90,
+    Parent = IntroBanner,
 })
 
 local TapAnywhere = new("TextLabel", {
@@ -1205,7 +1238,7 @@ local TapAnywhere = new("TextLabel", {
     TextColor3 = WHITE,
     TextSize = 11,
     Font = Enum.Font.GothamBlack,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 
 new("TextLabel", {
@@ -1219,7 +1252,7 @@ new("TextLabel", {
     TextColor3 = WHITE,
     TextSize = 10,
     Font = Enum.Font.GothamBlack,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 
 local IntroCaptionShield = new("Frame", {
@@ -1232,7 +1265,7 @@ local IntroCaptionShield = new("Frame", {
     BackgroundColor3 = DARKER_BG,
     BackgroundTransparency = 0.08,
     BorderSizePixel = 0,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 new("UICorner", {CornerRadius = UDim.new(0, 14), Parent = IntroCaptionShield})
 new("UIGradient", {
@@ -1252,7 +1285,7 @@ local TapCatcher = new("TextButton", {
     BackgroundTransparency = 1,
     Text = "",
     AutoButtonColor = false,
-    Parent = AdaptIntro,
+    Parent = WokeIntro,
 })
 
 --------------------------------------------------------------------------------
@@ -1264,7 +1297,7 @@ local TopBar = new("Frame", {
     BackgroundColor3 = INPUT_BG,
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Parent = AdaptHubPolished,
+    Parent = WokeGui,
 })
 
 new("Frame", {Visible = false, Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0, Parent = TopBar})
@@ -1295,8 +1328,8 @@ local FpsLabel = new("TextLabel", {
     Parent = TopBar,
 })
 
-local AdaptLogo = new("TextButton", {
-    Name = "AdaptLogo",
+local WokeLogo = new("TextButton", {
+    Name = "WokeLogo",
     Visible = false,
     Position = UDim2.new(0.5, -23, 0, 12),
     Size = UDim2.new(0, 46, 0, 46),
@@ -1306,15 +1339,15 @@ local AdaptLogo = new("TextButton", {
     AutoButtonColor = false,
     Parent = TopBar,
 })
-new("UICorner", {CornerRadius = UDim.new(0, 23), Parent = AdaptLogo})
-new("UIStroke", {Color = Color3.fromRGB(72, 70, 90), Transparency = 0.18, Parent = AdaptLogo})
+new("UICorner", {CornerRadius = UDim.new(0, 23), Parent = WokeLogo})
+new("UIStroke", {Color = Color3.fromRGB(72, 70, 90), Transparency = 0.18, Parent = WokeLogo})
 do
     local logoDot = new("Frame", {
         Position = UDim2.new(0.5, -8, 0.5, -8),
         Size = UDim2.new(0, 16, 0, 16),
         BackgroundColor3 = WHITE, BackgroundTransparency = 0.18,
         BorderSizePixel = 0,
-        Parent = AdaptLogo,
+        Parent = WokeLogo,
     })
     new("UICorner", {Parent = logoDot})
 end
@@ -1332,7 +1365,7 @@ local Main = new("Frame", {
     BackgroundColor3 = DARK_BG,
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Parent = AdaptHubPolished,
+    Parent = WokeGui,
 })
 new("UICorner", {CornerRadius = UDim.new(0, 14), Parent = Main})
 addDarkBorderGradient(new("UIStroke", {
@@ -1350,15 +1383,28 @@ local BackgroundAsset = new("ImageLabel", {
     Parent = Main,
 })
 
-new("ImageLabel", {
+local LogoAsset = new("TextLabel", {
     Name = "LogoAsset",
     ZIndex = 2,
-    Position = UDim2.new(0.5, -150, 0, -18),
-    Size = UDim2.new(0, 300, 0, 150),
+    Position = UDim2.new(0.5, -150, 0, 18),
+    Size = UDim2.new(0, 300, 0, 76),
     BackgroundTransparency = 1,
-    Image = "rbxassetid://135088241492683",
-    ScaleType = Enum.ScaleType.Fit,
+    Text = "WOKE",
+    TextColor3 = WHITE,
+    TextScaled = true,
+    Font = Enum.Font.GothamBlack,
     Parent = Main,
+})
+new("UITextSizeConstraint", {MinTextSize = 18, MaxTextSize = 46, Parent = LogoAsset})
+new("UIStroke", {Color = DARKER_BG, Thickness = 2, Transparency = 0.4, Parent = LogoAsset})
+new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(178, 184, 210)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+    }),
+    Rotation = 90,
+    Parent = LogoAsset,
 })
 
 local Close = new("TextButton", {
@@ -1607,8 +1653,8 @@ end
 --------------------------------------------------------------------------------
 -- FLOATING OPEN BUTTON
 --------------------------------------------------------------------------------
-local AdaptFloatOpen = new("Frame", {
-    Name = "AdaptFloatOpen",
+local WokeFloatOpen = new("Frame", {
+    Name = "WokeFloatOpen",
     Visible = false,
     Active = true,
     ZIndex = 500,
@@ -1617,10 +1663,10 @@ local AdaptFloatOpen = new("Frame", {
     BackgroundColor3 = Color3.fromRGB(14, 14, 18),
     BackgroundTransparency = 0.1,
     BorderSizePixel = 0,
-    Parent = AdaptHubPolished,
+    Parent = WokeGui,
 })
-new("UICorner", {Parent = AdaptFloatOpen})
-new("UIStroke", {Color = WHITE, Transparency = 0.45, Parent = AdaptFloatOpen})
+new("UICorner", {Parent = WokeFloatOpen})
+new("UIStroke", {Color = WHITE, Transparency = 0.45, Parent = WokeFloatOpen})
 
 local FloatButton = new("ImageButton", {
     Name = "FloatButton",
@@ -1631,7 +1677,7 @@ local FloatButton = new("ImageButton", {
     Image = "rbxassetid://92966351305582",
     ScaleType = Enum.ScaleType.Fit,
     AutoButtonColor = false,
-    Parent = AdaptFloatOpen,
+    Parent = WokeFloatOpen,
 })
 
 --------------------------------------------------------------------------------
@@ -1641,9 +1687,8 @@ local MobileButtons = new("Frame", {
     Name = "MobileButtons",
     Size = UDim2.new(1, 0, 1, 0),
     BackgroundTransparency = 1,
-    Parent = AdaptHubPolished,
+    Parent = WokeGui,
 })
-local MobileScale = new("UIScale", {Parent = MobileButtons})
 
 local MOBILE_DEFAULTS = {
     {"Drop Brainrot",  "DROP BRAINROT",  UDim2.new(1, -132, 0.5, -161), UDim2.new(0, 58, 0, 58)},
@@ -1680,7 +1725,7 @@ local function bindToggle(api, read, apply)
     api.button.MouseButton1Click:Connect(function()
         local nextState = not (read() == true)
         local ok, err = pcall(apply, nextState)
-        if not ok then warn("[AdaptHub] toggle failed: " .. tostring(err)) end
+        if not ok then warn("[WOKE] toggle failed: " .. tostring(err)) end
         api.setVisual(read() == true)
         saveSoon()
     end)
@@ -1778,10 +1823,10 @@ do
 
     -- Drop: JUMP = ascend then slam down (drops the brainrot), STAND = plain
     -- floor teleport without the hop.
-    bindExpandable(UI.expand["Drop"], function() return _G.AdaptDropMode == "Stand" and 2 or 1 end,
-        function(idx) _G.AdaptDropMode = (idx == 2) and "Stand" or "Jump" end)
+    bindExpandable(UI.expand["Drop"], function() return _G.WokeDropMode == "Stand" and 2 or 1 end,
+        function(idx) _G.WokeDropMode = (idx == 2) and "Stand" or "Jump" end)
     bindAction(UI.toggle["Drop"], function()
-        if _G.AdaptDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
+        if _G.WokeDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
     end)
 
     bindAction(UI.toggle["TP Down"], runTPFloor)
@@ -2095,7 +2140,7 @@ end
 --------------------------------------------------------------------------------
 -- KEYBINDS + CONTROLLER wiring
 --------------------------------------------------------------------------------
-_G.AdaptControllerBinds = _G.AdaptControllerBinds or {}
+_G.WokeControllerBinds = _G.WokeControllerBinds or {}
 
 local listeningRow = nil       -- {handle=, keyId=, controller=}
 
@@ -2105,17 +2150,17 @@ local function keyText(key)
 end
 
 local function currentBind(keyId, controller)
-    if controller then return _G.AdaptControllerBinds[keyId] end
+    if controller then return _G.WokeControllerBinds[keyId] end
     if keyId == "TPDown" then return tpDownKeybind end
     return speedKeybinds[keyId]
 end
 
 local function setBind(keyId, key, controller)
     if controller then
-        for otherId, bound in pairs(_G.AdaptControllerBinds) do
-            if otherId ~= keyId and bound == key then _G.AdaptControllerBinds[otherId] = nil end
+        for otherId, bound in pairs(_G.WokeControllerBinds) do
+            if otherId ~= keyId and bound == key then _G.WokeControllerBinds[otherId] = nil end
         end
-        _G.AdaptControllerBinds[keyId] = key
+        _G.WokeControllerBinds[keyId] = key
         return
     end
     if key then
@@ -2129,10 +2174,15 @@ end
 
 local function refreshKeybindButtons()
     for keyId, handle in pairs(UI.key) do
-        handle.button.Text = keyText(currentBind(keyId, false))
+        -- Leave the row that is waiting for a key showing its "..." prompt.
+        if not (listeningRow and listeningRow.handle == handle) then
+            handle.button.Text = keyText(currentBind(keyId, false))
+        end
     end
     for keyId, handle in pairs(UI.ctrlKey) do
-        handle.button.Text = keyText(currentBind(keyId, true))
+        if not (listeningRow and listeningRow.handle == handle) then
+            handle.button.Text = keyText(currentBind(keyId, true))
+        end
     end
 end
 refreshAllSpeedKeybinds = refreshKeybindButtons
@@ -2167,7 +2217,8 @@ end
 -- SETTINGS wiring
 --------------------------------------------------------------------------------
 local function applyMobileButtonScale(percent)
-    MobileScale.Scale = math.clamp(percent, 30, 200) / 100
+    local s = math.clamp(percent, 30, 135) / 100
+    for _, api in pairs(UI.mobile) do api.setScale(s) end
 end
 
 local function applyMobileButtonCorners(circle)
@@ -2193,9 +2244,9 @@ end
 
 do
     bindToggle(UI.toggle["Circle Buttons"],
-        function() return _G.AdaptCircleButtons == true end,
+        function() return _G.WokeCircleButtons == true end,
         function(state)
-            _G.AdaptCircleButtons = state
+            _G.WokeCircleButtons = state
             applyMobileButtonCorners(state)
         end)
 
@@ -2210,19 +2261,20 @@ do
         UI.toggle["Hide Mob Buttons"].setVisual(_G.AceHideMobileButtons == true)
     end
 
+    -- 135% is the ceiling the saved config clamps to, so the box matches it.
     bindValue(UI.value["Button Size %"],
         function() return math.floor((tonumber(_G.AceMobileButtonScale) or 1) * 100 + 0.5) end,
         function(v)
             _G.AceMobileButtonScale = v / 100
             applyMobileButtonScale(v)
-        end, 30, 200)
+        end, 30, 135)
     _G.AceApplyMobileButtonSize = function()
         applyMobileButtonScale((tonumber(_G.AceMobileButtonScale) or 1) * 100)
     end
 
     bindToggle(UI.toggle["Move Buttons"],
-        function() return _G.AdaptMoveButtons == true end,
-        function(state) _G.AdaptMoveButtons = state end)
+        function() return _G.WokeMoveButtons == true end,
+        function(state) _G.WokeMoveButtons = state end)
 
     UI.action["Reset Buttons"].button.MouseButton1Click:Connect(function()
         UI.action["Reset Buttons"].flash()
@@ -2231,9 +2283,9 @@ do
     end)
 
     bindToggle(UI.toggle["Intro Song"],
-        function() return _G.AdaptIntroSongEnabled == true end,
+        function() return _G.WokeIntroSongEnabled == true end,
         function(state)
-            _G.AdaptIntroSongEnabled = state
+            _G.WokeIntroSongEnabled = state
             if state then
                 if playIntroMusic then pcall(playIntroMusic) end
             else
@@ -2246,7 +2298,7 @@ do
         function(state) _introEnabled = state end)
 
     UI.gallery.Background.onSelect = function(index, image)
-        currentBackground = index - 1
+        _G.WokeBackground = index - 1
         if image == "" then
             BackgroundAsset.ImageTransparency = 1
         else
@@ -2257,7 +2309,7 @@ do
     end
 
     UI.gallery.Buttons.onSelect = function(_, image)
-        _G.AdaptButtonImage = image
+        _G.WokeButtonImage = image
         for _, api in pairs(UI.mobile) do
             api.overlay.Image = image or ""
             api.overlay.ImageTransparency = (image ~= "" and api.active) and 0.15 or 1
@@ -2266,7 +2318,7 @@ do
     end
 
     UI.colorPicker.onSelect = function(color)
-        _G.AdaptThemeColor = color
+        _G.WokeThemeColor = color
         uiTween(BackgroundAsset, 0.3, {ImageColor3 = color})
         for _, api in pairs(UI.mobile) do
             uiTween(api.stroke, 0.2, {Color = color})
@@ -2274,18 +2326,18 @@ do
     end
 
     bindToggle(UI.toggle["Background Color"],
-        function() return _G.AdaptBackgroundColorOn == true end,
+        function() return _G.WokeBackgroundColorOn == true end,
         function(state)
-            _G.AdaptBackgroundColorOn = state
+            _G.WokeBackgroundColorOn = state
             Main.BackgroundTransparency = state and 0 or 1
-            if state then Main.BackgroundColor3 = _G.AdaptThemeColor or DARK_BG end
+            if state then Main.BackgroundColor3 = _G.WokeThemeColor or DARK_BG end
         end)
 
     bindValue(UI.value["UI Scale"],
-        function() return math.floor((tonumber(aceGuiScaleValue) or 0.85) * 100 + 0.5) end,
+        function() return math.floor((tonumber(_G.WokeUiScale) or 0.85) * 100 + 0.5) end,
         function(v)
-            aceGuiScaleValue = v / 100
-            MainScale.Scale = aceGuiScaleValue
+            _G.WokeUiScale = v / 100
+            MainScale.Scale = _G.WokeUiScale
         end, 50, 150)
 
     bindValue(UI.value["Steal Bar Size"],
@@ -2309,7 +2361,7 @@ do
 
     UI.action["RESET ALL CONTROLLER"].button.MouseButton1Click:Connect(function()
         UI.action["RESET ALL CONTROLLER"].flash()
-        _G.AdaptControllerBinds = {}
+        _G.WokeControllerBinds = {}
         refreshKeybindButtons()
         saveSoon()
     end)
@@ -2376,7 +2428,7 @@ do
         end)
 
         UserInputService.InputChanged:Connect(function(input)
-            if not pressing or not (_G.AdaptMoveButtons == true) then return end
+            if not pressing or not (_G.WokeMoveButtons == true) then return end
             if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
             local delta = input.Position - pressPos
             if not dragging and (math.abs(delta.X) > 6 or math.abs(delta.Y) > 6) then dragging = true end
@@ -2388,6 +2440,9 @@ do
 
         btn.InputEnded:Connect(function(input)
             if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            -- Only act on a press that started on this button: InputEnded also
+            -- fires for input that began elsewhere and was released over it.
+            if not pressing then return end
             local wasDrag = dragging
             pressing = false
             dragging = false
@@ -2449,41 +2504,60 @@ end
 
 local function setMenuOpen(open)
     Main.Visible = open
-    AdaptFloatOpen.Visible = not open
+    WokeFloatOpen.Visible = not open
 end
 
 Close.MouseButton1Click:Connect(function() setMenuOpen(false) end)
-FloatButton.MouseButton1Click:Connect(function() setMenuOpen(true) end)
 
--- Dragging for the main window and the floating open button.
-local function makeDraggable(frame)
-    local dragging, dragStart, startPos, dragInput = false, nil, nil, nil
-    frame.InputBegan:Connect(function(input)
+-- Dragging. `handle` is the element that receives the input, which is not
+-- always the frame that moves: the float window is completely covered by its
+-- button, so input never reaches the frame itself. Returns a "was dragged"
+-- probe so a click handler can ignore the release that ends a drag.
+local function makeDraggable(frame, handle, onMoved)
+    handle = handle or frame
+    local dragging, moved, heldInput, startPos, framePos = false, false, nil, nil, nil
+
+    handle.InputBegan:Connect(function(input)
+        if _G.AceGuiLocked == true then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            moved = false
+            heldInput = input
+            startPos = input.Position
+            framePos = frame.Position
         end
     end)
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
+
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            savedMainPositionTable = udim2ToTable(Main.Position)
+        if not dragging or not startPos then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local delta = input.Position - startPos
+        if not moved and (math.abs(delta.X) > 4 or math.abs(delta.Y) > 4) then moved = true end
+        if moved then
+            frame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X,
+                                       framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+            if onMoved then onMoved() end
         end
     end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input ~= heldInput then return end
+        dragging = false
+        heldInput = nil
+    end)
+
+    return function() return moved end
 end
-makeDraggable(Main)
-makeDraggable(AdaptFloatOpen)
+
+makeDraggable(Main, Main, function()
+    savedMainPositionTable = udim2ToTable(Main.Position)
+end)
+local floatWasDragged = makeDraggable(WokeFloatOpen, FloatButton)
+
+FloatButton.MouseButton1Click:Connect(function()
+    if floatWasDragged() then return end
+    setMenuOpen(true)
+end)
 
 --------------------------------------------------------------------------------
 -- HOTKEYS (keyboard + controller)
@@ -2492,7 +2566,7 @@ local HOTKEY_ACTIONS = {
     SpeedToggle = function() toggleCarryMode() end,
     LaggerToggle = function() toggleLaggerMode() end,
     DropBrainrot = function()
-        if _G.AdaptDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
+        if _G.WokeDropMode == "Stand" then runTPFloor() else runDropBrainrot() end
     end,
     TPDown = function() runTPFloor() end,
     Aimbot = function()
@@ -2547,7 +2621,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if UserInputService:GetFocusedTextBox() then return end
 
     for keyId, fn in pairs(HOTKEY_ACTIONS) do
-        local bound = isController and _G.AdaptControllerBinds[keyId] or currentBind(keyId, false)
+        -- A gamepad press only ever matches a controller bind; it must not
+        -- fall through to the keyboard binding.
+        local bound
+        if isController then
+            bound = _G.WokeControllerBinds[keyId]
+        else
+            bound = currentBind(keyId, false)
+        end
         if bound and input.KeyCode == bound then
             pcall(fn)
             return
@@ -2577,7 +2658,7 @@ local function syncAll()
         if api.stateFn then api.setActive(api.stateFn()) end
     end
 end
-_G.AdaptSyncUI = syncAll
+_G.WokeSyncUI = syncAll
 
 task.spawn(function()
     while task.wait(0.35) do
@@ -2664,9 +2745,9 @@ UI.action["RESET ALL SETTINGS"].button.MouseButton1Click:Connect(function()
     selectedAnimationPack = "OFF"
     pcall(applyAnimationPack, "OFF")
     applyDefaultAceKeybinds()
-    _G.AdaptControllerBinds = {}
-    aceGuiScaleValue = 0.85
-    MainScale.Scale = aceGuiScaleValue
+    _G.WokeControllerBinds = {}
+    _G.WokeUiScale = 0.85
+    MainScale.Scale = _G.WokeUiScale
     resetMobileButtons()
 
     syncAll()
@@ -2681,13 +2762,18 @@ do
     collectAceConfig = function()
         local t = baseCollect()
         local ctrl = {}
-        for keyId, key in pairs(_G.AdaptControllerBinds) do ctrl[keyId] = keyToString(key) end
-        t.adaptControllerKeybinds = ctrl
-        t.adaptDropMode = _G.AdaptDropMode
-        t.adaptButtonImage = _G.AdaptButtonImage
-        t.adaptCircleButtons = _G.AdaptCircleButtons == true
-        t.adaptIntroSong = _G.AdaptIntroSongEnabled == true
-        t.adaptMobilePositions = (function()
+        for keyId, key in pairs(_G.WokeControllerBinds) do ctrl[keyId] = keyToString(key) end
+        t.wokeControllerKeybinds = ctrl
+        t.wokeDropMode = _G.WokeDropMode
+        t.wokeButtonImage = _G.WokeButtonImage
+        t.wokeCircleButtons = _G.WokeCircleButtons == true
+        t.wokeIntroSong = _G.WokeIntroSongEnabled == true
+        -- The hub keeps its own scale and background index: the Ace values
+        -- describe a different menu (and a different image list), so reusing
+        -- them would load this UI at the wrong size with the wrong picture.
+        t.wokeUiScale = _G.WokeUiScale
+        t.wokeBackground = _G.WokeBackground
+        t.wokeMobilePositions = (function()
             local out = {}
             for name, api in pairs(UI.mobile) do out[name] = udim2ToTable(api.button.Position) end
             return out
@@ -2696,17 +2782,30 @@ do
     end
 
     local data = savedConfig or {}
-    if type(data.adaptControllerKeybinds) == "table" then
-        for keyId, name in pairs(data.adaptControllerKeybinds) do
-            _G.AdaptControllerBinds[keyId] = stringToKeyCode(name)
+    -- `adapt*` are the keys this hub used before the rename; read them as a
+    -- fallback so existing settings survive the upgrade.
+    local function saved(key, legacy)
+        local v = data[key]
+        if v == nil then v = data[legacy] end
+        return v
+    end
+
+    local binds = saved("wokeControllerKeybinds", "adaptControllerKeybinds")
+    if type(binds) == "table" then
+        for keyId, name in pairs(binds) do
+            _G.WokeControllerBinds[keyId] = stringToKeyCode(name)
         end
     end
-    _G.AdaptDropMode = data.adaptDropMode or "Jump"
-    _G.AdaptCircleButtons = data.adaptCircleButtons == true
-    _G.AdaptIntroSongEnabled = data.adaptIntroSong == true
-    _G.AdaptButtonImage = data.adaptButtonImage or ""
-    if type(data.adaptMobilePositions) == "table" then
-        for name, pos in pairs(data.adaptMobilePositions) do
+    _G.WokeDropMode = saved("wokeDropMode", "adaptDropMode") or "Jump"
+    _G.WokeCircleButtons = saved("wokeCircleButtons", "adaptCircleButtons") == true
+    _G.WokeIntroSongEnabled = saved("wokeIntroSong", "adaptIntroSong") == true
+    _G.WokeButtonImage = saved("wokeButtonImage", "adaptButtonImage") or ""
+    _G.WokeUiScale = math.clamp(tonumber(data.wokeUiScale) or 0.85, 0.5, 1.5)
+    _G.WokeBackground = tonumber(data.wokeBackground) or 0
+
+    local positions = saved("wokeMobilePositions", "adaptMobilePositions")
+    if type(positions) == "table" then
+        for name, pos in pairs(positions) do
             local api = UI.mobile[name]
             if api then api.button.Position = tableToUDim2(pos, api.button.Position) end
         end
@@ -2760,18 +2859,19 @@ local function applySavedState()
         if applySavedAnimationPackToCharacter then applySavedAnimationPackToCharacter(LocalPlayer.Character) end
     end)
     pcall(function()
-        MainScale.Scale = math.clamp(tonumber(aceGuiScaleValue) or 0.85, 0.5, 1.5)
+        MainScale.Scale = math.clamp(tonumber(_G.WokeUiScale) or 0.85, 0.5, 1.5)
         applyMobileButtonScale((tonumber(_G.AceMobileButtonScale) or 1) * 100)
-        applyMobileButtonCorners(_G.AdaptCircleButtons == true)
+        applyMobileButtonCorners(_G.WokeCircleButtons == true)
         MobileButtons.Visible = not (_G.AceHideMobileButtons == true)
         if savedMainPositionTable then
             Main.Position = tableToUDim2(savedMainPositionTable, Main.Position)
         end
-        if currentBackground and currentBackground > 0 and UI.gallery.Background.thumbs[currentBackground + 1] then
-            UI.gallery.Background.select(currentBackground + 1)
+        local bgIndex = tonumber(_G.WokeBackground) or 0
+        if bgIndex > 0 and UI.gallery.Background.thumbs[bgIndex + 1] then
+            UI.gallery.Background.select(bgIndex + 1)
         end
-        if _G.AdaptButtonImage and _G.AdaptButtonImage ~= "" then
-            for _, api in pairs(UI.mobile) do api.overlay.Image = _G.AdaptButtonImage end
+        if _G.WokeButtonImage and _G.WokeButtonImage ~= "" then
+            for _, api in pairs(UI.mobile) do api.overlay.Image = _G.WokeButtonImage end
         end
     end)
     syncAll()
@@ -2786,8 +2886,8 @@ local function skipIntro()
     if introSkipped then return end
     introSkipped = true
 
-    uiTween(AdaptIntro, 0.4, {BackgroundTransparency = 1})
-    for _, child in ipairs(AdaptIntro:GetChildren()) do
+    uiTween(WokeIntro, 0.4, {BackgroundTransparency = 1})
+    for _, child in ipairs(WokeIntro:GetChildren()) do
         if child:IsA("ImageLabel") then
             uiTween(child, 0.3, {ImageTransparency = 1})
         elseif child:IsA("TextLabel") then
@@ -2801,13 +2901,13 @@ local function skipIntro()
     end
 
     task.delay(0.45, function()
-        AdaptIntro.Visible = false
+        WokeIntro.Visible = false
         if stopIntroPlayback then pcall(stopIntroPlayback) end
         MainScale.Scale = 0.85
-        uiTween(MainScale, 0.35, {Scale = math.clamp(tonumber(aceGuiScaleValue) or 0.85, 0.5, 1.5)}, Enum.EasingStyle.Back)
+        uiTween(MainScale, 0.35, {Scale = math.clamp(tonumber(_G.WokeUiScale) or 0.85, 0.5, 1.5)}, Enum.EasingStyle.Back)
         PingLabel.Visible = true
         FpsLabel.Visible = true
-        AdaptLogo.Visible = true
+        WokeLogo.Visible = true
     end)
 end
 
@@ -2822,7 +2922,7 @@ task.spawn(function()
         return
     end
 
-    if _G.AdaptIntroSongEnabled and playIntroMusic then pcall(playIntroMusic) end
+    if _G.WokeIntroSongEnabled and playIntroMusic then pcall(playIntroMusic) end
 
     IntroBackdropImage.Visible = true
     uiTween(IntroBackdropImage, 0.8, {ImageTransparency = 0.3})
@@ -2909,4 +3009,4 @@ task.delay(1.5, function() pcall(syncAll) end)
 
 end
 
-AdaptHubMain()
+WokeHubMain()

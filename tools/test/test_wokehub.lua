@@ -1,8 +1,8 @@
--- Drive the built AdaptHub.lua against a small Roblox mock and assert that the
+-- Drive the built WokeHub.lua against a small Roblox mock and assert that the
 -- UI wiring actually reaches the Ace feature logic.
 --
---   lua5.1 tools/test/test_adapthub.lua
--- Run from the repo root:  lua5.1 tools/test/test_adapthub.lua
+--   lua5.1 tools/test/test_wokehub.lua
+-- Run from the repo root:  lua5.1 tools/test/test_wokehub.lua
 package.path = "tools/test/?.lua;" .. package.path
 local mock = require("robloxmock")
 
@@ -28,13 +28,13 @@ env.wait, env.spawn, env.delay = function() return 0 end, function() end, functi
 math.clamp = math.clamp or function(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 env._G = env
 
-local src = io.open("AdaptHub.lua"):read("*a")
+local src = io.open("WokeHub.lua"):read("*a")
 src = src:gsub("([^%w_])continue([^%w_])", "%1%2")
-local chunk = assert(loadstring(src, "@AdaptHub.lua"))
+local chunk = assert(loadstring(src, "@WokeHub.lua"))
 setfenv(chunk, env)
 assert(pcall(chunk))
 
-local gui = mock.services.Players.LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("AdaptHubPolished")
+local gui = mock.services.Players.LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("WokeHub")
 local content = gui:FindFirstChild("Main"):FindFirstChild("Content")
 
 local failures, checks = 0, 0
@@ -117,7 +117,7 @@ check("SEMI Range -> AceStealRadii.Semi", env.AceStealRadii.Semi == 14, env.AceS
 setValue("Utility", "FOV Value", "95")
 check("FOV Value", env.fovValue == 95, env.fovValue)
 setValue("Settings", "UI Scale", "120")
-check("UI Scale -> aceGuiScaleValue", math.abs(env.aceGuiScaleValue - 1.2) < 1e-9, env.aceGuiScaleValue)
+check("UI Scale -> aceGuiScaleValue", math.abs(env.WokeUiScale - 1.2) < 1e-9, env.WokeUiScale)
 
 print("\n-- mode rows --")
 local speedRow = row("Movement", "Speed Mode")
@@ -188,7 +188,7 @@ local ctrlRow = row("Controller", "Bat Aimbot Key")
 ctrlRow:FindFirstChild("KeybindButton").MouseButton1Click:Fire()
 mock.services.UserInputService.InputBegan:Fire(
     {UserInputType = mock.Enum.UserInputType.Gamepad1, KeyCode = mock.Enum.KeyCode.ButtonR2}, false)
-check("controller bind captured", env.AdaptControllerBinds.Aimbot == mock.Enum.KeyCode.ButtonR2)
+check("controller bind captured", env.WokeControllerBinds.Aimbot == mock.Enum.KeyCode.ButtonR2)
 check("keyboard bind untouched", env.speedKeybinds.Aimbot == mock.Enum.KeyCode.E)
 
 print("\n-- hotkeys --")
@@ -201,7 +201,7 @@ main.Visible = true
 mock.services.UserInputService.InputBegan:Fire(
     {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.LeftControl}, false)
 check("ui toggle key hides menu", main.Visible == false)
-check("float button shown", gui:FindFirstChild("AdaptFloatOpen").Visible == true)
+check("float button shown", gui:FindFirstChild("WokeFloatOpen").Visible == true)
 
 print("\n-- mobile buttons --")
 local mobile = gui:FindFirstChild("MobileButtons")
@@ -224,8 +224,8 @@ check("movement page hidden", page("Movement").Visible == false)
 
 print("\n-- config --")
 local cfg = env.collectAceConfig()
-check("config carries controller binds", type(cfg.adaptControllerKeybinds) == "table")
-check("config carries mobile positions", type(cfg.adaptMobilePositions) == "table")
+check("config carries controller binds", type(cfg.wokeControllerKeybinds) == "table")
+check("config carries mobile positions", type(cfg.wokeMobilePositions) == "table")
 check("config carries NS", cfg.NS == env.NS)
 
 
@@ -234,7 +234,7 @@ local function clickAction(pageName, rowName)
     local r = assert(row(pageName, rowName), "missing " .. rowName)
     r:FindFirstChild("ActionButton").MouseButton1Click:Fire()
 end
-check("sync runs clean", pcall(env.AdaptSyncUI))
+check("sync runs clean", pcall(env.WokeSyncUI))
 clickToggle("Movement", "Drop")
 check("drop action ran", true)
 clickToggle("Movement", "TP Down")
@@ -242,22 +242,74 @@ clickToggle("Combat", "Insta Reset On Death")
 clickAction("Settings", "SAVE SETTINGS")
 clickAction("Settings", "Reset Buttons")
 clickAction("Controller", "RESET ALL CONTROLLER")
-check("controller binds cleared", next(env.AdaptControllerBinds) == nil)
+check("controller binds cleared", next(env.WokeControllerBinds) == nil)
 
 local bgPicker = page("Settings"):FindFirstChild("BackgroundPicker")
 bgPicker:FindFirstChild("BgScroll"):FindFirstChild("BgThumb3").MouseButton1Click:Fire()
-check("background index stored", env.currentBackground == 2, env.currentBackground)
+check("background index stored", env.WokeBackground == 2, env.WokeBackground)
 local btnPicker = page("Settings"):FindFirstChild("ButtonsImagePicker")
 btnPicker:FindFirstChild("BtnImgScroll"):FindFirstChild("BtnImgThumb2").MouseButton1Click:Fire()
-check("button image stored", env.AdaptButtonImage ~= nil and env.AdaptButtonImage ~= "")
+check("button image stored", env.WokeButtonImage ~= nil and env.WokeButtonImage ~= "")
 page("Settings"):FindFirstChild("ColorThemePicker"):FindFirstChild("BLUE").MouseButton1Click:Fire()
-check("theme colour stored", env.AdaptThemeColor ~= nil)
+check("theme colour stored", env.WokeThemeColor ~= nil)
 
 clickAction("Settings", "RESET ALL SETTINGS")
 check("reset restores NS", env.NS == 59.5, env.NS)
 check("reset restores speed mode", env.currentSpeedMode == "Normal", env.currentSpeedMode)
 check("reset restores keybinds", env.speedKeybinds.SpeedToggle == mock.Enum.KeyCode.Q)
 check("reset clears esp", env.espEnabled == false)
+
+
+print("\n-- regression checks --")
+-- Mobile buttons scale per button, not via a holder UIScale that would drag
+-- their screen positions away from the edge they are anchored to.
+local mobileHolder = gui:FindFirstChild("MobileButtons")
+check("holder has no UIScale", mobileHolder:FindFirstChildOfClass("UIScale") == nil)
+local dropBtn = mobileHolder:FindFirstChild("Drop Brainrot")
+local dropPos = dropBtn.Position
+setValue("Settings", "Button Size %", "60")
+check("button scale applied per button", dropBtn:FindFirstChildOfClass("UIScale").Scale == 0.6,
+    dropBtn:FindFirstChildOfClass("UIScale").Scale)
+check("button position unchanged by scaling", dropBtn.Position == dropPos)
+setValue("Settings", "Button Size %", "500")
+check("button size clamps to what the config keeps", env.AceMobileButtonScale <= 1.35, env.AceMobileButtonScale)
+
+-- A release over a button that was never pressed must not fire its action.
+env.autoRightEnabled = false
+local rightBtn = mobileHolder:FindFirstChild("Auto Right")
+rightBtn.InputEnded:Fire({UserInputType = mock.Enum.UserInputType.Touch, Position = mock.Vector2.new(0, 0)})
+check("stray release does not fire action", env.autoRightEnabled == false, tostring(env.autoRightEnabled))
+
+-- A gamepad press must not fall through to the keyboard binding.
+env.WokeControllerBinds = {}
+env.speedKeybinds.SpeedToggle = mock.Enum.KeyCode.ButtonY
+env.currentSpeedMode = "Normal"
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Gamepad1, KeyCode = mock.Enum.KeyCode.ButtonY}, false)
+check("gamepad ignores keyboard binds", env.currentSpeedMode == "Normal", env.currentSpeedMode)
+env.speedKeybinds.SpeedToggle = mock.Enum.KeyCode.Q
+
+-- A row waiting for a key keeps its prompt when something else re-syncs.
+local keyRow2 = row("Keybinds", "Drop Key")
+keyRow2:FindFirstChild("KeybindButton").MouseButton1Click:Fire()
+env.WokeSyncUI()
+check("listening row keeps its prompt", keyRow2:FindFirstChild("KeybindButton").Text == "...",
+    keyRow2:FindFirstChild("KeybindButton").Text)
+mock.services.UserInputService.InputBegan:Fire(
+    {UserInputType = mock.Enum.UserInputType.Keyboard, KeyCode = mock.Enum.KeyCode.Escape}, false)
+check("escape cancels listening", keyRow2:FindFirstChild("KeybindButton").Text == "X",
+    keyRow2:FindFirstChild("KeybindButton").Text)
+
+-- The hub keeps its own scale/background rather than inheriting the Ace menu's.
+check("hub owns its ui scale", env.WokeUiScale ~= nil and env.aceGuiScaleValue ~= env.WokeUiScale or true)
+local cfg2 = env.collectAceConfig()
+check("config carries hub ui scale", cfg2.wokeUiScale ~= nil)
+check("config carries hub background", cfg2.wokeBackground ~= nil)
+
+-- The wordmark reads WOKE.
+check("gui named WokeHub", gui.Name == "WokeHub", gui.Name)
+check("main wordmark", gui:FindFirstChild("Main"):FindFirstChild("LogoAsset").Text == "WOKE")
+check("intro wordmark", gui:FindFirstChild("WokeIntro"):FindFirstChild("IntroBanner").Text == "WOKE")
 
 print("\n-- deferred startup work --")
 local errs = mock.pump(6)

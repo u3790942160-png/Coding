@@ -76,21 +76,11 @@ local CS = 28.8
 local LAGGER_SPEED = 29
 local LAGGER_CARRY_SPEED = 15
 local currentSpeedMode = "Normal"
-DiceSpeedMethods = {
-"Velocity", "AssemblyLinearVelocity", "Velocity Lerp", "AssemblyLinearVelocity Lerp",
-"CFrame", "CFrame Lerp", "Hyper CFrame", "Anchored CFrame", "PivotTo", "Model PivotTo", "Tween CFrame",
-"WalkSpeed", "Humanoid Move", "Humanoid MoveTo",
-"BodyVelocity", "BodyPosition", "BodyForce", "BodyThrust",
-"LinearVelocity", "VectorForce", "AlignPosition",
-"ApplyImpulse", "RocketPropulsion",
-}
-diceSpeedMethod = diceSpeedMethod or "Velocity"
-diceHyperMult = diceHyperMult or 4
 -- With WalkSpeed pinned at 16 the humanoid's ground controller spends
 -- every physics step dragging you back toward 16, so a 55 set on the
 -- assembly is measured at roughly 51 by the time the frame is drawn —
 -- and the same shortfall shows on carry speed. Handing the humanoid the
--- figure it is meant to be walking at makes it push with the method
+-- figure it is meant to be walking at makes it push with the movement
 -- instead of against it, and the number lands where it was set.
 diceMatchWalkSpeed = diceMatchWalkSpeed ~= false
 MOVE_KEYS = {
@@ -887,7 +877,6 @@ CS = CS,
 LAGGER_SPEED = LAGGER_SPEED,
 LAGGER_CARRY_SPEED = LAGGER_CARRY_SPEED,
 currentSpeedMode = currentSpeedMode,
-diceSpeedMethod = diceSpeedMethod,
 diceMatchWalkSpeed = diceMatchWalkSpeed == true,
 autoCarrySpeedEnabled = autoCarrySpeedEnabled == true,
 autoTPEnabled = autoTPEnabled,
@@ -1000,13 +989,6 @@ LAGGER_CARRY_SPEED = tonumber(data.LAGGER_CARRY_SPEED) or LAGGER_CARRY_SPEED
 currentSpeedMode = data.currentSpeedMode or currentSpeedMode
 if currentSpeedMode ~= "Normal" and currentSpeedMode ~= "Carry" and currentSpeedMode ~= "Lagger" and currentSpeedMode ~= "Lagger Carry" then currentSpeedMode = "Normal" end
 if data.diceMatchWalkSpeed ~= nil then diceMatchWalkSpeed = data.diceMatchWalkSpeed == true end
-if type(data.diceSpeedMethod) == "string" then
--- Only accept a method this build actually implements; a stale config
--- naming a removed one would leave movement doing nothing at all.
-for _, name in ipairs(DiceSpeedMethods or {}) do
-if name == data.diceSpeedMethod then diceSpeedMethod = name break end
-end
-end
 autoCarrySpeedEnabled = data.autoCarrySpeedEnabled == true
 autoTPEnabled = data.autoTPEnabled == true
 autoTPHeight = tonumber(data.autoTPHeight) or autoTPHeight
@@ -2831,236 +2813,40 @@ saveDiceConfig()
 end
 end)
 -- ═══════════════════════════════════════════════════════════════
--- SPEED ENGINE
--- Ported from the Vynx build. Rather than writing hrp.Velocity every
--- frame, movement goes through a selectable method: the default drives
--- the assembly with a mass-scaled impulse, and the rest cover the
--- CFrame, mover-instance and humanoid approaches. Switching method
--- tears down whatever the previous one left on the character.
+-- SPEED ENGINE — ApplyImpulse
+-- The delta between where the assembly is going and where it should be
+-- going, applied as an impulse scaled by its own mass. Measured fresh
+-- every frame, so it settles exactly on the figure and a loaded carry
+-- accelerates like an empty character. Vertical velocity is left alone
+-- so jumps and falls behave.
 -- ═══════════════════════════════════════════════════════════════
 do
--- Everything the active method parented to the character, so the next
--- method can clear it without hunting through the model.
-local SO = {}
-function DiceDestroySpeedObjects()
-DiceReleaseWalkSpeed(nil)
-SO.walkSpeedHeld = false
-if SO.anchored then pcall(function() SO.anchored.Anchored = false end); SO.anchored = nil end
-for _, key in ipairs({"bodyVel", "bodyPosition", "bodyForce", "bodyThrust", "linearVel",
-"vectorForce", "alignPos", "rocket", "rocketTarget", "attLinVel", "attVecForce", "attAlign"}) do
-if SO[key] then pcall(function() SO[key]:Destroy() end); SO[key] = nil end
-end
-if SO.tween then pcall(function() SO.tween:Cancel() end); SO.tween = nil end
-end
-local function ensureAttachment(hrp, key, name)
-local att = SO[key]
-if not att or att.Parent ~= hrp then
-if att then pcall(function() att:Destroy() end) end
-att = Instance.new("Attachment")
-att.Name = name or "DiceSpeedAtt"
-att.Parent = hrp
-SO[key] = att
-end
-return att
-end
--- Push the assembly to the target planar speed in one impulse, scaled by
--- its own mass so a heavy carry moves the same as an empty character.
-local function massImpulse(hrp, direction, targetSpeed)
-local mass = hrp.AssemblyMass or 1
-local current = hrp.AssemblyLinearVelocity
-local desired = Vector3.new(direction.X * targetSpeed, current.Y, direction.Z * targetSpeed)
-local delta = desired - current
-pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
-end
-local function lerpImpulse(hrp, dir, spd)
-local current = hrp.AssemblyLinearVelocity
-local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
-local blended = current:Lerp(desired, 0.6)
-local mass = hrp.AssemblyMass or 1
-pcall(function() hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass) end)
-end
--- These two set WalkSpeed as their whole mechanism; the rest only borrow
--- it to keep the humanoid agreeing with the movement.
-local function methodOwnsWalkSpeed(m)
-return m == "WalkSpeed" or m == "Humanoid Move"
-end
+local walkSpeedHeld = false
 -- Only ever touches the humanoid if we are the ones holding it off
 -- default, so the idle path costs a boolean rather than a lookup.
 function DiceReleaseWalkSpeed(hum)
-if not SO.walkSpeedHeld then return end
-SO.walkSpeedHeld = false
+if not walkSpeedHeld then return end
+walkSpeedHeld = false
 if not hum then
 local char = LP.Character
 hum = char and char:FindFirstChildOfClass("Humanoid")
 end
 if hum and hum.WalkSpeed ~= 16 then pcall(function() hum.WalkSpeed = 16 end) end
 end
-function DiceApplySpeedMethod(hrp, hum, dir, spd, dt)
-local step = dt or 1/60
-local m = diceSpeedMethod
-if SO.lastMethod ~= m then
-DiceDestroySpeedObjects()
-if not methodOwnsWalkSpeed(m) and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
-SO.lastMethod = m
-end
--- Match before dispatching, so the humanoid is already walking at the
--- target when the method's own push lands this step.
-if diceMatchWalkSpeed and not methodOwnsWalkSpeed(m) then
+function DiceApplyMoveSpeed(hrp, hum, dir, spd)
+-- Match before the push lands, so the humanoid is already walking at
+-- the target rather than hauling the character back toward 16.
+if diceMatchWalkSpeed and hum then
 if hum.WalkSpeed ~= spd then hum.WalkSpeed = spd end
-SO.walkSpeedHeld = true
+walkSpeedHeld = true
 end
-local char = hrp.Parent
-local targetPos = hrp.Position + (dir * spd * step)
-if m == "Velocity" or m == "AssemblyLinearVelocity" or m == "ApplyImpulse" then
-massImpulse(hrp, dir, spd)
-elseif m == "Velocity Lerp" or m == "AssemblyLinearVelocity Lerp" then
-lerpImpulse(hrp, dir, spd)
-elseif m == "CFrame" then
-hrp.CFrame = hrp.CFrame + (dir * spd * step)
-elseif m == "CFrame Lerp" then
-hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + (dir * spd * step), 0.5)
-elseif m == "Hyper CFrame" then
-hrp.CFrame = hrp.CFrame + (dir * spd * (diceHyperMult or 4) * step)
-elseif m == "Anchored CFrame" then
-if not hrp.Anchored then
-hrp.Anchored = true
-SO.anchored = hrp
-end
-hrp.CFrame = hrp.CFrame + (dir * spd * step)
-elseif m == "PivotTo" then
-hrp:PivotTo(hrp.CFrame + (dir * spd * step))
-elseif m == "Model PivotTo" then
-if char and char:IsA("Model") then
-char:PivotTo(char:GetPivot() + (dir * spd * step))
-else
-hrp:PivotTo(hrp.CFrame + (dir * spd * step))
-end
-elseif m == "Tween CFrame" then
-if SO.tween then pcall(function() SO.tween:Cancel() end) end
-SO.tween = TweenService:Create(hrp, TweenInfo.new(step, Enum.EasingStyle.Linear), {CFrame = hrp.CFrame + (dir * spd * step)})
-SO.tween:Play()
-elseif m == "WalkSpeed" then
-hum.WalkSpeed = spd
-elseif m == "Humanoid Move" then
-hum.WalkSpeed = spd
-hum:Move(dir)
-elseif m == "Humanoid MoveTo" then
-hum:MoveTo(targetPos, hrp)
-elseif m == "BodyVelocity" then
-if not SO.bodyVel or SO.bodyVel.Parent ~= hrp then
-if SO.bodyVel then pcall(function() SO.bodyVel:Destroy() end) end
-SO.bodyVel = Instance.new("BodyVelocity")
-SO.bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyVel.Parent = hrp
-end
-SO.bodyVel.Velocity = Vector3.new(dir.X * spd, SO.bodyVel.Velocity.Y, dir.Z * spd)
-elseif m == "BodyPosition" then
-if not SO.bodyPosition or SO.bodyPosition.Parent ~= hrp then
-if SO.bodyPosition then pcall(function() SO.bodyPosition:Destroy() end) end
-SO.bodyPosition = Instance.new("BodyPosition")
-SO.bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyPosition.P = 500
-SO.bodyPosition.D = 50
-SO.bodyPosition.Parent = hrp
-end
-SO.bodyPosition.Position = targetPos
-elseif m == "BodyForce" then
-if not SO.bodyForce or SO.bodyForce.Parent ~= hrp then
-if SO.bodyForce then pcall(function() SO.bodyForce:Destroy() end) end
-SO.bodyForce = Instance.new("BodyForce")
-SO.bodyForce.Parent = hrp
-end
-SO.bodyForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "BodyThrust" then
-if not SO.bodyThrust or SO.bodyThrust.Parent ~= hrp then
-if SO.bodyThrust then pcall(function() SO.bodyThrust:Destroy() end) end
-SO.bodyThrust = Instance.new("BodyThrust")
-SO.bodyThrust.Force = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyThrust.Parent = hrp
-end
-SO.bodyThrust.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "LinearVelocity" then
-if not SO.linearVel or SO.linearVel.Parent ~= hrp then
-if SO.linearVel then pcall(function() SO.linearVel:Destroy() end) end
-local att = ensureAttachment(hrp, "attLinVel", "DiceLinVelAtt")
-SO.linearVel = Instance.new("LinearVelocity")
-SO.linearVel.Attachment0 = att
-SO.linearVel.MaxForce = 1e8
-SO.linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
-SO.linearVel.Parent = hrp
-end
-SO.linearVel.VectorVelocity = Vector3.new(dir.X * spd, SO.linearVel.VectorVelocity.Y, dir.Z * spd)
-elseif m == "VectorForce" then
-if not SO.vectorForce or SO.vectorForce.Parent ~= hrp then
-if SO.vectorForce then pcall(function() SO.vectorForce:Destroy() end) end
-local att = ensureAttachment(hrp, "attVecForce", "DiceVecForceAtt")
-SO.vectorForce = Instance.new("VectorForce")
-SO.vectorForce.Attachment0 = att
-SO.vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
-SO.vectorForce.Parent = hrp
-end
-SO.vectorForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "AlignPosition" then
-if not SO.alignPos or SO.alignPos.Parent ~= hrp then
-if SO.alignPos then pcall(function() SO.alignPos:Destroy() end) end
-local att = ensureAttachment(hrp, "attAlign", "DiceAlignAtt")
-SO.alignPos = Instance.new("AlignPosition")
-SO.alignPos.Attachment0 = att
-SO.alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
-SO.alignPos.MaxForce = math.huge
-SO.alignPos.Responsiveness = 15
-SO.alignPos.RigidityEnabled = false
-SO.alignPos.Parent = hrp
-end
-SO.alignPos.Position = targetPos
-elseif m == "RocketPropulsion" then
-if not SO.rocket or SO.rocket.Parent ~= hrp or not SO.rocketTarget then
-if SO.rocket then pcall(function() SO.rocket:Destroy() end) end
-if SO.rocketTarget then pcall(function() SO.rocketTarget:Destroy() end) end
-SO.rocketTarget = Instance.new("Part")
-SO.rocketTarget.Name = "DiceRocketTarget"
-SO.rocketTarget.Anchored = true
-SO.rocketTarget.CanCollide = false
-SO.rocketTarget.Transparency = 1
-SO.rocketTarget.Size = Vector3.new(1, 1, 1)
-SO.rocketTarget.Parent = Workspace
-SO.rocket = Instance.new("RocketPropulsion")
-SO.rocket.MaxThrust = 3000
-SO.rocket.MaxTorque = 1000
-SO.rocket.ThrustP = 100
-SO.rocket.ThrustD = 20
-SO.rocket.TurnP = 100
-SO.rocket.TurnD = 10
-SO.rocket.Target = SO.rocketTarget
-SO.rocket.Parent = hrp
-end
-SO.rocketTarget.Position = targetPos
-pcall(function() SO.rocket:Fire() end)
+local mass = hrp.AssemblyMass or 1
+local current = hrp.AssemblyLinearVelocity
+local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
+local delta = desired - current
+pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
 end
 end
-end
-function DiceCycleSpeedMethod(delta)
-local index = 1
-for i, name in ipairs(DiceSpeedMethods) do
-if name == diceSpeedMethod then index = i break end
-end
-index = index + (delta or 1)
-if index < 1 then index = #DiceSpeedMethods end
-if index > #DiceSpeedMethods then index = 1 end
-diceSpeedMethod = DiceSpeedMethods[index]
--- The character keeps whatever the old method attached until it is told
--- otherwise, so clear it the moment the choice changes.
-if DiceDestroySpeedObjects then DiceDestroySpeedObjects() end
-local char = LP.Character
-local hum = char and char:FindFirstChildOfClass("Humanoid")
-if hum and diceSpeedMethod ~= "WalkSpeed" and diceSpeedMethod ~= "Humanoid Move" then
-pcall(function() hum.WalkSpeed = 16 end)
-end
-if refreshSpeedMethodRow then refreshSpeedMethodRow() end
-saveDiceConfig()
-return diceSpeedMethod
-end
-
 local lastMoveDir = Vector3.new(0, 0, 0)
 -- A brainrot in hand pins you to the lagger carry figure whatever the
 -- mode says — the Vynx rule. Auto Carry Speed drives the mode itself, so
@@ -3577,19 +3363,14 @@ discordLbl.BackgroundTransparency = 1
 discordLbl.Text = "discord.gg/qgwhrFZXd"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-discordLbl.TextStrokeTransparency = 0
-discordLbl.Font = Enum.Font.GothamBlack
-discordLbl.TextSize = 21
+-- Lighter than the speed line above it: the handle is there to be read,
+-- not to compete with the number.
+discordLbl.TextStrokeTransparency = 0.35
+discordLbl.Font = Enum.Font.GothamBold
+discordLbl.TextSize = 19
 discordLbl.TextXAlignment = Enum.TextXAlignment.Center
 discordLbl.ZIndex = 10
 discordLbl.Parent = overheadGui
-do
-local outline = Instance.new("UIStroke")
-outline.Color = Color3.fromRGB(0, 0, 0)
-outline.Thickness = 2.2
-outline.Transparency = 0
-outline.Parent = discordLbl
-end
 end
 local ragdollCountdownConn = nil
 local ragdollCountdownCharConn = nil
@@ -3661,7 +3442,7 @@ task.wait(0.5)
 setupOverheadInfo(char)
 if ragdollCountdownEnabled then hookRagdollCountdown(char) end
 end)
-RunService.RenderStepped:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
 local char = LP.Character
 if not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -3673,9 +3454,9 @@ or state == Enum.HumanoidStateType.Physics
 or state == Enum.HumanoidStateType.Ragdoll
 or state == Enum.HumanoidStateType.FallingDown then
 lastMoveDir = Vector3.new(0, 0, 0)
--- Ragdolled: hand the character back to the game rather than fighting
--- it with a mover that is still attached.
-DiceDestroySpeedObjects()
+-- Ragdolled: hand the humanoid back rather than holding it off default
+-- while the game has control.
+DiceReleaseWalkSpeed(hum)
 return
 end
 if not autoLeftEnabled and not autoRightEnabled then
@@ -3696,14 +3477,13 @@ end
 if anyHeld then dir = lastMoveDir end
 end
 if dir.Magnitude > 0 then
-DiceApplySpeedMethod(hrp, hum, dir, spd, dt)
+DiceApplyMoveSpeed(hrp, hum, dir, spd)
 else
-DiceDestroySpeedObjects()
+DiceReleaseWalkSpeed(hum)
 end
 else
--- Auto path drives the character itself; leaving a mover attached
--- would have it fighting the walk.
-DiceDestroySpeedObjects()
+-- Auto path drives the character itself.
+DiceReleaseWalkSpeed(hum)
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -5307,95 +5087,6 @@ if animationPackValueLabel then
 animationPackValueLabel.Text = selectedAnimationPack
 end
 end
-speedMethodValueLabel = nil
-function refreshSpeedMethodRow()
-if speedMethodValueLabel then
-speedMethodValueLabel.Text = tostring(diceSpeedMethod)
-end
-end
--- Cycles the movement method the speed engine drives the character with.
-function speedMethodRow(parent, order)
-local row = baseRow(parent, "Speed Method", order)
-row.Size = UDim2.new(1, -4, 0, 42)
-local label = row:FindFirstChild("Label")
-if label then
-label.Text = "Speed Method"
-label.Size = UDim2.new(0, 96, 1, 0)
-label.TextSize = 11
-end
-local left = Instance.new("TextButton")
-left.Name = "LeftArrow"
-left.BackgroundColor3 = COLORS.accentSoft
-left.BackgroundTransparency = 0.18
-left.Text = "<"
-left.TextColor3 = COLORS.white
-left.TextSize = 12
-left.Font = Enum.Font.GothamSemibold
-left.Size = UDim2.new(0, 36, 0, 28)
-left.Position = UDim2.new(1, -170, 0.5, -14)
-left.BorderSizePixel = 0
-left.ZIndex = 6
-left.AutoButtonColor = false
-left.Parent = row
-corner(left, 8)
-stroke(left, COLORS.strokeSoft, 1, 0.45)
-local holder = Instance.new("Frame")
-holder.Name = "SpeedMethodValueHolder"
-holder.BackgroundColor3 = COLORS.accentSoft
-holder.BackgroundTransparency = 0.18
-holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, 88, 0, 28)
-holder.Position = UDim2.new(1, -130, 0.5, -14)
-holder.ClipsDescendants = true
-holder.ZIndex = 6
-holder.Parent = row
-corner(holder, 8)
-stroke(holder, COLORS.strokeSoft, 1, 0.45)
-speedMethodValueLabel = Instance.new("TextLabel")
-speedMethodValueLabel.Name = "SpeedMethodValue"
-speedMethodValueLabel.BackgroundTransparency = 1
-speedMethodValueLabel.Text = tostring(diceSpeedMethod)
-speedMethodValueLabel.TextColor3 = COLORS.white
-speedMethodValueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-speedMethodValueLabel.TextStrokeTransparency = 0.35
-speedMethodValueLabel.Font = Enum.Font.GothamSemibold
-speedMethodValueLabel.TextXAlignment = Enum.TextXAlignment.Center
--- Names run from "CFrame" to "AssemblyLinearVelocity Lerp", so let the
--- long ones shrink to fit rather than truncating to an ambiguous stub.
-speedMethodValueLabel.TextScaled = true
-speedMethodValueLabel.Size = UDim2.new(1, -6, 1, -8)
-speedMethodValueLabel.Position = UDim2.new(0, 3, 0, 4)
-speedMethodValueLabel.ZIndex = 7
-speedMethodValueLabel.Parent = holder
-local sizeLimit = Instance.new("UITextSizeConstraint")
-sizeLimit.MaxTextSize = 10
-sizeLimit.MinTextSize = 6
-sizeLimit.Parent = speedMethodValueLabel
-local right = Instance.new("TextButton")
-right.Name = "RightArrow"
-right.BackgroundColor3 = COLORS.accentSoft
-right.BackgroundTransparency = 0.18
-right.Text = ">"
-right.TextColor3 = COLORS.white
-right.TextSize = 12
-right.Font = Enum.Font.GothamSemibold
-right.Size = UDim2.new(0, 36, 0, 28)
-right.Position = UDim2.new(1, -38, 0.5, -14)
-right.BorderSizePixel = 0
-right.ZIndex = 6
-right.AutoButtonColor = false
-right.Parent = row
-corner(right, 8)
-stroke(right, COLORS.strokeSoft, 1, 0.45)
-left.MouseButton1Click:Connect(function()
-DiceCycleSpeedMethod(-1)
-end)
-right.MouseButton1Click:Connect(function()
-DiceCycleSpeedMethod(1)
-end)
-refreshSpeedMethodRow()
-return row
-end
 function animationPackRow(parent, order)
 local row = baseRow(parent, "Animation Pack", order)
 row.Size = UDim2.new(1, -4, 0, 42)
@@ -5949,7 +5640,6 @@ end
 task.wait()
 Movement = pages.MOVEMENT
 section(Movement, "SPEED ENGINE", -4)
-speedMethodRow(Movement, -3)
 do
 local _, setVisual = _G.DiceActionToggleRow(Movement, "Match WalkSpeed", diceMatchWalkSpeed == true, -25)
 local row = Movement:FindFirstChild("Match WalkSpeed")
@@ -7787,14 +7477,15 @@ end
 -- ═══════════════════════════════════════════════════════════════
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
-pbFrame.Size = UDim2.new(0, 372, 0, 44)
-pbFrame.Position = UDim2.new(0.5, -186, 1, -92)
+-- Tall enough for the stat line to sit inside the pill rather than
+-- hanging off the bottom of it.
+pbFrame.Size = UDim2.new(0, 372, 0, 60)
+pbFrame.Position = UDim2.new(0.5, -186, 1, -100)
 pbFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
--- The stat line hangs below the pill, so nothing may be clipped.
-pbFrame.ClipsDescendants = false
+pbFrame.ClipsDescendants = true
 Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(1, 0)
 local pbSt = Instance.new("UIStroke", pbFrame)
 pbSt.Color = THEME_ACCENT_BRIGHT
@@ -7807,8 +7498,8 @@ pbScale.Scale = diceProgressBarScaleValue or 1
 pbScale.Parent = pbFrame
 local progressPct = Instance.new("TextLabel", pbFrame)
 progressPct.Name = "Percent"
-progressPct.Size = UDim2.new(0, 46, 1, 0)
-progressPct.Position = UDim2.new(0, 14, 0, 0)
+progressPct.Size = UDim2.new(0, 46, 0, 26)
+progressPct.Position = UDim2.new(0, 14, 0, 8)
 progressPct.BackgroundTransparency = 1
 progressPct.Text = "0%"
 progressPct.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -7818,8 +7509,8 @@ progressPct.TextXAlignment = Enum.TextXAlignment.Left
 progressPct.ZIndex = 5
 local progressRadLbl = Instance.new("TextLabel", pbFrame)
 progressRadLbl.Name = "Radius"
-progressRadLbl.Size = UDim2.new(0, 86, 1, 0)
-progressRadLbl.Position = UDim2.new(1, -100, 0, 0)
+progressRadLbl.Size = UDim2.new(0, 86, 0, 26)
+progressRadLbl.Position = UDim2.new(1, -100, 0, 8)
 progressRadLbl.BackgroundTransparency = 1
 progressRadLbl.Text = "Radius: 0"
 progressRadLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -7832,7 +7523,7 @@ local TRACK_KNOB_R = 11
 local fillRegion = Instance.new("Frame", pbFrame)
 fillRegion.Name = "Track"
 fillRegion.Size = UDim2.new(0, TRACK_WIDTH, 0, 18)
-fillRegion.Position = UDim2.new(0, 66, 0.5, -9)
+fillRegion.Position = UDim2.new(0, 66, 0, 12)
 fillRegion.BackgroundColor3 = Color3.fromRGB(6, 6, 7)
 fillRegion.BorderSizePixel = 0
 fillRegion.ZIndex = 2
@@ -7865,17 +7556,26 @@ knobStroke.Thickness = 1
 knobStroke.Transparency = 0.4
 local statLbl = Instance.new("TextLabel", pbFrame)
 statLbl.Name = "Stats"
-statLbl.Size = UDim2.new(1, 0, 0, 16)
-statLbl.Position = UDim2.new(0, 0, 1, 1)
+statLbl.Size = UDim2.new(1, -28, 0, 15)
+statLbl.Position = UDim2.new(0, 14, 0, 38)
 statLbl.BackgroundTransparency = 1
 statLbl.Text = "FPS: 0  discord.gg/qgwhrFZXd  PING: 0ms"
-statLbl.TextColor3 = Color3.fromRGB(236, 236, 240)
+statLbl.TextColor3 = Color3.fromRGB(232, 232, 238)
 statLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-statLbl.TextStrokeTransparency = 0.4
-statLbl.Font = Enum.Font.GothamBold
+statLbl.TextStrokeTransparency = 0.55
+statLbl.Font = Enum.Font.GothamSemibold
+-- Scaled rather than fixed: the discord handle and a three-digit FPS
+-- together are wider than the pill at a fixed size.
+statLbl.TextScaled = true
 statLbl.TextSize = 11
 statLbl.TextXAlignment = Enum.TextXAlignment.Center
 statLbl.ZIndex = 5
+do
+local limit = Instance.new("UITextSizeConstraint")
+limit.MaxTextSize = 11
+limit.MinTextSize = 7
+limit.Parent = statLbl
+end
 local barState = "IDLE"
 function setBarState(state)
 barState = state

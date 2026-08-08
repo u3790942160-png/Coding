@@ -1,0 +1,516 @@
+<title>Spidey Hub — interface preview</title>
+<style>
+	/* One committed dark world: this mocks an in-game overlay, so the ground is
+	   painted explicitly rather than inherited from the host theme. */
+	:root {
+		--page:        #08080d;
+		--page-raised: #0d0e15;
+		--rule:        #1c1e2a;
+		--ink:         #e8eaf4;
+		--ink-dim:     #878ca6;
+		--ink-faint:   #565a70;
+
+		/* Mirrors the COLORS table in Ace_SpiderVerse.lua exactly. */
+		--bg:         #070916;
+		--surface:    #0c0f22;
+		--row:        #151a38;
+		--row2:       #10142d;
+		--cardHover:  #1e254c;
+		--stroke:     #343e74;
+		--strokeSoft: #262d58;
+		--white:      #eef2ff;
+		--textDim:    #8591be;
+		--toggleBg:   #10142d;
+		--knob:       #eef2ff;
+		--accent:     #e2202a;
+		--accentDeep: #8a0c16;
+		--secondary:  #2b5cdb;
+		--web:        #c6d6ff;
+		--muted:      #58628a;
+
+		--mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+		--geo:  "Avenir Next", Futura, "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+	}
+
+	* { box-sizing: border-box; }
+
+	body {
+		margin: 0; background: var(--page); color: var(--ink);
+		font-family: var(--mono); font-size: 13px; line-height: 1.6;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	.wrap { max-width: 780px; margin: 0 auto; padding: 44px 20px 72px;
+		display: flex; flex-direction: column; gap: 32px; }
+
+	.eyebrow { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-faint); }
+	h1 { margin: 6px 0 10px; font-family: var(--geo); font-size: 28px; font-weight: 800; text-wrap: balance; }
+	h1 em { font-style: normal; color: var(--accent); }
+	.lede { margin: 0; max-width: 64ch; color: var(--ink-dim); }
+
+	.stage {
+		background: var(--page-raised); border: 1px solid var(--rule);
+		border-radius: 14px; padding: 28px 24px; overflow-x: auto;
+	}
+	.stage-inner { width: 640px; margin: 0 auto; }
+
+	/* ------------------------------------------------------- the menu ---
+	   Every offset matches Ace_SpiderVerse.lua 1:1: a 640x460 frame, sidebar
+	   at 14,66 (178 wide) and the content column starting at x=204.        */
+	.hub {
+		position: relative; width: 640px; height: 460px; border-radius: 14px;
+		background: linear-gradient(115deg, var(--surface) 0%, var(--bg) 55%, var(--bg) 100%);
+		box-shadow: inset 0 0 0 1.1px color-mix(in srgb, var(--stroke) 65%, transparent),
+			0 26px 60px -18px #000c;
+		overflow: hidden; font-family: var(--geo); user-select: none;
+	}
+	.hub svg.web { position: absolute; inset: 0; pointer-events: none; }
+	.bloom {
+		position: absolute; inset: 0 0 auto 0; height: 130px; pointer-events: none;
+		background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 14%, transparent), transparent);
+	}
+
+	.emblem { position: absolute; left: 18px; top: 10px; width: 34px; height: 34px;
+		display: grid; place-items: center; }
+	.title {
+		position: absolute; left: 62px; top: 11px; height: 18px;
+		display: flex; align-items: center; gap: 8px; line-height: 1;
+		font-size: 16px; font-weight: 800; color: var(--white); letter-spacing: 0.03em;
+	}
+	.title span { color: var(--accent); }
+	.sub { position: absolute; left: 62px; top: 30px; font-size: 11px; color: var(--muted); }
+
+	.divider {
+		position: absolute; left: 16px; top: 54px; width: calc(100% - 32px); height: 1px;
+		background: linear-gradient(to right, transparent,
+			color-mix(in srgb, var(--accent) 78%, transparent), transparent);
+	}
+
+	.wbtn {
+		position: absolute; top: 13px; height: 28px; border-radius: 8px;
+		background: var(--row); border: 1px solid color-mix(in srgb, var(--strokeSoft) 50%, transparent);
+		color: var(--textDim); font-family: var(--geo); font-weight: 700;
+		display: grid; place-items: center; cursor: pointer; transition: background .16s, color .16s;
+	}
+	.wbtn.close { right: 16px; width: 28px; font-size: 20px; line-height: 0; }
+	.wbtn.close:hover { background: var(--accent); color: var(--white); }
+	.wbtn.lock { right: 68px; width: 46px; font-size: 8px; letter-spacing: 0.06em; }
+
+	/* ----------------------------------------------------------- sidebar */
+	.sidebar {
+		position: absolute; left: 14px; top: 66px; width: 178px; height: 380px;
+		border-radius: 12px; background: color-mix(in srgb, var(--surface) 75%, transparent);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 35%, transparent);
+	}
+	.navlabel {
+		position: absolute; left: 16px; top: 12px;
+		font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--muted);
+	}
+	.tabwrap { position: absolute; left: 12px; top: 34px; width: 154px; height: 266px; }
+	.tabs { display: flex; flex-direction: column; gap: 6px; }
+	.tab {
+		position: relative; height: 42px; border-radius: 9px; width: 100%;
+		background: color-mix(in srgb, var(--row) 55%, transparent);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 40%, transparent);
+		color: var(--textDim); font-family: var(--geo);
+		font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+		text-align: left; padding-left: 18px; cursor: pointer;
+		transition: background .18s, color .18s, border-color .18s;
+	}
+	.tab:hover { color: var(--white); }
+	.tab[aria-selected="true"] {
+		background: var(--row); color: var(--white);
+		border-color: color-mix(in srgb, var(--accent) 85%, transparent);
+	}
+	.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+	/* Sits above the buttons, matching the Lua where the indicator's ZIndex
+	   is 6 against the tab button's 4. */
+	.indicator {
+		position: absolute; left: 0; top: 0; z-index: 2;
+		width: 3px; height: 22px; border-radius: 2px;
+		background: var(--accent); transition: transform .32s cubic-bezier(.2,1.4,.4,1);
+	}
+
+	.footer {
+		position: absolute; left: 12px; bottom: 12px; width: 154px; height: 60px;
+		border-radius: 10px; background: var(--row);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 50%, transparent);
+	}
+	.avatar {
+		position: absolute; left: 10px; top: 11px; width: 38px; height: 38px; border-radius: 50%;
+		background: var(--row2); border: 1.4px solid var(--accent);
+		display: grid; place-items: center;
+	}
+	.fname { position: absolute; left: 56px; top: 12px; font-size: 12px; font-weight: 700; color: var(--white); }
+	.fsub  { position: absolute; left: 56px; top: 30px; font-size: 10px; color: var(--muted); }
+
+	/* ----------------------------------------------------------- content */
+	.content { position: absolute; left: 204px; top: 66px; width: 422px; height: 380px; }
+	.ptitle {
+		position: absolute; left: 2px; top: 0; font-size: 18px; font-weight: 800;
+		letter-spacing: 0.05em; color: var(--white);
+	}
+	.psub { position: absolute; left: 2px; top: 22px; font-size: 11px; color: var(--muted); }
+
+	.scroll {
+		position: absolute; top: 46px; left: 0; width: 100%; height: 334px;
+		overflow-y: auto; padding: 2px 10px 18px 0;
+		display: flex; flex-direction: column; gap: 7px;
+		scrollbar-width: thin; scrollbar-color: var(--accent) transparent;
+	}
+	.scroll::-webkit-scrollbar { width: 3px; }
+	.scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+	.sec { position: relative; flex: none; height: 18px; }
+	.sec span { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: var(--textDim); }
+	.sec::after {
+		content: ""; position: absolute; left: 0; right: 6px; bottom: 0; height: 1px;
+		background: linear-gradient(to right,
+			color-mix(in srgb, var(--accent) 75%, transparent),
+			color-mix(in srgb, var(--accent) 25%, transparent) 40%, transparent);
+	}
+
+	.row {
+		position: relative; flex: none; height: 40px; width: calc(100% - 4px); border-radius: 9px;
+		background: color-mix(in srgb, var(--row) 82%, transparent);
+		border: 1.15px solid color-mix(in srgb, var(--strokeSoft) 62%, transparent);
+		transition: background .16s, border-color .16s;
+	}
+	.row::before {
+		content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px;
+		background: var(--accent); opacity: 0; transition: opacity .16s;
+	}
+	.row:hover { background: var(--cardHover); }
+	.row:hover::before { opacity: 1; }
+	.row.on { border-color: color-mix(in srgb, var(--accent) 88%, transparent); }
+
+	.row .lbl {
+		position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+		font-size: 13px; font-weight: 500; color: var(--white);
+	}
+
+	.pill {
+		position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+		width: 58px; height: 24px; border-radius: 7px;
+		background: var(--accentDeep);
+		border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+		color: var(--white); font-family: var(--geo); font-size: 12px; font-weight: 600;
+		display: grid; place-items: center; font-variant-numeric: tabular-nums;
+	}
+
+	.sw {
+		position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+		width: 34px; height: 18px; border-radius: 9px; cursor: pointer;
+		background: var(--toggleBg);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 55%, transparent);
+		transition: border-color .2s;
+	}
+	.sw .fill {
+		position: absolute; inset: 0; border-radius: 9px; opacity: 0; transition: opacity .2s;
+		background: linear-gradient(25deg, var(--accent), var(--accentDeep));
+	}
+	.sw .knob {
+		position: absolute; top: 50%; left: 3px; width: 13px; height: 13px; border-radius: 50%;
+		background: var(--knob); transform: translateY(-50%); transition: left .2s;
+	}
+	.sw[aria-checked="true"] { border-color: var(--accent); }
+	.sw[aria-checked="true"] .fill { opacity: 1; }
+	.sw[aria-checked="true"] .knob { left: 18px; }
+	.sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+	.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px;
+		background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+	.note { background: var(--page-raised); padding: 18px; }
+	.note h2 { margin: 0 0 8px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+		color: var(--ink-faint); font-weight: 600; }
+	.note ul { margin: 0; padding-left: 16px; color: var(--ink-dim); font-size: 12px; line-height: 1.75; }
+	.note p { margin: 0; color: var(--ink-dim); font-size: 12px; line-height: 1.65; }
+	code { color: var(--ink); background: #ffffff0d; padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+	@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
+</style>
+
+<div class="wrap">
+	<header>
+		<div class="eyebrow">Ace_SpiderVerse.lua · rebuilt from your uploaded source</div>
+		<h1>Spidey <em>Hub</em></h1>
+		<p class="lede">
+			The menu rebuilt on the sidebar layout you sent: navigation rail on the left, page
+			header and scrolling rows on the right. Webbing and the emblem are drawn from frames
+			at runtime, so nothing here depends on an image asset. Click the tabs and toggles.
+		</p>
+	</header>
+
+	<div class="stage">
+		<div class="stage-inner">
+			<div class="hub">
+				<svg class="web" id="web" width="640" height="460" aria-hidden="true"></svg>
+				<div class="bloom"></div>
+
+				<div class="emblem"><svg width="30" height="30" viewBox="0 0 30 30" id="emblem" aria-hidden="true"></svg></div>
+				<div class="title">SPIDEY<span>HUB</span></div>
+				<div class="sub">discord.gg/aceduels</div>
+				<button class="wbtn lock" type="button">LOCK</button>
+				<button class="wbtn close" type="button">-</button>
+				<div class="divider"></div>
+
+				<nav class="sidebar" aria-label="Sections">
+					<div class="navlabel">NAVIGATION</div>
+					<div class="tabwrap">
+						<div class="indicator" id="indicator"></div>
+						<div class="tabs" id="tabs" role="tablist"></div>
+					</div>
+					<div class="footer">
+						<div class="avatar"><svg width="20" height="20" viewBox="0 0 20 20" id="emblemAvatar" aria-hidden="true"></svg></div>
+						<div class="fname">Peter</div>
+						<div class="fsub">spidey hub</div>
+					</div>
+				</nav>
+
+				<main class="content">
+					<div class="ptitle" id="ptitle">MOVEMENT</div>
+					<div class="psub" id="psub">speeds, teleports and jump</div>
+					<div class="scroll" id="scroll"></div>
+				</main>
+			</div>
+		</div>
+	</div>
+
+	<div class="notes">
+		<div class="note">
+			<h2>Layout</h2>
+			<ul>
+				<li>640×460 frame, was 356×536</li>
+				<li>Sidebar rail replaces the top tab strip</li>
+				<li>Page title and blurb above the rows</li>
+				<li>Player card pinned to the sidebar foot</li>
+				<li>Rows grew 34→40px with roomier labels</li>
+			</ul>
+		</div>
+		<div class="note">
+			<h2>Identity</h2>
+			<ul>
+				<li>Renamed to Spidey Hub throughout</li>
+				<li>Corner webs and a red header bloom</li>
+				<li>Emblem drawn from frames, no asset</li>
+				<li>Toggles fill red and pulse on turning on</li>
+				<li>Intro cards deal spiders, not spades</li>
+			</ul>
+		</div>
+		<div class="note">
+			<h2>Untouched</h2>
+			<p>
+				<code>baseRow</code>, <code>toggleRow</code>, <code>textboxRow</code>,
+				<code>dropdownRow</code> and <code>section</code> keep their names, arguments and
+				return values, so every call site and all the game logic behind them is unchanged.
+				Config filenames and the Discord link were left alone on purpose.
+			</p>
+		</div>
+	</div>
+</div>
+
+<script>
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function line(parent, x1, y1, x2, y2, w, color, opacity, cap) {
+	const l = document.createElementNS(SVGNS, "line");
+	l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+	l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+	l.setAttribute("stroke", color); l.setAttribute("stroke-width", w);
+	l.setAttribute("stroke-opacity", opacity);
+	if (cap) l.setAttribute("stroke-linecap", cap);
+	parent.appendChild(l);
+}
+
+// Port of aceWeb(): spokes from a corner hub, chords sagging back toward it.
+function web(svg, ox, oy, spokes, rings, spacing, inner, a0deg, a1deg, fade) {
+	const a0 = a0deg * Math.PI / 180, a1 = a1deg * Math.PI / 180;
+	const id = "f" + Math.random().toString(36).slice(2);
+	const defs = document.createElementNS(SVGNS, "defs");
+	defs.innerHTML = `<linearGradient id="${id}" gradientTransform="rotate(${fade} .5 .5)">
+		<stop offset="0%" stop-color="#fff" stop-opacity="1"/>
+		<stop offset="55%" stop-color="#fff" stop-opacity="0.4"/>
+		<stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+		<mask id="m${id}" maskUnits="userSpaceOnUse" x="-400" y="-400" width="1600" height="1600">
+		<rect x="-400" y="-400" width="1600" height="1600" fill="url(#${id})"/></mask>`;
+	svg.appendChild(defs);
+	const g = document.createElementNS(SVGNS, "g");
+	g.setAttribute("mask", `url(#m${id})`);
+	svg.appendChild(g);
+
+	const color = css("--web");
+	const pt = (r, s) => {
+		const rad = inner + spacing * r, a = a0 + (a1 - a0) * (s / spokes);
+		return [ox + Math.cos(a) * rad, oy + Math.sin(a) * rad];
+	};
+	for (let s = 0; s <= spokes; s++) {
+		const [x1, y1] = pt(0, s), [x2, y2] = pt(rings, s);
+		line(g, x1, y1, x2, y2, 1, color, 0.30);
+	}
+	for (let r = 1; r <= rings; r++) {
+		for (let s = 0; s < spokes; s++) {
+			const [x1, y1] = pt(r, s), [x2, y2] = pt(r, s + 1);
+			const mx = ox + ((x1 + x2) / 2 - ox) * 0.96;
+			const my = oy + ((y1 + y2) / 2 - oy) * 0.96;
+			line(g, x1, y1, mx, my, 1, color, 0.20);
+			line(g, mx, my, x2, y2, 1, color, 0.20);
+		}
+	}
+}
+
+// Port of aceSpider().
+function spider(svg, size) {
+	svg.textContent = "";
+	const unit = size / 24, cx = size / 2, cy = size / 2, color = css("--accent");
+	for (const base of [-68, -28, 20, 58]) {
+		for (const side of [-1, 1]) {
+			const a = base * Math.PI / 180;
+			const rx = cx + side * unit * 1.6, ry = cy + unit * 0.4;
+			const kx = rx + side * Math.cos(a) * unit * 5.4, ky = ry + Math.sin(a) * unit * 5.4;
+			const tx = kx + side * Math.cos(a) * unit * 4.4;
+			const ty = ky + Math.sin(a) * unit * 4.4 + unit * 2.2;
+			line(svg, rx, ry, kx, ky, Math.max(2, unit * 1.05), color, 1, "round");
+			line(svg, kx, ky, tx, ty, Math.max(2, unit * 0.9), color, 1, "round");
+		}
+	}
+	const rect = (x, y, w, h, r) => {
+		const el = document.createElementNS(SVGNS, "rect");
+		el.setAttribute("x", x - w / 2); el.setAttribute("y", y - h / 2);
+		el.setAttribute("width", w); el.setAttribute("height", h);
+		el.setAttribute("rx", r); el.setAttribute("fill", color);
+		svg.appendChild(el);
+	};
+	rect(cx, size * 0.56, Math.max(4, unit * 4.6), Math.max(6, unit * 9.4), unit * 2.3);
+	rect(cx, size * 0.26, Math.max(4, unit * 3.4), Math.max(4, unit * 3.4), unit * 1.7);
+}
+
+/* The five real pages, in the order the script builds them. */
+const BLURBS = {
+	MOVEMENT: "speeds, teleports and jump",
+	COMBAT:   "steal, aimbot and counters",
+	KEYBINDS: "bind anything to a key",
+	VISUALS:  "esp, world and lighting",
+	SETTINGS: "menu, intro and config",
+};
+
+const PAGES = {
+	MOVEMENT: [
+		["s", "AUTO SPEED"],
+		["t", "Auto Carry Speed", true],
+		["s", "NORMAL SPEED"],
+		["v", "Normal Speed", "70"],
+		["v", "Carry Speed", "34"],
+		["s", "LAGGER SPEED"],
+		["v", "Lagger Speed", "45"],
+		["v", "Lagger Carry Speed", "29"],
+		["s", "TELEPORT"],
+		["t", "Auto TP Down", false],
+		["v", "Auto TP Height", "18"],
+		["s", "JUMP"],
+		["t", "Infinite Jump", false],
+		["t", "Anti Ragdoll", true],
+	],
+	COMBAT: [
+		["s", "AUTO STEAL"],
+		["t", "Auto Steal", true],
+		["v", "Radius", "22"],
+		["s", "NORMAL/BYPASS AIMBOT"],
+		["v", "Normal Aimbot Speed", "12"],
+		["v", "Normal Lagger Aimbot Speed", "9"],
+		["s", "COUNTERS"],
+		["t", "Auto Reset On Med Fling", false],
+	],
+	KEYBINDS: [
+		["s", "MOVEMENT KEYBINDS"],
+		["v", "Normal Speed", "V"],
+		["v", "Carry Speed", "B"],
+		["v", "TP Down", "N"],
+		["s", "COMBAT KEYBINDS"],
+		["v", "Aimbot", "E"],
+	],
+	VISUALS: [
+		["s", "ESP"],
+		["t", "Boxed ESP", false],
+		["t", "Tracers", false],
+		["s", "WORLD"],
+		["v", "Sky Theme", "Off"],
+		["t", "Fullbright", true],
+	],
+	SETTINGS: [
+		["s", "GUI SETTINGS"],
+		["t", "Lock GUI", false],
+		["s", "MOBILE BUTTONS"],
+		["t", "Mobile Buttons", true],
+		["s", "INTRO"],
+		["t", "Intro", true],
+	],
+};
+
+const NAMES = ["MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"];
+const tabsEl = document.getElementById("tabs");
+const scrollEl = document.getElementById("scroll");
+const indicator = document.getElementById("indicator");
+
+function render(name) {
+	scrollEl.textContent = "";
+	for (const item of PAGES[name]) {
+		if (item[0] === "s") {
+			const el = document.createElement("div");
+			el.className = "sec";
+			el.innerHTML = `<span>${item[1]}</span>`;
+			scrollEl.appendChild(el);
+			continue;
+		}
+		const row = document.createElement("div");
+		row.className = "row";
+		if (item[0] === "v") {
+			row.innerHTML = `<div class="lbl">${item[1]}</div><div class="pill">${item[2]}</div>`;
+		} else {
+			if (item[2]) row.classList.add("on");
+			row.innerHTML = `<div class="lbl">${item[1]}</div>
+				<div class="sw" role="switch" tabindex="0" aria-checked="${item[2]}" aria-label="${item[1]}">
+					<div class="fill"></div><div class="knob"></div></div>`;
+			const sw = row.querySelector(".sw");
+			const flip = () => {
+				const on = sw.getAttribute("aria-checked") !== "true";
+				sw.setAttribute("aria-checked", String(on));
+				row.classList.toggle("on", on);
+				item[2] = on;
+			};
+			sw.addEventListener("click", flip);
+			sw.addEventListener("keydown", e => {
+				if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+			});
+		}
+		scrollEl.appendChild(row);
+	}
+}
+
+function select(i) {
+	const name = NAMES[i];
+	[...tabsEl.children].forEach((b, n) => b.setAttribute("aria-selected", String(n === i)));
+	// (TAB_H + TAB_GAP) * index + (TAB_H - 22) / 2, exactly as in the Lua.
+	indicator.style.transform = `translateY(${i * 48 + 10}px)`;
+	document.getElementById("ptitle").textContent = name;
+	document.getElementById("psub").textContent = BLURBS[name];
+	render(name);
+}
+
+NAMES.forEach((name, i) => {
+	const b = document.createElement("button");
+	b.className = "tab"; b.type = "button"; b.role = "tab";
+	b.textContent = name;
+	b.setAttribute("aria-selected", String(i === 0));
+	b.addEventListener("click", () => select(i));
+	tabsEl.appendChild(b);
+});
+
+web(document.getElementById("web"), 640, 0, 10, 9, 42, 26, 90, 180, 215);
+web(document.getElementById("web"), 0, 460, 8, 6, 38, 22, -90, 0, 35);
+spider(document.getElementById("emblem"), 30);
+spider(document.getElementById("emblemAvatar"), 20);
+select(0);
+</script>

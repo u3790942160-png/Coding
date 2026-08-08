@@ -81,8 +81,10 @@ local currentSpeedMode = "Normal"
 -- assembly is measured at roughly 51 by the time the frame is drawn —
 -- and the same shortfall shows on carry speed. Handing the humanoid the
 -- figure it is meant to be walking at makes it push with the movement
--- instead of against it, and the number lands where it was set.
-diceMatchWalkSpeed = diceMatchWalkSpeed ~= false
+-- instead of against it, and the number lands where it was set. Always
+-- on, and deliberately not a setting: with it off the speeds simply read
+-- wrong, so there is nothing to choose between.
+diceMatchWalkSpeed = true
 MOVE_KEYS = {
 [Enum.KeyCode.W] = true,
 [Enum.KeyCode.A] = true,
@@ -877,7 +879,6 @@ CS = CS,
 LAGGER_SPEED = LAGGER_SPEED,
 LAGGER_CARRY_SPEED = LAGGER_CARRY_SPEED,
 currentSpeedMode = currentSpeedMode,
-diceMatchWalkSpeed = diceMatchWalkSpeed == true,
 autoCarrySpeedEnabled = autoCarrySpeedEnabled == true,
 autoTPEnabled = autoTPEnabled,
 autoTPHeight = autoTPHeight,
@@ -988,7 +989,6 @@ LAGGER_SPEED = tonumber(data.LAGGER_SPEED) or LAGGER_SPEED
 LAGGER_CARRY_SPEED = tonumber(data.LAGGER_CARRY_SPEED) or LAGGER_CARRY_SPEED
 currentSpeedMode = data.currentSpeedMode or currentSpeedMode
 if currentSpeedMode ~= "Normal" and currentSpeedMode ~= "Carry" and currentSpeedMode ~= "Lagger" and currentSpeedMode ~= "Lagger Carry" then currentSpeedMode = "Normal" end
-if data.diceMatchWalkSpeed ~= nil then diceMatchWalkSpeed = data.diceMatchWalkSpeed == true end
 autoCarrySpeedEnabled = data.autoCarrySpeedEnabled == true
 autoTPEnabled = data.autoTPEnabled == true
 autoTPHeight = tonumber(data.autoTPHeight) or autoTPHeight
@@ -5639,20 +5639,6 @@ end
 -- loadstring does not monopolize the client thread and visibly freeze play.
 task.wait()
 Movement = pages.MOVEMENT
-section(Movement, "SPEED ENGINE", -4)
-do
-local _, setVisual = _G.DiceActionToggleRow(Movement, "Match WalkSpeed", diceMatchWalkSpeed == true, -25)
-local row = Movement:FindFirstChild("Match WalkSpeed")
-local btn = row and row:FindFirstChild("ToggleButton")
-if btn then
-btn.Activated:Connect(function()
-diceMatchWalkSpeed = not (diceMatchWalkSpeed == true)
-if setVisual then setVisual(diceMatchWalkSpeed == true) end
-if not diceMatchWalkSpeed and DiceReleaseWalkSpeed then DiceReleaseWalkSpeed(nil) end
-saveDiceConfig()
-end)
-end
-end
 section(Movement, "AUTO SPEED", -2)
 _, setAutoCarrySpeedVisual = toggleRow(Movement, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
 do

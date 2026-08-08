@@ -76,16 +76,6 @@ local CS = 28.8
 local LAGGER_SPEED = 29
 local LAGGER_CARRY_SPEED = 15
 local currentSpeedMode = "Normal"
-AceSpeedMethods = {
-"Velocity", "AssemblyLinearVelocity", "Velocity Lerp", "AssemblyLinearVelocity Lerp",
-"CFrame", "CFrame Lerp", "Hyper CFrame", "Anchored CFrame", "PivotTo", "Model PivotTo", "Tween CFrame",
-"WalkSpeed", "Humanoid Move", "Humanoid MoveTo",
-"BodyVelocity", "BodyPosition", "BodyForce", "BodyThrust",
-"LinearVelocity", "VectorForce", "AlignPosition",
-"ApplyImpulse", "RocketPropulsion",
-}
-aceSpeedMethod = aceSpeedMethod or "Velocity"
-aceHyperMult = aceHyperMult or 4
 MOVE_KEYS = {
 [Enum.KeyCode.W] = true,
 [Enum.KeyCode.A] = true,
@@ -815,10 +805,12 @@ end
 return fallback
 end
 function collectAceMobileButtonPositions()
+-- The buttons live in one draggable panel now, so only its position is
+-- worth storing. Older configs held a position per button; those keys
+-- are simply ignored.
 local out = {}
-for key, entry in pairs(_G.AceMobileButtonRefs or {}) do
-local holder = entry and entry.holder
-if holder then out[key] = udim2ToTable(holder.Position) end
+if _G.AceMobilePanel then
+out.panel = udim2ToTable(_G.AceMobilePanel.Position)
 end
 if next(out) == nil and type(_G.AceMobileButtonPositions) == "table" then
 return _G.AceMobileButtonPositions
@@ -874,7 +866,6 @@ CS = CS,
 LAGGER_SPEED = LAGGER_SPEED,
 LAGGER_CARRY_SPEED = LAGGER_CARRY_SPEED,
 currentSpeedMode = currentSpeedMode,
-aceSpeedMethod = aceSpeedMethod,
 autoCarrySpeedEnabled = autoCarrySpeedEnabled == true,
 autoTPEnabled = autoTPEnabled,
 autoTPHeight = autoTPHeight,
@@ -975,13 +966,6 @@ LAGGER_SPEED = tonumber(data.LAGGER_SPEED) or LAGGER_SPEED
 LAGGER_CARRY_SPEED = tonumber(data.LAGGER_CARRY_SPEED) or LAGGER_CARRY_SPEED
 currentSpeedMode = data.currentSpeedMode or currentSpeedMode
 if currentSpeedMode ~= "Normal" and currentSpeedMode ~= "Carry" and currentSpeedMode ~= "Lagger" and currentSpeedMode ~= "Lagger Carry" then currentSpeedMode = "Normal" end
-if type(data.aceSpeedMethod) == "string" then
--- Only accept a method this build actually implements; a stale config
--- naming a removed one would leave movement doing nothing at all.
-for _, name in ipairs(AceSpeedMethods or {}) do
-if name == data.aceSpeedMethod then aceSpeedMethod = name break end
-end
-end
 autoCarrySpeedEnabled = data.autoCarrySpeedEnabled == true
 autoTPEnabled = data.autoTPEnabled == true
 autoTPHeight = tonumber(data.autoTPHeight) or autoTPHeight
@@ -2807,212 +2791,21 @@ end
 end)
 -- ═══════════════════════════════════════════════════════════════
 -- SPEED ENGINE
--- Ported from the Vynx build. Rather than writing hrp.Velocity every
--- frame, movement goes through a selectable method: the default drives
--- the assembly with a mass-scaled impulse, and the rest cover the
--- CFrame, mover-instance and humanoid approaches. Switching method
--- tears down whatever the previous one left on the character.
+-- One method, from the Vynx build: push the assembly to the target
+-- planar speed with a mass-scaled impulse. The delta is measured against
+-- the current velocity every frame, so the character settles exactly on
+-- the figure — 60 reads as 60 — and because the move goes through the
+-- solver as an ordinary owned-assembly velocity rather than a CFrame
+-- write, the server has no position jump to correct and nothing lags
+-- back. Vertical velocity is left alone so jumps and falls behave.
 -- ═══════════════════════════════════════════════════════════════
-do
--- Everything the active method parented to the character, so the next
--- method can clear it without hunting through the model.
-local SO = {}
-function AceDestroySpeedObjects()
-if SO.anchored then pcall(function() SO.anchored.Anchored = false end); SO.anchored = nil end
-for _, key in ipairs({"bodyVel", "bodyPosition", "bodyForce", "bodyThrust", "linearVel",
-"vectorForce", "alignPos", "rocket", "rocketTarget", "attLinVel", "attVecForce", "attAlign"}) do
-if SO[key] then pcall(function() SO[key]:Destroy() end); SO[key] = nil end
-end
-if SO.tween then pcall(function() SO.tween:Cancel() end); SO.tween = nil end
-end
-local function ensureAttachment(hrp, key, name)
-local att = SO[key]
-if not att or att.Parent ~= hrp then
-if att then pcall(function() att:Destroy() end) end
-att = Instance.new("Attachment")
-att.Name = name or "AceSpeedAtt"
-att.Parent = hrp
-SO[key] = att
-end
-return att
-end
--- Push the assembly to the target planar speed in one impulse, scaled by
--- its own mass so a heavy carry moves the same as an empty character.
-local function massImpulse(hrp, direction, targetSpeed)
+function AceApplyMoveSpeed(hrp, dir, spd)
 local mass = hrp.AssemblyMass or 1
 local current = hrp.AssemblyLinearVelocity
-local desired = Vector3.new(direction.X * targetSpeed, current.Y, direction.Z * targetSpeed)
+local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
 local delta = desired - current
 pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
 end
-local function lerpImpulse(hrp, dir, spd)
-local current = hrp.AssemblyLinearVelocity
-local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
-local blended = current:Lerp(desired, 0.6)
-local mass = hrp.AssemblyMass or 1
-pcall(function() hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass) end)
-end
-function AceApplySpeedMethod(hrp, hum, dir, spd, dt)
-local step = dt or 1/60
-local m = aceSpeedMethod
-if SO.lastMethod ~= m then
-AceDestroySpeedObjects()
--- Only the WalkSpeed methods are allowed to leave it off default.
-if m ~= "WalkSpeed" and m ~= "Humanoid Move" and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
-SO.lastMethod = m
-end
-local char = hrp.Parent
-local targetPos = hrp.Position + (dir * spd * step)
-if m == "Velocity" or m == "AssemblyLinearVelocity" or m == "ApplyImpulse" then
-massImpulse(hrp, dir, spd)
-elseif m == "Velocity Lerp" or m == "AssemblyLinearVelocity Lerp" then
-lerpImpulse(hrp, dir, spd)
-elseif m == "CFrame" then
-hrp.CFrame = hrp.CFrame + (dir * spd * step)
-elseif m == "CFrame Lerp" then
-hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + (dir * spd * step), 0.5)
-elseif m == "Hyper CFrame" then
-hrp.CFrame = hrp.CFrame + (dir * spd * (aceHyperMult or 4) * step)
-elseif m == "Anchored CFrame" then
-if not hrp.Anchored then
-hrp.Anchored = true
-SO.anchored = hrp
-end
-hrp.CFrame = hrp.CFrame + (dir * spd * step)
-elseif m == "PivotTo" then
-hrp:PivotTo(hrp.CFrame + (dir * spd * step))
-elseif m == "Model PivotTo" then
-if char and char:IsA("Model") then
-char:PivotTo(char:GetPivot() + (dir * spd * step))
-else
-hrp:PivotTo(hrp.CFrame + (dir * spd * step))
-end
-elseif m == "Tween CFrame" then
-if SO.tween then pcall(function() SO.tween:Cancel() end) end
-SO.tween = TweenService:Create(hrp, TweenInfo.new(step, Enum.EasingStyle.Linear), {CFrame = hrp.CFrame + (dir * spd * step)})
-SO.tween:Play()
-elseif m == "WalkSpeed" then
-hum.WalkSpeed = spd
-elseif m == "Humanoid Move" then
-hum.WalkSpeed = spd
-hum:Move(dir)
-elseif m == "Humanoid MoveTo" then
-hum:MoveTo(targetPos, hrp)
-elseif m == "BodyVelocity" then
-if not SO.bodyVel or SO.bodyVel.Parent ~= hrp then
-if SO.bodyVel then pcall(function() SO.bodyVel:Destroy() end) end
-SO.bodyVel = Instance.new("BodyVelocity")
-SO.bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyVel.Parent = hrp
-end
-SO.bodyVel.Velocity = Vector3.new(dir.X * spd, SO.bodyVel.Velocity.Y, dir.Z * spd)
-elseif m == "BodyPosition" then
-if not SO.bodyPosition or SO.bodyPosition.Parent ~= hrp then
-if SO.bodyPosition then pcall(function() SO.bodyPosition:Destroy() end) end
-SO.bodyPosition = Instance.new("BodyPosition")
-SO.bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyPosition.P = 500
-SO.bodyPosition.D = 50
-SO.bodyPosition.Parent = hrp
-end
-SO.bodyPosition.Position = targetPos
-elseif m == "BodyForce" then
-if not SO.bodyForce or SO.bodyForce.Parent ~= hrp then
-if SO.bodyForce then pcall(function() SO.bodyForce:Destroy() end) end
-SO.bodyForce = Instance.new("BodyForce")
-SO.bodyForce.Parent = hrp
-end
-SO.bodyForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "BodyThrust" then
-if not SO.bodyThrust or SO.bodyThrust.Parent ~= hrp then
-if SO.bodyThrust then pcall(function() SO.bodyThrust:Destroy() end) end
-SO.bodyThrust = Instance.new("BodyThrust")
-SO.bodyThrust.Force = Vector3.new(math.huge, math.huge, math.huge)
-SO.bodyThrust.Parent = hrp
-end
-SO.bodyThrust.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "LinearVelocity" then
-if not SO.linearVel or SO.linearVel.Parent ~= hrp then
-if SO.linearVel then pcall(function() SO.linearVel:Destroy() end) end
-local att = ensureAttachment(hrp, "attLinVel", "AceLinVelAtt")
-SO.linearVel = Instance.new("LinearVelocity")
-SO.linearVel.Attachment0 = att
-SO.linearVel.MaxForce = 1e8
-SO.linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
-SO.linearVel.Parent = hrp
-end
-SO.linearVel.VectorVelocity = Vector3.new(dir.X * spd, SO.linearVel.VectorVelocity.Y, dir.Z * spd)
-elseif m == "VectorForce" then
-if not SO.vectorForce or SO.vectorForce.Parent ~= hrp then
-if SO.vectorForce then pcall(function() SO.vectorForce:Destroy() end) end
-local att = ensureAttachment(hrp, "attVecForce", "AceVecForceAtt")
-SO.vectorForce = Instance.new("VectorForce")
-SO.vectorForce.Attachment0 = att
-SO.vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
-SO.vectorForce.Parent = hrp
-end
-SO.vectorForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
-elseif m == "AlignPosition" then
-if not SO.alignPos or SO.alignPos.Parent ~= hrp then
-if SO.alignPos then pcall(function() SO.alignPos:Destroy() end) end
-local att = ensureAttachment(hrp, "attAlign", "AceAlignAtt")
-SO.alignPos = Instance.new("AlignPosition")
-SO.alignPos.Attachment0 = att
-SO.alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
-SO.alignPos.MaxForce = math.huge
-SO.alignPos.Responsiveness = 15
-SO.alignPos.RigidityEnabled = false
-SO.alignPos.Parent = hrp
-end
-SO.alignPos.Position = targetPos
-elseif m == "RocketPropulsion" then
-if not SO.rocket or SO.rocket.Parent ~= hrp or not SO.rocketTarget then
-if SO.rocket then pcall(function() SO.rocket:Destroy() end) end
-if SO.rocketTarget then pcall(function() SO.rocketTarget:Destroy() end) end
-SO.rocketTarget = Instance.new("Part")
-SO.rocketTarget.Name = "AceRocketTarget"
-SO.rocketTarget.Anchored = true
-SO.rocketTarget.CanCollide = false
-SO.rocketTarget.Transparency = 1
-SO.rocketTarget.Size = Vector3.new(1, 1, 1)
-SO.rocketTarget.Parent = Workspace
-SO.rocket = Instance.new("RocketPropulsion")
-SO.rocket.MaxThrust = 3000
-SO.rocket.MaxTorque = 1000
-SO.rocket.ThrustP = 100
-SO.rocket.ThrustD = 20
-SO.rocket.TurnP = 100
-SO.rocket.TurnD = 10
-SO.rocket.Target = SO.rocketTarget
-SO.rocket.Parent = hrp
-end
-SO.rocketTarget.Position = targetPos
-pcall(function() SO.rocket:Fire() end)
-end
-end
-end
-function AceCycleSpeedMethod(delta)
-local index = 1
-for i, name in ipairs(AceSpeedMethods) do
-if name == aceSpeedMethod then index = i break end
-end
-index = index + (delta or 1)
-if index < 1 then index = #AceSpeedMethods end
-if index > #AceSpeedMethods then index = 1 end
-aceSpeedMethod = AceSpeedMethods[index]
--- The character keeps whatever the old method attached until it is told
--- otherwise, so clear it the moment the choice changes.
-if AceDestroySpeedObjects then AceDestroySpeedObjects() end
-local char = LP.Character
-local hum = char and char:FindFirstChildOfClass("Humanoid")
-if hum and aceSpeedMethod ~= "WalkSpeed" and aceSpeedMethod ~= "Humanoid Move" then
-pcall(function() hum.WalkSpeed = 16 end)
-end
-if refreshSpeedMethodRow then refreshSpeedMethodRow() end
-saveAceConfig()
-return aceSpeedMethod
-end
-
 local lastMoveDir = Vector3.new(0, 0, 0)
 -- A brainrot in hand pins you to the lagger carry figure whatever the
 -- mode says — the Vynx rule. Auto Carry Speed drives the mode itself, so
@@ -3597,7 +3390,7 @@ task.wait(0.5)
 setupOverheadInfo(char)
 if ragdollCountdownEnabled then hookRagdollCountdown(char) end
 end)
-RunService.RenderStepped:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
 local char = LP.Character
 if not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -3609,9 +3402,6 @@ or state == Enum.HumanoidStateType.Physics
 or state == Enum.HumanoidStateType.Ragdoll
 or state == Enum.HumanoidStateType.FallingDown then
 lastMoveDir = Vector3.new(0, 0, 0)
--- Ragdolled: hand the character back to the game rather than fighting
--- it with a mover that is still attached.
-AceDestroySpeedObjects()
 return
 end
 if not autoLeftEnabled and not autoRightEnabled then
@@ -3632,14 +3422,8 @@ end
 if anyHeld then dir = lastMoveDir end
 end
 if dir.Magnitude > 0 then
-AceApplySpeedMethod(hrp, hum, dir, spd, dt)
-else
-AceDestroySpeedObjects()
+AceApplyMoveSpeed(hrp, dir, spd)
 end
-else
--- Auto path drives the character itself; leaving a mover attached
--- would have it fighting the walk.
-AceDestroySpeedObjects()
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -5280,95 +5064,6 @@ if animationPackValueLabel then
 animationPackValueLabel.Text = selectedAnimationPack
 end
 end
-speedMethodValueLabel = nil
-function refreshSpeedMethodRow()
-if speedMethodValueLabel then
-speedMethodValueLabel.Text = tostring(aceSpeedMethod)
-end
-end
--- Cycles the movement method the speed engine drives the character with.
-function speedMethodRow(parent, order)
-local row = baseRow(parent, "Speed Method", order)
-row.Size = UDim2.new(1, -4, 0, 42)
-local label = row:FindFirstChild("Label")
-if label then
-label.Text = "Speed Method"
-label.Size = UDim2.new(0, 96, 1, 0)
-label.TextSize = 11
-end
-local left = Instance.new("TextButton")
-left.Name = "LeftArrow"
-left.BackgroundColor3 = COLORS.accentSoft
-left.BackgroundTransparency = 0.18
-left.Text = "<"
-left.TextColor3 = COLORS.white
-left.TextSize = 12
-left.Font = Enum.Font.GothamSemibold
-left.Size = UDim2.new(0, 36, 0, 28)
-left.Position = UDim2.new(1, -170, 0.5, -14)
-left.BorderSizePixel = 0
-left.ZIndex = 6
-left.AutoButtonColor = false
-left.Parent = row
-corner(left, 8)
-stroke(left, COLORS.strokeSoft, 1, 0.45)
-local holder = Instance.new("Frame")
-holder.Name = "SpeedMethodValueHolder"
-holder.BackgroundColor3 = COLORS.accentSoft
-holder.BackgroundTransparency = 0.18
-holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, 88, 0, 28)
-holder.Position = UDim2.new(1, -130, 0.5, -14)
-holder.ClipsDescendants = true
-holder.ZIndex = 6
-holder.Parent = row
-corner(holder, 8)
-stroke(holder, COLORS.strokeSoft, 1, 0.45)
-speedMethodValueLabel = Instance.new("TextLabel")
-speedMethodValueLabel.Name = "SpeedMethodValue"
-speedMethodValueLabel.BackgroundTransparency = 1
-speedMethodValueLabel.Text = tostring(aceSpeedMethod)
-speedMethodValueLabel.TextColor3 = COLORS.white
-speedMethodValueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-speedMethodValueLabel.TextStrokeTransparency = 0.35
-speedMethodValueLabel.Font = Enum.Font.GothamSemibold
-speedMethodValueLabel.TextXAlignment = Enum.TextXAlignment.Center
--- Names run from "CFrame" to "AssemblyLinearVelocity Lerp", so let the
--- long ones shrink to fit rather than truncating to an ambiguous stub.
-speedMethodValueLabel.TextScaled = true
-speedMethodValueLabel.Size = UDim2.new(1, -6, 1, -8)
-speedMethodValueLabel.Position = UDim2.new(0, 3, 0, 4)
-speedMethodValueLabel.ZIndex = 7
-speedMethodValueLabel.Parent = holder
-local sizeLimit = Instance.new("UITextSizeConstraint")
-sizeLimit.MaxTextSize = 10
-sizeLimit.MinTextSize = 6
-sizeLimit.Parent = speedMethodValueLabel
-local right = Instance.new("TextButton")
-right.Name = "RightArrow"
-right.BackgroundColor3 = COLORS.accentSoft
-right.BackgroundTransparency = 0.18
-right.Text = ">"
-right.TextColor3 = COLORS.white
-right.TextSize = 12
-right.Font = Enum.Font.GothamSemibold
-right.Size = UDim2.new(0, 36, 0, 28)
-right.Position = UDim2.new(1, -38, 0.5, -14)
-right.BorderSizePixel = 0
-right.ZIndex = 6
-right.AutoButtonColor = false
-right.Parent = row
-corner(right, 8)
-stroke(right, COLORS.strokeSoft, 1, 0.45)
-left.MouseButton1Click:Connect(function()
-AceCycleSpeedMethod(-1)
-end)
-right.MouseButton1Click:Connect(function()
-AceCycleSpeedMethod(1)
-end)
-refreshSpeedMethodRow()
-return row
-end
 function animationPackRow(parent, order)
 local row = baseRow(parent, "Animation Pack", order)
 row.Size = UDim2.new(1, -4, 0, 42)
@@ -5921,8 +5616,6 @@ end
 -- loadstring does not monopolize the client thread and visibly freeze play.
 task.wait()
 Movement = pages.MOVEMENT
-section(Movement, "SPEED ENGINE", -4)
-speedMethodRow(Movement, -3)
 section(Movement, "AUTO SPEED", -2)
 _, setAutoCarrySpeedVisual = toggleRow(Movement, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
 do
@@ -8590,6 +8283,39 @@ mobileGui.DisplayOrder = 1000
 mobileGui.Parent = PlayerGui
 _G.AceMobileButtonRefs = {}
 local mobileButtons = _G.AceMobileButtonRefs
+-- ═══════════════════════════════════════════════════════════════
+-- MOBILE PANEL
+-- One draggable grid rather than ten loose buttons. Each button is a
+-- die: dark face with light pips when off, white face with dark pips
+-- when on. Pips sit in the corners so the label never collides.
+-- ═══════════════════════════════════════════════════════════════
+local BTN_SIZE = 58
+local BTN_GAP = 14
+local PADDING = 6
+local COLS = 3
+local ROWS = 4
+local PANEL_W = PADDING * 2 + COLS * BTN_SIZE + (COLS - 1) * BTN_GAP
+local PANEL_H = PADDING * 2 + ROWS * BTN_SIZE + (ROWS - 1) * BTN_GAP
+local PANEL_DEFAULT = UDim2.new(1, -(PANEL_W + 20), 0.5, -(PANEL_H / 2))
+local FACE_OFF = Color3.fromRGB(18, 18, 21)
+local FACE_ON = Color3.fromRGB(240, 240, 244)
+local TEXT_OFF = Color3.fromRGB(232, 232, 238)
+local TEXT_ON = Color3.fromRGB(14, 14, 16)
+-- Corner-only pip spots keep the middle of the die clear for the label.
+local MOBILE_PIPS = {
+[2] = {{0.19, 0.18}, {0.81, 0.82}},
+[4] = {{0.19, 0.18}, {0.81, 0.18}, {0.19, 0.82}, {0.81, 0.82}},
+}
+local MobilePanel = Instance.new("Frame")
+MobilePanel.Name = "MobileButtonsPanel"
+MobilePanel.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
+MobilePanel.Position = tableToUDim2(_G.AceMobileButtonPositions and _G.AceMobileButtonPositions.panel, PANEL_DEFAULT)
+MobilePanel.BackgroundTransparency = 1
+MobilePanel.BorderSizePixel = 0
+MobilePanel.Active = true
+MobilePanel.ZIndex = 1000
+MobilePanel.Parent = mobileGui
+_G.AceMobilePanel = MobilePanel
 function _G.AceApplyMobileButtonsHidden()
 local g = PlayerGui:FindFirstChild("AceMobileButtons")
 if g then g.Enabled = not (_G.AceHideMobileButtons == true) end
@@ -8597,15 +8323,10 @@ if setHideMobileButtonsVisual then pcall(setHideMobileButtonsVisual, _G.AceHideM
 end
 function _G.AceApplyMobileButtonSize()
 _G.AceMobileButtonScale = math.clamp(tonumber(_G.AceMobileButtonScale) or 0.75, 0.30, 1.35)
-for _, entry in pairs(mobileButtons) do
-local holder = entry and entry.holder
-if holder then
-local sc = holder:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
+local sc = MobilePanel:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
 sc.Name = "MobileButtonScale"
 sc.Scale = _G.AceMobileButtonScale
-sc.Parent = holder
-end
-end
+sc.Parent = MobilePanel
 pcall(function()
 local gui = PlayerGui:FindFirstChild("AceDuelsAdaptReconstruct") or PlayerGui:FindFirstChild("AdaptHubPolished") or PlayerGui:FindFirstChild("CyberHub")
 local root = gui or PlayerGui
@@ -8619,6 +8340,49 @@ end
 end
 end)
 end
+-- The whole grid drags as one unit. Buttons feed the same drag state, so
+-- you can grab the panel anywhere: a tap fires the button, a drag past
+-- the threshold moves the panel and cancels the tap.
+local panelDrag = {active = false, moved = false, start = nil, origin = nil}
+local DRAG_DEADZONE = 6
+local function beginPanelDrag(input)
+if _G.AceGuiLocked == true then return end
+panelDrag.active = true
+panelDrag.moved = false
+panelDrag.start = input.Position
+panelDrag.origin = MobilePanel.Position
+end
+local function endPanelDrag()
+local moved = panelDrag.moved
+panelDrag.active = false
+panelDrag.moved = false
+if moved then task.defer(saveAceConfig) end
+return moved
+end
+MobilePanel.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
+end
+end)
+MobilePanel.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+endPanelDrag()
+end
+end)
+UserInputService.InputChanged:Connect(function(input)
+if not panelDrag.active or _G.AceGuiLocked == true then return end
+if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+local delta = input.Position - panelDrag.start
+if not panelDrag.moved and (math.abs(delta.X) > DRAG_DEADZONE or math.abs(delta.Y) > DRAG_DEADZONE) then
+panelDrag.moved = true
+end
+if panelDrag.moved then
+MobilePanel.Position = UDim2.new(
+panelDrag.origin.X.Scale, panelDrag.origin.X.Offset + delta.X,
+panelDrag.origin.Y.Scale, panelDrag.origin.Y.Offset + delta.Y
+)
+end
+end)
 local function setActive(btn, state)
 if not btn then return end
 local pressed = btn:GetAttribute("AceMobilePressed") == true
@@ -8626,173 +8390,100 @@ state = (state == true) or pressed
 local visualState = state and "on" or "off"
 if btn:GetAttribute("AceMobileVisualState") == visualState then return end
 btn:SetAttribute("AceMobileVisualState", visualState)
-local holder = btn.Parent
-local glow = holder and holder:FindFirstChild("Glow")
+TS:Create(btn, TweenInfo.new(0.15), {
+BackgroundColor3 = state and FACE_ON or FACE_OFF,
+TextColor3 = state and TEXT_ON or TEXT_OFF,
+}):Play()
 local st = btn:FindFirstChildOfClass("UIStroke")
-TS:Create(btn, TweenInfo.new(0.18), {
-BackgroundColor3 = state and Color3.fromRGB(238,238,238) or Color3.fromRGB(8,8,8),
-TextColor3 = state and Color3.fromRGB(0,0,0) or Color3.fromRGB(225,225,225),
-TextTransparency = 0,
-}):Play()
 if st then
-TS:Create(st, TweenInfo.new(0.18), {
-Color = state and Color3.fromRGB(190,190,190) or Color3.fromRGB(85,85,85),
-Thickness = 1,
-Transparency = state and 0 or 0.4,
+TS:Create(st, TweenInfo.new(0.15), {
+Color = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(78, 78, 84),
+Transparency = state and 0.1 or 0.45,
 }):Play()
 end
-if glow then
-glow.Visible = false
-glow.BackgroundTransparency = 1
-local gs = glow:FindFirstChildOfClass("UIStroke")
-if gs then gs.Transparency = 1 end
+local pipHolder = btn:FindFirstChild("Pips")
+if pipHolder then
+for _, pip in ipairs(pipHolder:GetChildren()) do
+TS:Create(pip, TweenInfo.new(0.15), {
+BackgroundColor3 = state and TEXT_ON or TEXT_OFF,
+BackgroundTransparency = state and 0 or 0.35,
+}):Play()
 end
 end
+end
+-- Momentary feedback for the buttons that fire an action rather than latch.
 local function pulse(btn)
 if not btn then return end
 btn:SetAttribute("AceMobilePressed", true)
 setActive(btn, true)
-task.delay(0.18, function()
+task.delay(0.2, function()
 if btn and btn.Parent then
 btn:SetAttribute("AceMobilePressed", false)
 setActive(btn, false)
 end
 end)
 end
-local function makeButton(key, label, pos, onPress)
-local holder = Instance.new("Frame")
-holder.Name = "MBH_" .. key
-holder.Size = UDim2.new(0, 78, 0, 58)
-holder.Position = tableToUDim2(_G.AceMobileButtonPositions[key], pos)
-holder.BackgroundTransparency = 1
-holder.BorderSizePixel = 0
-holder.ZIndex = 1000
-holder.Active = true
-holder.Parent = mobileGui
-local glow = Instance.new("Frame", holder)
-glow.Name = "Glow"
-glow.Size = UDim2.new(1, 4, 1, 4)
-glow.Position = UDim2.new(0, -2, 0, -2)
-glow.BackgroundColor3 = Color3.fromRGB(255,255,255)
-glow.BackgroundTransparency = 1
-glow.BorderSizePixel = 0
-glow.ZIndex = 1000
-Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 13)
-local glowStroke = Instance.new("UIStroke", glow)
-glowStroke.Color = Color3.fromRGB(255,255,255)
-glowStroke.Thickness = 0.8
-glowStroke.Transparency = 1
-glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local btn = Instance.new("TextButton", holder)
+local function makeButton(key, label, col, row, face, onPress)
+local btn = Instance.new("TextButton")
 btn.Name = "MB_" .. key
-btn.Size = UDim2.new(1, 0, 1, 0)
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.BackgroundColor3 = Color3.fromRGB(8,8,8)
-btn.BackgroundTransparency = 0
+btn.Size = UDim2.new(0, BTN_SIZE, 0, BTN_SIZE)
+btn.Position = UDim2.new(0, PADDING + col * (BTN_SIZE + BTN_GAP), 0, PADDING + row * (BTN_SIZE + BTN_GAP))
+btn.BackgroundColor3 = FACE_OFF
 btn.BorderSizePixel = 0
 btn.Text = label
-btn.TextColor3 = Color3.fromRGB(225,225,225)
-btn.Font = Enum.Font.GothamBlack
+btn.TextColor3 = TEXT_OFF
+btn.Font = Enum.Font.GothamBold
 btn.TextSize = 10
 btn.TextWrapped = true
+btn.LineHeight = 1.15
 btn.AutoButtonColor = false
 btn.ZIndex = 1002
 btn.Active = true
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-local stroke = Instance.new("UIStroke", btn)
-stroke.Color = Color3.fromRGB(85,85,85)
-stroke.Thickness = 1
-stroke.Transparency = 0.4
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local pressing, dragging = false, false
-local pressPos, holderStart = nil, nil
-btn.InputBegan:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-pressing = true
-dragging = false
-pressPos = i.Position
-holderStart = holder.Position
-btn:SetAttribute("AceMobilePressed", true)
-setActive(btn, true)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 4),
-Size = UDim2.new(1, 0, 1, -4)
-}):Play()
-end)
+btn.Parent = MobilePanel
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+local st = Instance.new("UIStroke", btn)
+st.Color = Color3.fromRGB(78, 78, 84)
+st.Thickness = 1
+st.Transparency = 0.45
+st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local pipHolder = Instance.new("Frame", btn)
+pipHolder.Name = "Pips"
+pipHolder.Size = UDim2.new(1, 0, 1, 0)
+pipHolder.BackgroundTransparency = 1
+pipHolder.ZIndex = 1003
+for _, spot in ipairs(MOBILE_PIPS[face] or MOBILE_PIPS[4]) do
+local pip = Instance.new("Frame")
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, 5, 0, 5)
+pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
+pip.BackgroundColor3 = TEXT_OFF
+pip.BackgroundTransparency = 0.35
+pip.BorderSizePixel = 0
+pip.ZIndex = 1003
+pip.Parent = pipHolder
+Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+end
+btn.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
 end
 end)
-btn.InputEnded:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-if pressing and not dragging then pcall(onPress, btn) end
-if dragging then saveAceConfig() end
-pressing = false
-dragging = false
-btn:SetAttribute("AceMobilePressed", false)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 0),
-Size = UDim2.new(1, 0, 1, 0)
-}):Play()
+btn.InputEnded:Connect(function(input)
+if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+if not endPanelDrag() then pcall(onPress, btn) end
 end)
-task.delay(0.08, function()
-if btn and btn.Parent then
-local keepOn = false
-if key == "autoLeft" then keepOn = autoLeftEnabled == true
-elseif key == "autoRight" then keepOn = autoRightEnabled == true
-elseif key == "aimbot" then keepOn = (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true)
-elseif key == "antiDesync" then keepOn = _G.AceAntiDesyncAimbotOn == true
-elseif key == "carry" then keepOn = currentSpeedMode == "Carry"
-elseif key == "laggerNormal" then keepOn = currentSpeedMode == "Lagger"
-elseif key == "laggerCarry" then keepOn = currentSpeedMode == "Lagger Carry"
-end
-setActive(btn, keepOn)
-end
-end)
-end
-end)
-UserInputService.InputChanged:Connect(function(i)
-if _G.AceGuiLocked == true or not pressing then return end
-if i.UserInputType ~= Enum.UserInputType.MouseMovement and i.UserInputType ~= Enum.UserInputType.Touch then return end
-local delta = i.Position - pressPos
-if not dragging and (math.abs(delta.X) > 6 or math.abs(delta.Y) > 6) then dragging = true end
-if dragging then
-holder.Position = UDim2.new(holderStart.X.Scale, holderStart.X.Offset + delta.X, holderStart.Y.Scale, holderStart.Y.Offset + delta.Y)
-end
-end)
-mobileButtons[key] = {holder = holder, btn = btn, setActive = function(state) setActive(btn, state) end}
+mobileButtons[key] = {holder = MobilePanel, btn = btn, setActive = function(state) setActive(btn, state) end}
 return btn
 end
-local x1, x2, x3 = -218, -154, -90
-local y1, y2, y3, y4 = -150, -102, -54, -6
-local defaults = {
-insta        = UDim2.new(1, x1, 0.5, y1),
-drop         = UDim2.new(1, x2, 0.5, y1),
-autoLeft     = UDim2.new(1, x3, 0.5, y1),
-antiDesync   = UDim2.new(1, x1, 0.5, y2),
-aimbot       = UDim2.new(1, x2, 0.5, y2),
-autoRight    = UDim2.new(1, x3, 0.5, y2),
-tp           = UDim2.new(1, x2, 0.5, y3),
-carry        = UDim2.new(1, x3, 0.5, y3),
-laggerNormal = UDim2.new(1, x2, 0.5, y4),
-laggerCarry  = UDim2.new(1, x3, 0.5, y4),
-}
 function _G.AceResetMobileButtons()
 _G.AceMobileButtonScale = 0.75
 _G.AceHideMobileButtons = false
-for key, defaultPos in pairs(defaults) do
-local entry = mobileButtons[key]
-local holder = entry and entry.holder
-if holder then
-holder.Position = defaultPos
-holder.Size = UDim2.new(0, 78, 0, 58)
-local btn = entry.btn
+MobilePanel.Position = PANEL_DEFAULT
+for _, entry in pairs(mobileButtons) do
+local btn = entry and entry.btn
 if btn then
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.Size = UDim2.new(1, 0, 1, 0)
 btn:SetAttribute("AceMobilePressed", false)
 btn:SetAttribute("AceMobileVisualState", nil)
-end
 end
 end
 if _G.AceApplyMobileButtonSize then _G.AceApplyMobileButtonSize() end
@@ -8800,22 +8491,23 @@ if _G.AceApplyMobileButtonsHidden then _G.AceApplyMobileButtonsHidden() end
 if showActionNotification then pcall(function() showActionNotification("MOBILE BUTTONS RESET") end) end
 saveAceConfig()
 end
-makeButton("insta", "INSTA\nRESET", defaults.insta, function(btn)
+-- Two pips mark the momentary actions, four the latching toggles.
+makeButton("insta", "INSTA\nRESET", 0, 0, 2, function(btn)
 if _G.AceCursedInstaReset then _G.AceCursedInstaReset() elseif cursedInstaReset then cursedInstaReset() end
 pulse(btn)
 end)
-makeButton("drop", "DROP\nBR", defaults.drop, function(btn)
+makeButton("drop", "DROP\nBR", 1, 0, 2, function(btn)
 if runDropBrainrot then runDropBrainrot() elseif runDrop then runDrop() end
 pulse(btn)
 end)
-makeButton("autoLeft", "AUTO\nLEFT", defaults.autoLeft, function(btn)
+makeButton("autoLeft", "AUTO\nLEFT", 2, 0, 4, function(btn)
 if _G.AceSetAutoLeft then _G.AceSetAutoLeft(not autoLeftEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 end)
 end)
-makeButton("antiDesync", "ANTI\nDESYNC", defaults.antiDesync, function(btn)
+makeButton("antiDesync", "ANTI\nDESYNC", 0, 1, 4, function(btn)
 if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
 if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -8827,7 +8519,7 @@ if _G.AceAntiDesyncAimbotOn then _G.AceStopAntiDesyncAimbot() else _G.AceStartAn
 end
 task.delay(0.03, function() setActive(btn, _G.AceAntiDesyncAimbotOn == true) end)
 end)
-makeButton("aimbot", "BAT\nBOT", defaults.aimbot, function(btn)
+makeButton("aimbot", "BAT\nBOT", 1, 1, 4, function(btn)
 if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
 if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -8838,18 +8530,18 @@ task.delay(0.03, function()
 setActive(btn, (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true))
 end)
 end)
-makeButton("autoRight", "AUTO\nRIGHT", defaults.autoRight, function(btn)
+makeButton("autoRight", "AUTO\nRIGHT", 2, 1, 4, function(btn)
 if _G.AceSetAutoRight then _G.AceSetAutoRight(not autoRightEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 end)
 end)
-makeButton("tp", "TP\nDOWN", defaults.tp, function(btn)
+makeButton("tp", "TP\nDOWN", 1, 2, 2, function(btn)
 if runTPFloor then runTPFloor() end
 pulse(btn)
 end)
-makeButton("carry", "CARRY\nSPEED", defaults.carry, function(btn)
+makeButton("carry", "CARRY\nSPEED", 2, 2, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Carry" and "Normal" or "Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -8857,7 +8549,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerNormal", "LAGGER\nNORMAL", defaults.laggerNormal, function(btn)
+makeButton("laggerNormal", "LAGGER\nNORMAL", 1, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger" and "Normal" or "Lagger") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -8865,7 +8557,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerCarry", "LAGGER\nCARRY", defaults.laggerCarry, function(btn)
+makeButton("laggerCarry", "LAGGER\nCARRY", 2, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger Carry" and "Normal" or "Lagger Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end

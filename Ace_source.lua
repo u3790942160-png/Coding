@@ -3235,7 +3235,7 @@ ragdollCountdownLabel.Position = UDim2.new(0, 0, 0, 0)
 ragdollCountdownLabel.BackgroundTransparency = 1
 ragdollCountdownLabel.Text = ""
 ragdollCountdownLabel.Visible = false
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(240, 240, 244)
 ragdollCountdownLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 ragdollCountdownLabel.TextStrokeTransparency = 0
 ragdollCountdownLabel.Font = Enum.Font.GothamBlack
@@ -3322,9 +3322,9 @@ if left > 0 then
 ragdollCountdownLabel.Visible = true
 ragdollCountdownLabel.Text = string.format("RAGDOLL %.1f", left)
 if left <= 1 then
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(255, 230, 90)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(150, 150, 156)
 else
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(240, 240, 244)
 end
 else
 ragdollCountdownLabel.Visible = false
@@ -3373,16 +3373,22 @@ overheadSpeedLabel.Text = string.format("Speed: %.1f", rounded)
 end
 end
 end)
+-- Monochrome dice table: near-black panels, white pips, white accent.
+-- There is no hue anywhere in the palette on purpose — the accent is
+-- plain white and does the work a colour would normally do.
 local COLORS = {
-bg = Color3.fromRGB(0, 0, 0),
-row = Color3.fromRGB(6, 6, 9),
-row2 = Color3.fromRGB(8, 8, 12),
-stroke = Color3.fromRGB(90, 90, 105),
-strokeSoft = Color3.fromRGB(60, 60, 72),
-white = Color3.fromRGB(255, 255, 255),
-textDim = Color3.fromRGB(180, 180, 190),
-toggleBg = Color3.fromRGB(18, 18, 26),
-knob = Color3.fromRGB(238, 238, 245),
+bg = Color3.fromRGB(8, 8, 9),
+row = Color3.fromRGB(19, 19, 21),
+row2 = Color3.fromRGB(26, 26, 29),
+stroke = Color3.fromRGB(78, 78, 84),
+strokeSoft = Color3.fromRGB(52, 52, 57),
+white = Color3.fromRGB(244, 244, 247),
+textDim = Color3.fromRGB(150, 150, 156),
+toggleBg = Color3.fromRGB(28, 28, 32),
+knob = Color3.fromRGB(244, 244, 248),
+accent = Color3.fromRGB(240, 240, 244),
+accentDim = Color3.fromRGB(122, 122, 128),
+accentSoft = Color3.fromRGB(38, 38, 42),
 }
 function corner(parent, radius)
 local c = Instance.new("UICorner")
@@ -3397,29 +3403,77 @@ s.Color = color or COLORS.stroke
 s.Thickness = thickness or 1
 s.Transparency = transparency or 0.35
 s.Parent = parent
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-ColorSequenceKeypoint.new(0.5, Color3.fromRGB(155, 160, 185)),
-ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
-})
-g.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 0.55),
-NumberSequenceKeypoint.new(0.5, 0.1),
-NumberSequenceKeypoint.new(1, 0.55),
-})
-g.Parent = s
+-- Flat border. The shimmering gradient that used to live here fought
+-- with the dice motif and made every edge look the same shade of busy.
 return s
 end
 function tween(obj, props, time)
 TweenService:Create(obj, TweenInfo.new(time or 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
-function makeDraggable(frame)
+-- ═══════════════════════════════════════════════════════════════
+-- DICE
+-- Drawn from frames, so there is no image asset to load and the faces
+-- can be repainted at will. Returns the die and a face setter.
+-- ═══════════════════════════════════════════════════════════════
+local DIE_PIPS = {
+[1] = {{0.5, 0.5}},
+[2] = {{0.28, 0.28}, {0.72, 0.72}},
+[3] = {{0.26, 0.26}, {0.5, 0.5}, {0.74, 0.74}},
+[4] = {{0.28, 0.28}, {0.72, 0.28}, {0.28, 0.72}, {0.72, 0.72}},
+[5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
+[6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
+}
+function makeDie(parent, sizePx, value, dark, fade)
+fade = tonumber(fade) or 0
+local die = Instance.new("Frame")
+die.Name = "Die"
+die.Size = UDim2.new(0, sizePx, 0, sizePx)
+die.BackgroundColor3 = dark and Color3.fromRGB(14, 14, 16) or Color3.fromRGB(246, 246, 250)
+die.BackgroundTransparency = fade
+die.BorderSizePixel = 0
+die.ZIndex = (parent.ZIndex or 1) + 1
+die.Parent = parent
+corner(die, math.max(3, math.floor(sizePx * 0.22)))
+stroke(die, dark and COLORS.stroke or Color3.fromRGB(255, 255, 255), 1, 0.4 + fade * 0.55)
+local pipColor = dark and Color3.fromRGB(242, 242, 246) or Color3.fromRGB(16, 16, 18)
+local pipSize = math.max(2, math.floor(sizePx * 0.19))
+-- Six pips is the most any face needs; the rest are hidden per value.
+local pips = {}
+for i = 1, 6 do
+local pip = Instance.new("Frame")
+pip.Name = "Pip" .. i
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, pipSize, 0, pipSize)
+pip.BackgroundColor3 = pipColor
+pip.BackgroundTransparency = fade
+pip.BorderSizePixel = 0
+pip.Visible = false
+pip.ZIndex = die.ZIndex + 1
+pip.Parent = die
+corner(pip, 999)
+pips[i] = pip
+end
+local function setFace(v)
+v = math.clamp(math.floor(tonumber(v) or 1), 1, 6)
+local layout = DIE_PIPS[v]
+for i = 1, 6 do
+local spot = layout[i]
+pips[i].Visible = spot ~= nil
+if spot then
+pips[i].Position = UDim2.new(spot[1], 0, spot[2], 0)
+end
+end
+end
+setFace(value or 1)
+return die, setFace
+end
+function makeDraggable(frame, handle)
+handle = handle or frame
 local dragging = false
 local dragStart
 local startPos
 local dragInput
-frame.InputBegan:Connect(function(input)
+handle.InputBegan:Connect(function(input)
 if _G.AceGuiLocked == true then return end
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 dragging = true
@@ -3432,7 +3486,7 @@ end
 end)
 end
 end)
-frame.InputChanged:Connect(function(input)
+handle.InputChanged:Connect(function(input)
 if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 dragInput = input
 end
@@ -3455,7 +3509,7 @@ Gui.Name = "AceDuelsAdaptReconstruct"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
-local FULL_MAIN_SIZE = UDim2.new(0, 356, 0, 536)
+local FULL_MAIN_SIZE = UDim2.new(0, 520, 0, 470)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0, 0.5)
@@ -3476,42 +3530,32 @@ end)
 local MiniFrame = Instance.new("Frame")
 MiniFrame.Name = "MiniFrame"
 MiniFrame.AnchorPoint = Vector2.new(0, 0)
-MiniFrame.Size = UDim2.new(0, 78, 0, 28)
+MiniFrame.Size = UDim2.new(0, 46, 0, 46)
 local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
 MiniFrame.Position = MINI_DEFAULT_POSITION
 savedMiniPositionTable = nil
-MiniFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-MiniFrame.BackgroundTransparency = 0
+MiniFrame.BackgroundTransparency = 1
 MiniFrame.BorderSizePixel = 0
 MiniFrame.Visible = false
 MiniFrame.Active = true
 MiniFrame.ZIndex = 20
 MiniFrame.Parent = Gui
-corner(MiniFrame, 8)
-stroke(MiniFrame, Color3.fromRGB(120, 120, 130), 1, 0.22)
+-- The collapsed handle is a die rather than a labelled tab.
+local MiniDie, setMiniDieFace = makeDie(MiniFrame, 46, 6, false)
+MiniDie.Name = "MiniDie"
+MiniDie.Position = UDim2.new(0, 0, 0, 0)
 local MiniButton = Instance.new("TextButton")
 MiniButton.Name = "MiniButton"
 MiniButton.Size = UDim2.new(1, 0, 1, 0)
 MiniButton.BackgroundTransparency = 1
-MiniButton.Text = "ACE"
-MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-MiniButton.TextStrokeTransparency = 0.18
-MiniButton.TextSize = 17
-MiniButton.Font = Enum.Font.GothamBlack
+MiniButton.Text = ""
 MiniButton.AutoButtonColor = false
-MiniButton.ZIndex = 21
+MiniButton.ZIndex = 25
 MiniButton.Parent = MiniFrame
-local MiniShade = Instance.new("Frame")
-MiniShade.Name = "MiniShade"
-MiniShade.Size = UDim2.new(1, -4, 1, -4)
-MiniShade.Position = UDim2.new(0, 2, 0, 2)
-MiniShade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-MiniShade.BackgroundTransparency = 0.12
-MiniShade.BorderSizePixel = 0
-MiniShade.ZIndex = 20
-MiniShade.Parent = MiniFrame
-corner(MiniShade, 7)
+-- Fresh roll every time it appears.
+MiniFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+if MiniFrame.Visible then setMiniDieFace(math.random(1, 6)) end
+end)
 do
 local miniDragging = false
 local miniDragStart = nil
@@ -3600,17 +3644,60 @@ end
 applyBackground(currentBackground)
 
 -- ═══════════════════════════════════════════════════════════════
+-- BACKDROP — faded dice scattered behind the panels. Sits low in the
+-- stack so the translucent sidebar and content pane read over the top.
+-- ═══════════════════════════════════════════════════════════════
+local DiceBackdrop = Instance.new("Frame")
+DiceBackdrop.Name = "DiceBackdrop"
+DiceBackdrop.BackgroundTransparency = 1
+DiceBackdrop.Size = UDim2.new(1, 0, 1, 0)
+DiceBackdrop.Position = UDim2.new(0, 0, 0, 0)
+DiceBackdrop.ClipsDescendants = true
+DiceBackdrop.ZIndex = 2
+DiceBackdrop.Parent = Main
+corner(DiceBackdrop, 14)
+local backdropDieSetters = {}
+do
+-- All light faced: a dark die on a near-black panel reads as nothing.
+local layout = {
+{x = 0.09, y = 0.16, size = 62, rot = -14, face = 5},
+{x = 0.29, y = 0.62, size = 46, rot = 12, face = 3},
+{x = 0.54, y = 0.13, size = 72, rot = -7, face = 6},
+{x = 0.80, y = 0.42, size = 52, rot = 18, face = 2},
+{x = 0.93, y = 0.78, size = 64, rot = -12, face = 4},
+{x = 0.16, y = 0.89, size = 40, rot = 23, face = 1},
+{x = 0.65, y = 0.87, size = 44, rot = -20, face = 5},
+{x = 0.42, y = 0.34, size = 36, rot = 7, face = 2},
+{x = 0.71, y = 0.63, size = 34, rot = -25, face = 3},
+{x = 0.35, y = 0.10, size = 30, rot = 15, face = 4},
+}
+for _, spec in ipairs(layout) do
+local die, setFace = makeDie(DiceBackdrop, spec.size, spec.face, false, 0.85)
+die.AnchorPoint = Vector2.new(0.5, 0.5)
+die.Position = UDim2.new(spec.x, 0, spec.y, 0)
+die.Rotation = spec.rot
+table.insert(backdropDieSetters, setFace)
+end
+end
+-- Re-rolled alongside the title pair whenever you change tab.
+function rollBackdropDice()
+for _, setFace in ipairs(backdropDieSetters) do
+setFace(math.random(1, 6))
+end
+end
+
+-- ═══════════════════════════════════════════════════════════════
 -- LIGHTNING STRIKES SYSTEM — detailed procedural lightning bolts
 -- ═══════════════════════════════════════════════════════════════
 do
 	local LIGHTNING_COLORS = {
-		primary   = Color3.fromRGB(200, 210, 255),
+		primary   = Color3.fromRGB(226, 226, 230),
 		core      = Color3.fromRGB(255, 255, 255),
-		glow      = Color3.fromRGB(130, 150, 255),
-		branch    = Color3.fromRGB(170, 185, 255),
-		spark     = Color3.fromRGB(220, 230, 255),
-		flash     = Color3.fromRGB(180, 195, 255),
-		ambient   = Color3.fromRGB(100, 120, 220),
+		glow      = Color3.fromRGB(150, 150, 156),
+		branch    = Color3.fromRGB(190, 190, 196),
+		spark     = Color3.fromRGB(238, 238, 242),
+		flash     = Color3.fromRGB(205, 205, 210),
+		ambient   = Color3.fromRGB(120, 120, 126),
 	}
 
 	local LightningContainer = Instance.new("Frame")
@@ -3643,9 +3730,9 @@ do
 
 	local GlowGradient = Instance.new("UIGradient")
 	GlowGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 100, 200)),
-		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 50, 120)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 100, 200)),
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 120, 126)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(58, 58, 62)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 120, 126)),
 	})
 	GlowGradient.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 0.7),
@@ -4040,71 +4127,84 @@ do
 end
 -- ═══════════════════════════════════════════════════════════════
 
-local LogoIcon = Instance.new("ImageLabel")
-LogoIcon.Name = "LogoIcon"
-LogoIcon.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
-LogoIcon.BackgroundTransparency = 0.12
-LogoIcon.BorderSizePixel = 0
-LogoIcon.Image = "rbxassetid://84453255265251"
-LogoIcon.ScaleType = Enum.ScaleType.Fit
-LogoIcon.Size = UDim2.new(0, 58, 0, 58)
-LogoIcon.Position = UDim2.new(0, 16, 0, 17)
-LogoIcon.ZIndex = 6
-LogoIcon.Parent = Main
-corner(LogoIcon, 12)
-stroke(LogoIcon, COLORS.strokeSoft, 1, 0.35)
+-- ═══════════════════════════════════════════════════════════════
+-- TOP BAR — inset title strip with the window controls on the right
+-- ═══════════════════════════════════════════════════════════════
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+TopBar.BackgroundTransparency = 0.12
+TopBar.BorderSizePixel = 0
+TopBar.Position = UDim2.new(0, 10, 0, 10)
+TopBar.Size = UDim2.new(1, -20, 0, 42)
+TopBar.Active = true
+TopBar.ZIndex = 5
+TopBar.Parent = Main
+corner(TopBar, 10)
+stroke(TopBar, COLORS.strokeSoft, 1, 0.5)
+-- The title strip now covers the old bare-Main drag area, so make it a handle.
+makeDraggable(Main, TopBar)
+local TitleDieA, setTitleDieA = makeDie(TopBar, 18, 5, false)
+TitleDieA.Name = "TitleDieA"
+TitleDieA.Position = UDim2.new(0, 14, 0.5, -9)
+TitleDieA.Rotation = -9
+local TitleDieB, setTitleDieB = makeDie(TopBar, 18, 2, true)
+TitleDieB.Name = "TitleDieB"
+TitleDieB.Position = UDim2.new(0, 34, 0.5, -9)
+TitleDieB.Rotation = 8
+-- Re-rolled whenever you change tab, so the pair is never dead weight.
+function rollTitleDice()
+task.spawn(function()
+for _ = 1, 7 do
+setTitleDieA(math.random(1, 6))
+setTitleDieB(math.random(1, 6))
+task.wait(0.045)
+end
+end)
+end
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, -118, 0, 30)
-Title.Position = UDim2.new(0, 86, 0, 24)
-Title.Text = "ACE DUELS"
+Title.Size = UDim2.new(0, 44, 1, 0)
+Title.Position = UDim2.new(0, 60, 0, 0)
+Title.Text = "ACE"
 Title.TextColor3 = COLORS.white
-Title.TextStrokeTransparency = 0.65
+Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 27
+Title.TextSize = 17
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 6
-Title.Parent = Main
-local Discord = Instance.new("TextLabel")
-Discord.Name = "Discord"
-Discord.BackgroundTransparency = 1
-Discord.Size = UDim2.new(1, -118, 0, 18)
-Discord.Position = UDim2.new(0, 87, 0, 55)
-Discord.Text = "discord.gg/aceduels"
-Discord.TextColor3 = Color3.fromRGB(235, 235, 245)
-Discord.Font = Enum.Font.GothamSemibold
-Discord.TextSize = 14
-Discord.TextXAlignment = Enum.TextXAlignment.Left
-Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Discord.TextStrokeTransparency = 0.25
-Discord.ZIndex = 6
-Discord.Parent = Main
-local HeaderDivider = Instance.new("Frame")
-HeaderDivider.Name = "HeaderDivider"
-HeaderDivider.BackgroundColor3 = Color3.fromRGB(70, 70, 82)
-HeaderDivider.BackgroundTransparency = 0.45
-HeaderDivider.BorderSizePixel = 0
-HeaderDivider.Size = UDim2.new(1, -34, 0, 1)
-HeaderDivider.Position = UDim2.new(0, 17, 0, 96)
-HeaderDivider.ZIndex = 6
-HeaderDivider.Parent = Main
+Title.Parent = TopBar
+local TitleSub = Instance.new("TextLabel")
+TitleSub.Name = "TitleSub"
+TitleSub.BackgroundTransparency = 1
+TitleSub.Size = UDim2.new(0, 90, 1, 0)
+TitleSub.Position = UDim2.new(0, 104, 0, 0)
+TitleSub.Text = "DUELS"
+TitleSub.TextColor3 = COLORS.accentDim
+TitleSub.TextStrokeTransparency = 0.7
+TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+TitleSub.Font = Enum.Font.GothamBlack
+TitleSub.TextSize = 17
+TitleSub.TextXAlignment = Enum.TextXAlignment.Left
+TitleSub.ZIndex = 6
+TitleSub.Parent = TopBar
 local Close = Instance.new("TextButton")
 Close.Name = "Close"
-Close.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Close.BackgroundTransparency = 0.28
-Close.Text = "-"
-Close.TextColor3 = COLORS.white
-Close.TextSize = 22
-Close.Font = Enum.Font.GothamSemibold
-Close.Size = UDim2.new(0, 32, 0, 28)
-Close.Position = UDim2.new(1, -42, 0, 14)
+Close.BackgroundColor3 = Color3.fromRGB(246, 246, 250)
+Close.BackgroundTransparency = 0.04
+Close.Text = "–"
+Close.TextColor3 = Color3.fromRGB(12, 12, 14)
+Close.TextSize = 20
+Close.Font = Enum.Font.GothamBold
+Close.Size = UDim2.new(0, 30, 0, 26)
+Close.Position = UDim2.new(1, -38, 0.5, -13)
 Close.AutoButtonColor = false
-Close.ZIndex = 5
-Close.Parent = Main
-corner(Close, 8)
-stroke(Close, COLORS.stroke, 1, 0.35)
+Close.ZIndex = 6
+Close.Parent = TopBar
+corner(Close, 7)
+stroke(Close, Color3.fromRGB(255, 255, 255), 1, 0.45)
 AceLockTopButton = Instance.new("TextButton")
 AceLockTopButton.Name = "LockGUI"
 AceLockTopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -4112,12 +4212,12 @@ AceLockTopButton.BackgroundTransparency = 0.28
 AceLockTopButton.TextColor3 = COLORS.white
 AceLockTopButton.TextSize = 8
 AceLockTopButton.Font = Enum.Font.GothamBlack
-AceLockTopButton.Size = UDim2.new(0, 32, 0, 28)
-AceLockTopButton.Position = UDim2.new(1, -78, 0, 14)
+AceLockTopButton.Size = UDim2.new(0, 46, 0, 26)
+AceLockTopButton.Position = UDim2.new(1, -90, 0.5, -13)
 AceLockTopButton.AutoButtonColor = false
-AceLockTopButton.ZIndex = 5
-AceLockTopButton.Parent = Main
-corner(AceLockTopButton, 8)
+AceLockTopButton.ZIndex = 6
+AceLockTopButton.Parent = TopBar
+corner(AceLockTopButton, 7)
 stroke(AceLockTopButton, COLORS.stroke, 1, 0.35)
 function AceUpdateGuiLockVisual()
 if AceLockTopButton then
@@ -4137,26 +4237,127 @@ AceUpdateGuiLockVisual()
 saveAceConfig()
 end)
 AceUpdateGuiLockVisual()
-local Content = Instance.new("Frame")
-Content.Name = "Content"
-Content.BackgroundTransparency = 1
-Content.Position = UDim2.new(0, 13, 0, 145)
-Content.Size = UDim2.new(1, -26, 1, -157)
-Content.ZIndex = 3
-Content.Parent = Main
+-- ═══════════════════════════════════════════════════════════════
+-- SIDEBAR — vertical navigation rail with the credit card pinned
+-- to the bottom, and the scrolling content pane beside it
+-- ═══════════════════════════════════════════════════════════════
+local SIDEBAR_WIDTH = 140
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+Sidebar.BackgroundTransparency = 0.34
+Sidebar.BorderSizePixel = 0
+Sidebar.Position = UDim2.new(0, 10, 0, 60)
+Sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -70)
+Sidebar.ZIndex = 3
+Sidebar.Parent = Main
+corner(Sidebar, 12)
+stroke(Sidebar, COLORS.strokeSoft, 1, 0.5)
+local NavCaption = Instance.new("TextLabel")
+NavCaption.Name = "NavCaption"
+NavCaption.BackgroundTransparency = 1
+NavCaption.Position = UDim2.new(0, 13, 0, 10)
+NavCaption.Size = UDim2.new(1, -26, 0, 12)
+NavCaption.Text = "NAVIGATION"
+NavCaption.TextColor3 = COLORS.textDim
+NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+NavCaption.TextStrokeTransparency = 0.5
+NavCaption.Font = Enum.Font.GothamBold
+NavCaption.TextSize = 9
+NavCaption.TextXAlignment = Enum.TextXAlignment.Left
+NavCaption.ZIndex = 4
+NavCaption.Parent = Sidebar
 local Tabs = Instance.new("Frame")
 Tabs.Name = "Tabs"
 Tabs.BackgroundTransparency = 1
-Tabs.Position = UDim2.new(0, 12, 0, 103)
-Tabs.Size = UDim2.new(1, -24, 0, 34)
+Tabs.Position = UDim2.new(0, 9, 0, 30)
+Tabs.Size = UDim2.new(1, -18, 1, -104)
 Tabs.ZIndex = 3
-Tabs.Parent = Main
+Tabs.Parent = Sidebar
 local TabLayout = Instance.new("UIListLayout")
-TabLayout.FillDirection = Enum.FillDirection.Horizontal
-TabLayout.Padding = UDim.new(0, 5)
+TabLayout.FillDirection = Enum.FillDirection.Vertical
+TabLayout.Padding = UDim.new(0, 6)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TabLayout.Parent = Tabs
+local ProfileCard = Instance.new("Frame")
+ProfileCard.Name = "ProfileCard"
+ProfileCard.BackgroundColor3 = COLORS.row2
+ProfileCard.BackgroundTransparency = 0.22
+ProfileCard.BorderSizePixel = 0
+ProfileCard.AnchorPoint = Vector2.new(0.5, 1)
+ProfileCard.Position = UDim2.new(0.5, 0, 1, -9)
+ProfileCard.Size = UDim2.new(1, -18, 0, 54)
+ProfileCard.ZIndex = 4
+ProfileCard.Parent = Sidebar
+corner(ProfileCard, 10)
+stroke(ProfileCard, COLORS.strokeSoft, 1, 0.42)
+local LogoDie = makeDie(ProfileCard, 32, 6, false)
+LogoDie.Name = "LogoDie"
+LogoDie.Position = UDim2.new(0, 8, 0.5, -16)
+LogoDie.Rotation = -6
+local MadeBy = Instance.new("TextLabel")
+MadeBy.Name = "MadeBy"
+MadeBy.BackgroundTransparency = 1
+MadeBy.Position = UDim2.new(0, 46, 0.5, -14)
+MadeBy.Size = UDim2.new(1, -52, 0, 14)
+MadeBy.Text = "ACE DUELS"
+MadeBy.TextColor3 = COLORS.white
+MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+MadeBy.TextStrokeTransparency = 0.35
+MadeBy.Font = Enum.Font.GothamBold
+MadeBy.TextSize = 10
+MadeBy.TextXAlignment = Enum.TextXAlignment.Left
+MadeBy.ZIndex = 5
+MadeBy.Parent = ProfileCard
+local Discord = Instance.new("TextLabel")
+Discord.Name = "Discord"
+Discord.BackgroundTransparency = 1
+Discord.Position = UDim2.new(0, 46, 0.5, 1)
+Discord.Size = UDim2.new(1, -52, 0, 13)
+Discord.Text = "discord.gg/aceduels"
+Discord.TextColor3 = Color3.fromRGB(166, 166, 172)
+Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+Discord.TextStrokeTransparency = 0.45
+Discord.Font = Enum.Font.GothamSemibold
+Discord.TextSize = 8
+Discord.TextXAlignment = Enum.TextXAlignment.Left
+Discord.ZIndex = 5
+Discord.Parent = ProfileCard
+-- Content pane: the rows need a ground of their own, otherwise the
+-- backdrop dice read straight through the gaps between them.
+local ContentPane = Instance.new("Frame")
+ContentPane.Name = "ContentPane"
+ContentPane.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+ContentPane.BackgroundTransparency = 0.34
+ContentPane.BorderSizePixel = 0
+ContentPane.Position = UDim2.new(0, SIDEBAR_WIDTH + 18, 0, 60)
+ContentPane.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 28), 1, -70)
+ContentPane.ZIndex = 3
+ContentPane.Parent = Main
+corner(ContentPane, 12)
+stroke(ContentPane, COLORS.strokeSoft, 1, 0.5)
+local PageTitle = Instance.new("TextLabel")
+PageTitle.Name = "PageTitle"
+PageTitle.BackgroundTransparency = 1
+PageTitle.Position = UDim2.new(0, SIDEBAR_WIDTH + 30, 0, 70)
+PageTitle.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 40), 0, 22)
+PageTitle.Text = "MOVEMENT"
+PageTitle.TextColor3 = COLORS.white
+PageTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PageTitle.TextStrokeTransparency = 0.4
+PageTitle.Font = Enum.Font.GothamBlack
+PageTitle.TextSize = 16
+PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+PageTitle.ZIndex = 6
+PageTitle.Parent = Main
+local Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, SIDEBAR_WIDTH + 28, 0, 98)
+Content.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 48), 1, -108)
+Content.ZIndex = 3
+Content.Parent = Main
 local pages = {}
 local tabButtons = {}
 local tabNames = {"MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
@@ -4166,8 +4367,9 @@ local page = Instance.new("ScrollingFrame")
 page.Name = name
 page.BackgroundTransparency = 1
 page.BorderSizePixel = 0
-page.ScrollBarThickness = 0
-page.ScrollBarImageTransparency = 1
+page.ScrollBarThickness = 3
+page.ScrollBarImageColor3 = Color3.fromRGB(215, 215, 220)
+page.ScrollBarImageTransparency = 0.35
 page.CanvasSize = UDim2.new(0, 0, 0, 0)
 page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 page.Size = UDim2.new(1, 0, 1, 0)
@@ -4186,69 +4388,122 @@ activeTab = name
 for pageName, page in pairs(pages) do
 page.Visible = pageName == name
 end
+if PageTitle then PageTitle.Text = name end
+if rollTitleDice then rollTitleDice() end
+if rollBackdropDice then rollBackdropDice() end
 for tabName, btn in pairs(tabButtons) do
 local on = tabName == name
-btn.TextColor3 = on and COLORS.white or Color3.fromRGB(170, 170, 180)
-btn.BackgroundTransparency = on and 0.28 or 0.72
+btn.TextColor3 = on and COLORS.white or COLORS.textDim
+tween(btn, {BackgroundTransparency = on and 0.22 or 0.68})
 local st = btn:FindFirstChildOfClass("UIStroke")
 if st then
-st.Transparency = on and 0.05 or 0.52
-st.Color = on and Color3.fromRGB(245, 245, 255) or COLORS.stroke
+st.Transparency = on and 0.15 or 0.6
+st.Color = on and COLORS.accent or COLORS.stroke
+end
+local accent = btn:FindFirstChild("Accent")
+if accent then
+tween(accent, {
+BackgroundTransparency = on and 0 or 1,
+Size = on and UDim2.new(0, 3, 0, 22) or UDim2.new(0, 3, 0, 0)
+})
 end
 end
 end
-for _, name in ipairs(tabNames) do
+for i, name in ipairs(tabNames) do
 addPage(name)
 local btn = Instance.new("TextButton")
 btn.Name = name
-btn.Size = UDim2.new(0, 62, 0, 34)
-btn.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
-btn.BackgroundTransparency = 0.72
+btn.Size = UDim2.new(1, 0, 0, 48)
+btn.BackgroundColor3 = Color3.fromRGB(22, 22, 25)
+btn.BackgroundTransparency = 0.68
 btn.BorderSizePixel = 0
 btn.Text = name
-btn.TextColor3 = Color3.fromRGB(170, 170, 180)
+btn.TextColor3 = COLORS.textDim
 btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 btn.TextStrokeTransparency = 0.35
-btn.TextSize = 8
+btn.TextSize = 10
 btn.Font = Enum.Font.GothamBlack
+btn.TextXAlignment = Enum.TextXAlignment.Left
 btn.AutoButtonColor = false
 btn.ZIndex = 4
 btn.Parent = Tabs
-corner(btn, 7)
-stroke(btn, COLORS.stroke, 1, 0.52)
+corner(btn, 9)
+stroke(btn, COLORS.stroke, 1, 0.6)
+local pad = Instance.new("UIPadding")
+pad.PaddingLeft = UDim.new(0, 46)
+pad.Parent = btn
+-- Each tab carries its own face, one through five.
+local tabDie = makeDie(btn, 22, i, false)
+tabDie.Name = "TabDie"
+tabDie.Position = UDim2.new(0, -34, 0.5, -11)
+tabDie.Rotation = (i % 2 == 0) and 7 or -7
+local accent = Instance.new("Frame")
+accent.Name = "Accent"
+accent.BackgroundColor3 = COLORS.accent
+accent.BackgroundTransparency = 1
+accent.BorderSizePixel = 0
+accent.AnchorPoint = Vector2.new(0, 0.5)
+accent.Position = UDim2.new(0, -41, 0.5, 0)
+accent.Size = UDim2.new(0, 3, 0, 0)
+accent.ZIndex = 5
+accent.Parent = btn
+corner(accent, 2)
 tabButtons[name] = btn
 btn.MouseButton1Click:Connect(function()
 setTab(name)
 end)
 end
 function section(parent, text, order)
+local holder = Instance.new("Frame")
+holder.Name = text
+holder.BackgroundTransparency = 1
+holder.Size = UDim2.new(1, -6, 0, 24)
+holder.LayoutOrder = order
+holder.ZIndex = 8
+holder.Parent = parent
 local label = Instance.new("TextLabel")
-label.Name = text
+label.Name = "Label"
 label.BackgroundTransparency = 1
 label.Text = text
-label.TextColor3 = Color3.fromRGB(245, 245, 255)
+label.TextColor3 = Color3.fromRGB(245, 245, 250)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.22
 label.TextSize = 11
 label.Font = Enum.Font.GothamBlack
 label.TextXAlignment = Enum.TextXAlignment.Left
-label.Size = UDim2.new(1, -6, 0, 15)
-label.LayoutOrder = order
+label.Position = UDim2.new(0, 2, 0, 0)
+label.Size = UDim2.new(1, -2, 0, 15)
 label.ZIndex = 8
-label.Parent = parent
-return label
+label.Parent = holder
+local underline = Instance.new("Frame")
+underline.Name = "Underline"
+underline.BackgroundColor3 = COLORS.accent
+underline.BackgroundTransparency = 0.3
+underline.BorderSizePixel = 0
+underline.Size = UDim2.new(1, -2, 0, 1)
+underline.Position = UDim2.new(0, 2, 0, 20)
+underline.ZIndex = 8
+underline.Parent = holder
+local fade = Instance.new("UIGradient")
+fade.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(0.75, 0.5),
+NumberSequenceKeypoint.new(1, 1),
+})
+fade.Parent = underline
+return holder
 end
 function baseRow(parent, labelText, order)
 local row = Instance.new("Frame")
 row.Name = labelText
 row.BackgroundColor3 = COLORS.row
 row.BackgroundTransparency = 0.3
-row.Size = UDim2.new(1, -4, 0, 34)
+row.Size = UDim2.new(1, -4, 0, 36)
 row.BorderSizePixel = 0
 row.LayoutOrder = order
 row.ZIndex = 4
 row.Parent = parent
-corner(row, 9)
+corner(row, 10)
 stroke(row, COLORS.strokeSoft, 1.15, 0.38)
 local label = Instance.new("TextLabel")
 label.Name = "Label"
@@ -4276,19 +4531,19 @@ function textboxRow(parent, labelText, value, order)
 local row = baseRow(parent, labelText, order)
 local box = Instance.new("TextBox")
 box.Name = "ValueBox"
-box.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+box.BackgroundColor3 = COLORS.accentSoft
 box.BackgroundTransparency = 0.18
 box.Text = tostring(value or "")
 box.TextColor3 = COLORS.white
 box.TextSize = 12
 box.Font = Enum.Font.GothamSemibold
 box.ClearTextOnFocus = false
-box.Size = UDim2.new(0, 58, 0, 24)
-box.Position = UDim2.new(1, -68, 0.5, -12)
+box.Size = UDim2.new(0, 62, 0, 26)
+box.Position = UDim2.new(1, -72, 0.5, -13)
 box.BorderSizePixel = 0
 box.ZIndex = 6
 box.Parent = row
-corner(box, 7)
+corner(box, 8)
 stroke(box, COLORS.strokeSoft, 1, 0.45)
 return row, box
 end
@@ -4338,21 +4593,26 @@ local trackStroke = track:FindFirstChildOfClass("UIStroke")
 local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 state = on and true or false
-tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
+tween(knob, {
+Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
+-- White track, dark knob when on: the only contrast a monochrome
+-- switch has left once the accent stopped being a colour.
+BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and Color3.fromRGB(36, 36, 46) or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and Color3.fromRGB(255, 255, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4417,21 +4677,26 @@ local trackStroke = track:FindFirstChildOfClass("UIStroke")
 local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 local state = on and true or false
-tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
+tween(knob, {
+Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
+-- White track, dark knob when on: the only contrast a monochrome
+-- switch has left once the accent stopped being a colour.
+BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and Color3.fromRGB(36, 36, 46) or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and Color3.fromRGB(255, 255, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4445,7 +4710,7 @@ function dropdownRow(parent, labelText, value, order)
 local row = baseRow(parent, labelText, order)
 local select = Instance.new("TextButton")
 select.Name = "Dropdown"
-select.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+select.BackgroundColor3 = COLORS.accentSoft
 select.BackgroundTransparency = 0.18
 select.Text = tostring(value or "None") .. "  ▼"
 select.TextColor3 = COLORS.white
@@ -4477,7 +4742,7 @@ label.TextSize = 11
 end
 local left = Instance.new("TextButton")
 left.Name = "LeftArrow"
-left.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+left.BackgroundColor3 = COLORS.accentSoft
 left.BackgroundTransparency = 0.18
 left.Text = "<"
 left.TextColor3 = COLORS.white
@@ -4506,7 +4771,7 @@ animationPackValueLabel.ZIndex = 6
 animationPackValueLabel.Parent = row
 local right = Instance.new("TextButton")
 right.Name = "RightArrow"
-right.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+right.BackgroundColor3 = COLORS.accentSoft
 right.BackgroundTransparency = 0.18
 right.Text = ">"
 right.TextColor3 = COLORS.white
@@ -4567,7 +4832,7 @@ function tpDownKeybindRow(parent, order)
 local row = baseRow(parent, "TP Down", order)
 local btn = Instance.new("TextButton")
 btn.Name = "TPDownKeybindButton"
-btn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+btn.BackgroundColor3 = COLORS.accentSoft
 btn.BackgroundTransparency = 0.18
 btn.Text = keyName(tpDownKeybind)
 btn.TextColor3 = COLORS.white
@@ -4583,7 +4848,7 @@ corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
 local clearBtn = Instance.new("TextButton")
 clearBtn.Name = "ClearKeybindButton"
-clearBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
@@ -4620,7 +4885,7 @@ function speedKeybindRow(parent, labelText, keyId, order)
 local row = baseRow(parent, labelText, order)
 local btn = Instance.new("TextButton")
 btn.Name = "KeybindButton"
-btn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+btn.BackgroundColor3 = COLORS.accentSoft
 btn.BackgroundTransparency = 0.18
 btn.Text = keyName(speedKeybinds[keyId])
 btn.TextColor3 = COLORS.white
@@ -4636,7 +4901,7 @@ corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
 local clearBtn = Instance.new("TextButton")
 clearBtn.Name = "ClearKeybindButton"
-clearBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
@@ -6032,7 +6297,7 @@ label.TextSize = 11
 end
 local left = Instance.new("TextButton")
 left.Name = "SkyLeft"
-left.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
+left.BackgroundColor3 = COLORS.accentSoft
 left.BackgroundTransparency = 0.04
 left.Text = "<"
 left.TextColor3 = COLORS.white
@@ -6085,7 +6350,7 @@ skyValueLabel.ZIndex = 9
 skyValueLabel.Parent = holder
 local right = Instance.new("TextButton")
 right.Name = "SkyRight"
-right.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
+right.BackgroundColor3 = COLORS.accentSoft
 right.BackgroundTransparency = 0.04
 right.Text = ">"
 right.TextColor3 = COLORS.white
@@ -6334,7 +6599,7 @@ end
 function makeNoneButton(index, x)
 local btn = Instance.new("TextButton")
 btn.Name = "None"
-btn.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+btn.BackgroundColor3 = COLORS.row
 btn.BackgroundTransparency = 0.12
 btn.BorderSizePixel = 0
 btn.Text = "None"
@@ -6358,7 +6623,7 @@ end
 function makeImageButton(index, x)
 local holder = Instance.new("Frame")
 holder.Name = "Image " .. tostring(index)
-holder.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+holder.BackgroundColor3 = COLORS.row
 holder.BackgroundTransparency = 0.35
 holder.BorderSizePixel = 0
 holder.Size = UDim2.new(0, 58, 0, 40)
@@ -6422,7 +6687,7 @@ label.Parent = row
 local value = defaultValue
 local minus = Instance.new("TextButton")
 minus.Name = "Minus"
-minus.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+minus.BackgroundColor3 = COLORS.accentSoft
 minus.BackgroundTransparency = 0.1
 minus.BorderSizePixel = 0
 minus.Text = "-"
@@ -6438,7 +6703,7 @@ corner(minus, 7)
 stroke(minus, COLORS.strokeSoft, 1, 0.5)
 local valueBox = Instance.new("TextLabel")
 valueBox.Name = "Value"
-valueBox.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+valueBox.BackgroundColor3 = COLORS.accentSoft
 valueBox.BackgroundTransparency = 0.05
 valueBox.BorderSizePixel = 0
 valueBox.Text = string.format("%.2f", value)
@@ -6454,7 +6719,7 @@ corner(valueBox, 7)
 stroke(valueBox, COLORS.strokeSoft, 1, 0.5)
 local plus = Instance.new("TextButton")
 plus.Name = "Plus"
-plus.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+plus.BackgroundColor3 = COLORS.accentSoft
 plus.BackgroundTransparency = 0.1
 plus.BorderSizePixel = 0
 plus.Text = "+"
@@ -6638,10 +6903,10 @@ resetStroke.Parent = resetBtn
 local resetDefaultBg = Color3.fromRGB(232, 232, 238)
 local resetHoverBg = Color3.fromRGB(245, 245, 250)
 local resetConfirmBg = Color3.fromRGB(35, 35, 38)
-local resetDoneBg = Color3.fromRGB(28, 40, 30)
+local resetDoneBg = Color3.fromRGB(30, 30, 33)
 local resetDefaultText = Color3.fromRGB(0, 0, 0)
-local resetConfirmText = Color3.fromRGB(255, 210, 80)
-local resetDoneText = Color3.fromRGB(140, 230, 160)
+local resetConfirmText = Color3.fromRGB(240, 240, 244)
+local resetDoneText = Color3.fromRGB(210, 210, 215)
 local confirmState = false
 local confirmTimer = nil
 function setResetDefaultTheme()
@@ -7137,12 +7402,12 @@ darkBg.ZIndex = 1
 local bgGrad = Instance.new("UIGradient", darkBg)
 bgGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(42,42,46)), ColorSequenceKeypoint.new(0.45, Color3.fromRGB(18,18,20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(10,10,12))})
 bgGrad.Rotation = 90
-local redWash = Instance.new("Frame", introGui)
-redWash.Size = UDim2.new(1,0,1,0)
-redWash.BackgroundColor3 = Color3.fromRGB(255,255,255)
-redWash.BackgroundTransparency = 1
-redWash.BorderSizePixel = 0
-redWash.ZIndex = 2
+local flashWash = Instance.new("Frame", introGui)
+flashWash.Size = UDim2.new(1,0,1,0)
+flashWash.BackgroundColor3 = Color3.fromRGB(255,255,255)
+flashWash.BackgroundTransparency = 1
+flashWash.BorderSizePixel = 0
+flashWash.ZIndex = 2
 local skipBtn = Instance.new("TextButton", introGui)
 skipBtn.Name = "SkipIntro"
 skipBtn.AnchorPoint = Vector2.new(1,0)
@@ -7163,40 +7428,45 @@ skipStroke.Color = Color3.fromRGB(255,255,255)
 skipStroke.Thickness = 1
 skipStroke.Transparency = 0.12
 skipBtn.MouseButton1Click:Connect(finishIntro)
-function makeAceCard(parent, size, z)
-local card = Instance.new("Frame", parent)
-card.Size = UDim2.new(0, math.floor(size * 0.68), 0, size)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-card.BackgroundColor3 = Color3.fromRGB(238, 238, 232)
-card.BackgroundTransparency = 1
-card.BorderSizePixel = 0
-card.ZIndex = z or 6
-Instance.new("UICorner", card).CornerRadius = UDim.new(0, math.max(8, math.floor(size * 0.08)))
-local stroke = Instance.new("UIStroke", card)
-stroke.Color = Color3.fromRGB(190,190,190)
+-- The intro tumbles dice rather than playing cards. Same shell as the
+-- panel motif: a white face, black pips, no image assets involved.
+function makeIntroDie(parent, size, z, face)
+local die = Instance.new("Frame", parent)
+die.Size = UDim2.new(0, size, 0, size)
+die.AnchorPoint = Vector2.new(0.5, 0.5)
+die.BackgroundColor3 = Color3.fromRGB(240, 240, 244)
+die.BackgroundTransparency = 1
+die.BorderSizePixel = 0
+die.ZIndex = z or 6
+Instance.new("UICorner", die).CornerRadius = UDim.new(0, math.max(5, math.floor(size * 0.2)))
+local stroke = Instance.new("UIStroke", die)
+stroke.Color = Color3.fromRGB(190,190,194)
 stroke.Thickness = 1
 stroke.Transparency = 1
-local grad = Instance.new("UIGradient", card)
-grad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(195,198,200))
+local grad = Instance.new("UIGradient", die)
+grad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(196,196,200))
 grad.Rotation = 125
-local a1 = Instance.new("TextLabel", card)
-a1.Size = UDim2.new(0.28,0,0.25,0); a1.Position = UDim2.new(0.06,0,0.04,0)
-a1.BackgroundTransparency = 1; a1.Text = "A\n♠"; a1.TextColor3 = Color3.fromRGB(0,0,0)
-a1.Font = Enum.Font.GothamBlack; a1.TextScaled = true; a1.TextTransparency = 1; a1.ZIndex = (z or 6) + 1
-local suit = Instance.new("TextLabel", card)
-suit.Size = UDim2.new(0.62,0,0.52,0); suit.Position = UDim2.new(0.19,0,0.25,0)
-suit.BackgroundTransparency = 1; suit.Text = "♠"; suit.TextColor3 = Color3.fromRGB(0,0,0)
-suit.Font = Enum.Font.GothamBlack; suit.TextScaled = true; suit.TextTransparency = 1; suit.ZIndex = (z or 6) + 1
-local a2 = Instance.new("TextLabel", card)
-a2.Size = UDim2.new(0.28,0,0.25,0); a2.Position = UDim2.new(0.66,0,0.71,0)
-a2.BackgroundTransparency = 1; a2.Text = "A\n♠"; a2.TextColor3 = Color3.fromRGB(0,0,0)
-a2.Font = Enum.Font.GothamBlack; a2.TextScaled = true; a2.TextTransparency = 1; a2.Rotation = 180; a2.ZIndex = (z or 6) + 1
-return card, {a1, suit, a2}, stroke
+local pips = {}
+local spots = DIE_PIPS[math.clamp(math.floor(tonumber(face) or 1), 1, 6)]
+local pipSize = math.max(2, math.floor(size * 0.17))
+for _, spot in ipairs(spots) do
+local pip = Instance.new("Frame", die)
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
+pip.Size = UDim2.new(0, pipSize, 0, pipSize)
+pip.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+pip.BackgroundTransparency = 1
+pip.BorderSizePixel = 0
+pip.ZIndex = (z or 6) + 1
+Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+table.insert(pips, pip)
+end
+return die, pips, stroke
 end
 local cards = {}
 for i = 1, 24 do
-local size = math.random(46, 108)
-local card, labels, stroke = makeAceCard(introGui, size, 5 + i)
+local size = math.random(34, 82)
+local card, labels, stroke = makeIntroDie(introGui, size, 5 + i, math.random(1, 6))
 local side = (i % 2 == 0) and -0.35 or 1.35
 local targetSide = (i % 2 == 0) and 1.35 or -0.35
 local y = math.random(4, 96) / 100
@@ -7204,9 +7474,9 @@ card.Position = UDim2.new(side, 0, y, 0)
 card.Rotation = math.random(-40, 40)
 cards[i] = {frame=card, labels=labels, stroke=stroke, startX=side, endX=targetSide, y=y, speed=0.09+math.random()*0.10, bob=math.random()*6.28, rot=math.random(-55,55), drift=math.random(-14,14)/100}
 end
-local aceLogo, aceLabels, aceStroke = makeAceCard(introGui, 170, 25)
-aceLogo.Position = UDim2.new(0.5,0,-0.35,0)
-aceLogo.Rotation = -12
+local introDie, introDiePips, introDieStroke = makeIntroDie(introGui, 130, 25, 5)
+introDie.Position = UDim2.new(0.5,0,-0.35,0)
+introDie.Rotation = -12
 local t = 0
 local driftConn = RunService.Heartbeat:Connect(function(dt)
 if not introActive then return end
@@ -7247,13 +7517,13 @@ task.delay(math.random() * 0.9, function()
 if not introActive then return end
 TS:Create(cd.frame, TweenInfo.new(0.65), {BackgroundTransparency = 0.08}):Play()
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.65), {Transparency = 0.25}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.65), {TextTransparency = 0}):Play() end
+for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.65), {BackgroundTransparency = 0}):Play() end
 end)
 end
 task.wait(0.85); if not introActive then pcall(function() driftConn:Disconnect() end); return end
-TS:Create(aceLogo, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), BackgroundTransparency = 0.02, Rotation = 8}):Play()
-if aceStroke then TS:Create(aceStroke, TweenInfo.new(0.55), {Transparency = 0.15}):Play() end
-for _, lbl in ipairs(aceLabels) do TS:Create(lbl, TweenInfo.new(0.55), {TextTransparency = 0}):Play() end
+TS:Create(introDie, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), BackgroundTransparency = 0.02, Rotation = 8}):Play()
+if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.55), {Transparency = 0.15}):Play() end
+for _, lbl in ipairs(introDiePips) do TS:Create(lbl, TweenInfo.new(0.55), {BackgroundTransparency = 0}):Play() end
 task.wait(1.05); if not introActive then pcall(function() driftConn:Disconnect() end); return end
 TS:Create(lineTop, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
@@ -7275,14 +7545,14 @@ TS:Create(titleShadow, TweenInfo.new(0.36), {TextTransparency = 1}):Play()
 TS:Create(subtitle, TweenInfo.new(0.32), {TextTransparency = 1}):Play()
 TS:Create(lineTop, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
-TS:Create(aceLogo, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), BackgroundTransparency = 1, Rotation = 28}):Play()
-for _, lbl in ipairs(aceLabels) do TS:Create(lbl, TweenInfo.new(0.45), {TextTransparency = 1}):Play() end
-if aceStroke then TS:Create(aceStroke, TweenInfo.new(0.45), {Transparency = 1}):Play() end
+TS:Create(introDie, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), BackgroundTransparency = 1, Rotation = 28}):Play()
+for _, lbl in ipairs(introDiePips) do TS:Create(lbl, TweenInfo.new(0.45), {BackgroundTransparency = 1}):Play() end
+if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.45), {Transparency = 1}):Play() end
 TS:Create(darkBg, TweenInfo.new(0.75), {BackgroundTransparency = 1}):Play()
 for _, cd in ipairs(cards) do
 TS:Create(cd.frame, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play()
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.55), {Transparency = 1}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.55), {TextTransparency = 1}):Play() end
+for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play() end
 end
 Main.Visible = true
 MiniFrame.Visible = false

@@ -16,37 +16,43 @@
 			print("speed is now", box.Text)
 		end)
 
-		local row, setVisual, button = _G.AceActionToggleRow(page, "Fly", false, 3)
-		local on = false
-		button.Activated:Connect(function()
-			on = not on
-			setVisual(on)
+		toggleRow(page, "Fly", false, 3, function(on)
 			print("fly:", on)
 		end)
 
 	Row builders, all of which take (parent, ..., order):
 
-		section(parent, text, order)                  -> label
-		baseRow(parent, labelText, order)             -> row
-		textboxRow(parent, labelText, value, order)   -> row, TextBox
-		toggleRow(parent, labelText, default, order)  -> row, setVisual
-		dropdownRow(parent, labelText, value, order)  -> row, TextButton
+		section(parent, text, order)                 -> label
+		baseRow(parent, labelText, order)            -> row
+		textboxRow(parent, labelText, value, order)  -> row, TextBox
+		toggleRow(parent, labelText, default, order, callback)
+		                                             -> row, setVisual
+		dropdownRow(parent, labelText, value, order) -> row, TextButton
 		_G.AceActionToggleRow(parent, labelText, default, order)
-		                                              -> row, setVisual, button
+		                                             -> row, setVisual, button
 
-	toggleRow gives you a display-only switch; AceActionToggleRow also hands
-	back the button so you can wire the click yourself.
+	toggleRow flips itself and calls your callback. AceActionToggleRow does not
+	flip on its own; it hands back the button so you drive the state yourself,
+	which is what you want when the toggle can fail or is set from elsewhere.
 
 	Tabs live in `tabNames`; edit that list and `tabBlurbs` to change them.
-	The minimise button collapses the window to a draggable spider emblem.
+	The `-` button and the RightControl key both collapse the window to a
+	draggable spider emblem; click the emblem to bring it back.
+
+	Everything is also exposed on `_G.SpideyHub` so another script can add rows
+	without editing this file.
 --]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
+
+-- Key that hides and restores the menu.
+local MENU_KEY = Enum.KeyCode.RightControl
 
 -- Set true to stop the window being dragged.
 _G.AceGuiLocked = _G.AceGuiLocked or false
@@ -938,7 +944,7 @@ boxStroke.Transparency = 0.4
 boxStroke.Parent = box
 return row, box
 end
-function toggleRow(parent, labelText, default, order)
+function toggleRow(parent, labelText, default, order, callback)
 local row = baseRow(parent, labelText, order)
 local button = Instance.new("TextButton")
 button.Name = "ToggleButton"
@@ -1027,6 +1033,9 @@ tween(row, {BackgroundTransparency = state and 0.04 or 0.18})
 end
 setVisual(state)
 button.Activated:Connect(function()
+state = not state
+setVisual(state)
+if callback then task.spawn(callback, state) end
 end)
 return row, setVisual
 end
@@ -1140,6 +1149,74 @@ return row, select
 end
 local animationPackValueLabel = nil
 
+-- --------------------------------------------------------- window behaviour
+
+-- Scale, so the window fits phones as well as desktops.
+local GuiScale = Instance.new("UIScale")
+GuiScale.Name = "GuiScale"
+GuiScale.Scale = 1
+GuiScale.Parent = Main
+
+function setGuiScale(value)
+GuiScale.Scale = math.clamp(tonumber(value) or 1, 0.4, 2)
+end
+
+-- The frame is a fixed 640x460, which overflows a phone screen at 1:1, so
+-- shrink to fit whenever the viewport is smaller. Never scales above 1.
+local function fitToViewport()
+local camera = Workspace.CurrentCamera
+if not camera then return end
+local viewport = camera.ViewportSize
+if viewport.X < 1 or viewport.Y < 1 then return end
+local fit = math.min(viewport.X / (640 + 40), viewport.Y / (460 + 40), 1)
+GuiScale.Scale = math.max(0.4, fit)
+end
+fitToViewport()
+task.spawn(function()
+local camera = Workspace.CurrentCamera
+if camera then
+camera:GetPropertyChangedSignal("ViewportSize"):Connect(fitToViewport)
+end
+end)
+
+-- Minimise and restore. In the full hub this lived with the keybind system,
+-- so without it the "-" button does nothing.
+function setMenuOpen(open)
+Main.Visible = open
+MiniFrame.Visible = not open
+if open then Main.Size = FULL_MAIN_SIZE end
+end
+
+Close.Activated:Connect(function()
+setMenuOpen(false)
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+if gameProcessed then return end
+if input.KeyCode == MENU_KEY then
+setMenuOpen(not Main.Visible)
+end
+end)
+
+-- ------------------------------------------------------------------ the API
+-- So another script can build rows without editing this file.
+_G.SpideyHub = {
+Gui = Gui,
+Main = Main,
+COLORS = COLORS,
+pages = pages,
+tabNames = tabNames,
+setTab = setTab,
+setMenuOpen = setMenuOpen,
+setGuiScale = setGuiScale,
+section = section,
+baseRow = baseRow,
+textboxRow = textboxRow,
+toggleRow = toggleRow,
+dropdownRow = dropdownRow,
+actionToggleRow = _G.AceActionToggleRow,
+}
+
 -- ---------------------------------------------------------------- demo rows
 -- Everything below is an example: delete it and build your own pages.
 
@@ -1162,11 +1239,10 @@ textboxRow(page, "Carry Speed", "34", 3)
 
 section(page, "JUMP", 4)
 
-local _, setInfJump, infJumpButton = _G.AceActionToggleRow(page, "Infinite Jump", false, 5)
+-- toggleRow flips itself, so a callback is all you need.
 local infJump = false
-infJumpButton.Activated:Connect(function()
-infJump = not infJump
-setInfJump(infJump)
+toggleRow(page, "Infinite Jump", false, 5, function(on)
+infJump = on
 end)
 UserInputService.JumpRequest:Connect(function()
 if not infJump then return end

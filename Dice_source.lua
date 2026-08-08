@@ -2994,77 +2994,91 @@ return NS
 end
 -- ═══════════════════════════════════════════════════════════════
 -- MOVEMENT DRIVE
--- Speed is applied through a LinearVelocity constraint on the root
--- instead of writing HumanoidRootPart.Velocity every frame. WalkSpeed
--- is left at the game default and the movement resolves through the
--- physics solver, so it replicates as ordinary motion rather than as a
--- per-frame velocity override. Direction still comes from
--- Humanoid.MoveDirection, so it follows normal input.
+-- Roblox validates your position against the humanoid's replicated
+-- WalkSpeed. Forcing velocity, or a constraint, while WalkSpeed sits at
+-- the game default means the server sees you covering more ground than
+-- it allows and snaps you back. That is the lagback, and changing *how*
+-- the motion is produced does not avoid it.
+-- So drive WalkSpeed itself: the server then expects that speed and
+-- lets it stand. Direction stays with the humanoid, i.e. normal input.
+-- Client-side reads of WalkSpeed can be masked to the original value.
 -- ═══════════════════════════════════════════════════════════════
 _G.DicePhysicsSpeed = (_G.DicePhysicsSpeed ~= false)
-diceMoveDrive = {root = nil, lv = nil, att = nil, plane = false}
+_G.DiceWalkSpeedMaskOn = (_G.DiceWalkSpeedMaskOn ~= false)
+diceMoveDrive = diceMoveDrive or {base = nil, rawBase = nil, applied = nil, masked = false}
+-- Strip anything left behind by the earlier constraint-based version.
 function diceReleaseMoveDrive()
-if diceMoveDrive.lv then pcall(function() diceMoveDrive.lv:Destroy() end) end
-if diceMoveDrive.att then pcall(function() diceMoveDrive.att:Destroy() end) end
-diceMoveDrive.root, diceMoveDrive.lv, diceMoveDrive.att, diceMoveDrive.plane = nil, nil, nil, false
+local char = LP.Character
+local root = char and char:FindFirstChild("HumanoidRootPart")
+if root then
+for _, name in ipairs({"DiceMoveDrive", "DiceMoveAttachment"}) do
+local old = root:FindFirstChild(name)
+if old then pcall(function() old:Destroy() end) end
 end
-function diceEnsureMoveDrive(root)
-if diceMoveDrive.root == root and diceMoveDrive.lv and diceMoveDrive.lv.Parent then
-return diceMoveDrive
 end
-diceReleaseMoveDrive()
-if not root or not root.Parent then return diceMoveDrive end
-local okBuild = pcall(function()
-local att = Instance.new("Attachment")
-att.Name = "DiceMoveAttachment"
-att.Parent = root
-local lv = Instance.new("LinearVelocity")
-lv.Name = "DiceMoveDrive"
-lv.Attachment0 = att
-lv.RelativeTo = Enum.ActuatorRelativeTo.World
-lv.Enabled = false
-pcall(function() lv.MaxForce = math.huge end)
-pcall(function() lv.MaxAxesForce = Vector3.new(math.huge, 0, math.huge) end)
--- Plane mode leaves the vertical axis to gravity. Not every client
--- exposes it, so fall back to Vector mode and carry Y across by hand.
-local plane = pcall(function()
-lv.VelocityConstraintMode = Enum.LinearVelocityConstraintMode.Plane
-lv.PrimaryTangentAxis = Vector3.new(1, 0, 0)
-lv.SecondaryTangentAxis = Vector3.new(0, 0, 1)
-lv.PlaneVelocity = Vector2.new(0, 0)
+diceMoveDrive.applied = nil
+end
+-- Client-side scripts reading WalkSpeed get the game's own value back.
+function diceMaskWalkSpeed()
+if diceMoveDrive.masked then return true end
+if not (getrawmetatable and setreadonly and newcclosure) then return false end
+local ok = pcall(function()
+local mt = getrawmetatable(game)
+local oldIndex = mt.__index
+local hooked
+hooked = newcclosure(function(self, key)
+if key == "WalkSpeed" and _G.DiceWalkSpeedMaskOn and diceMoveDrive.base then
+if typeof(self) == "Instance" and self:IsA("Humanoid") then
+return diceMoveDrive.base
+end
+end
+return oldIndex(self, key)
 end)
-lv.Parent = root
-diceMoveDrive.root, diceMoveDrive.lv, diceMoveDrive.att, diceMoveDrive.plane = root, lv, att, plane
+setreadonly(mt, false)
+mt.__index = hooked
+setreadonly(mt, true)
 end)
-if not okBuild then diceReleaseMoveDrive() end
-return diceMoveDrive
+diceMoveDrive.masked = ok
+return ok
 end
+-- Hand the game's own WalkSpeed back when we stop driving it.
 function diceStopMoveDrive()
-if diceMoveDrive.lv and diceMoveDrive.lv.Parent then
-pcall(function() diceMoveDrive.lv.Enabled = false end)
+local char = LP.Character
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if hum and diceMoveDrive.applied and diceMoveDrive.base then
+pcall(function() hum.WalkSpeed = diceMoveDrive.base end)
 end
+diceMoveDrive.applied = nil
 end
--- Returns false when the constraint could not be used, so callers can
--- fall back to the old direct velocity write.
+-- Returns false if WalkSpeed could not be driven, so callers fall back
+-- to the old direct velocity write.
 function diceApplyMoveDrive(root, dir, spd)
-if not root then return false end
-local d = diceEnsureMoveDrive(root)
-if not d.lv or not d.lv.Parent then return false end
-local flat = dir and Vector3.new(dir.X, 0, dir.Z) or Vector3.zero
-if flat.Magnitude <= 0.001 then
-d.lv.Enabled = false
+local char = root and root.Parent
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if not hum then return false end
+spd = tonumber(spd)
+if not spd or spd <= 0 then return false end
+if not diceMoveDrive.base then
+diceMoveDrive.base = diceMoveDrive.rawBase or 16
+diceMaskWalkSpeed()
+end
+if diceMoveDrive.applied ~= spd then
+local ok = pcall(function() hum.WalkSpeed = spd end)
+if not ok then return false end
+diceMoveDrive.applied = spd
+end
 return true
 end
-flat = flat.Unit
-local ok = pcall(function()
-if d.plane then
-d.lv.PlaneVelocity = Vector2.new(flat.X * spd, flat.Z * spd)
-else
-d.lv.VectorVelocity = Vector3.new(flat.X * spd, root.AssemblyLinearVelocity.Y, flat.Z * spd)
+-- Capture the game's WalkSpeed before anything overwrites it.
+function diceCaptureBaseWalkSpeed(char)
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if not hum then return end
+local ok, v = pcall(function() return hum.WalkSpeed end)
+v = tonumber(v)
+if ok and v and v > 0 then
+diceMoveDrive.rawBase = v
+if not diceMoveDrive.applied then diceMoveDrive.base = v end
 end
-d.lv.Enabled = true
-end)
-return ok
 end
 local refreshSpeedModeRows = nil
 local function setSpeedMode(mode)
@@ -3614,10 +3628,13 @@ end)
 end
 if LP.Character then
 task.spawn(function()
+diceCaptureBaseWalkSpeed(LP.Character)
 setupOverheadInfo(LP.Character)
 end)
 end
 LP.CharacterAdded:Connect(function(char)
+diceMoveDrive.applied = nil
+diceCaptureBaseWalkSpeed(char)
 diceReleaseMoveDrive()
 task.wait(0.5)
 setupOverheadInfo(char)
@@ -5078,7 +5095,7 @@ end)
 end
 end
 do
-local row, setVisual = _G.DiceActionToggleRow(Movement, "Physics Speed (Anti Kick)", _G.DicePhysicsSpeed ~= false, 0)
+local row, setVisual = _G.DiceActionToggleRow(Movement, "WalkSpeed Drive (No Lagback)", _G.DicePhysicsSpeed ~= false, 0)
 local lbl = row and row:FindFirstChild("Label")
 if lbl then lbl.TextSize = 11 end
 local btn = row and row:FindFirstChild("ToggleButton")
@@ -5086,9 +5103,9 @@ if btn then
 btn.Activated:Connect(function()
 _G.DicePhysicsSpeed = not (_G.DicePhysicsSpeed ~= false)
 if setVisual then setVisual(_G.DicePhysicsSpeed ~= false) end
--- Drop the constraint straight away when switching back to the
--- old direct velocity write, or the two fight each other.
-if not _G.DicePhysicsSpeed then diceReleaseMoveDrive() end
+-- Hand WalkSpeed back at once when switching to the direct write,
+-- otherwise the raised value stays on the humanoid.
+if not _G.DicePhysicsSpeed then diceStopMoveDrive() end
 saveDiceConfig()
 end)
 end

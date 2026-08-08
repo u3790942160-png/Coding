@@ -3111,7 +3111,7 @@ discordLbl.Name = "Discord"
 discordLbl.Size = UDim2.new(1, 0, 0, 30)
 discordLbl.Position = UDim2.new(0, 0, 0, 26)
 discordLbl.BackgroundTransparency = 1
-discordLbl.Text = "discord.gg/aceduels"
+discordLbl.Text = "discord.gg/spideyhub"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 discordLbl.TextStrokeTransparency = 0
@@ -3689,7 +3689,7 @@ Discord.Name = "Discord"
 Discord.BackgroundTransparency = 1
 Discord.Size = UDim2.new(0, 240, 0, 14)
 Discord.Position = UDim2.new(0, 62, 0, 30)
-Discord.Text = "discord.gg/aceduels"
+Discord.Text = "discord.gg/spideyhub"
 Discord.TextColor3 = COLORS.muted
 Discord.Font = Enum.Font.Gotham
 Discord.TextSize = 11
@@ -5239,7 +5239,7 @@ speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
 do
 THEME_ACCENT = THEME_ACCENT or Color3.fromRGB(230, 230, 230)
 THEME_ACCENT_DIM = THEME_ACCENT_DIM or Color3.fromRGB(145, 145, 145)
-PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/aceduels"}
+PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/spideyhub"}
 BoxedESPOptions = BoxedESPOptions or {box=false, tracer=false}
 BoxedESPData = BoxedESPData or {}
 BoxedESPConn = BoxedESPConn or nil

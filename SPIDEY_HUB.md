@@ -44,13 +44,17 @@ values. `pages`, `addPage`, `setTab`, `Content`, `Close` and
 callback or feature code was modified; the diff is confined to the window
 chrome and the shared styling.
 
-Three things were deliberately left alone:
+The Discord handle reads `discord.gg/spideyhub` everywhere a player sees it:
+the header subtitle, the overhead ESP nametag, and the ESP default. Point that
+invite at a real server before handing the script out.
+
+Two things were deliberately left alone:
 
 - **Config filenames** (`AceDuels_MainGUI_Config_DefaultsV2.json` and the
   keybinds file) — renaming them would orphan everyone's saved settings.
-- **The Discord link** — it's a real invite, so it stays as the header subtitle
-  rather than being replaced with something invented.
-- **Intro song filenames** — internal cache names, not user-visible.
+- **Internal `AceDuels*` identifiers** — globals, instance names and intro song
+  cache keys. They are never shown to a player, and renaming them piecemeal
+  risks breaking cross-references for no visible gain.
 
 `"SpideyHub"` was added to the startup cleanup list alongside the old GUI names,
 so re-running the script still removes a previous instance instead of stacking

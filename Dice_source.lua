@@ -3062,11 +3062,13 @@ if not diceMoveDrive.base then
 diceMoveDrive.base = diceMoveDrive.rawBase or 16
 diceMaskWalkSpeed()
 end
-if diceMoveDrive.applied ~= spd then
+-- Re-asserted every frame rather than only on change. The game can
+-- reset WalkSpeed at any time, and with a write-once guard we would
+-- never notice and never correct it. Reading it back is not an option
+-- either, since the mask below hands us the spoofed value.
 local ok = pcall(function() hum.WalkSpeed = spd end)
 if not ok then return false end
 diceMoveDrive.applied = spd
-end
 return true
 end
 -- Capture the game's WalkSpeed before anything overwrites it.

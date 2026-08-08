@@ -76,6 +76,26 @@ local CS = 28.8
 local LAGGER_SPEED = 29
 local LAGGER_CARRY_SPEED = 15
 local currentSpeedMode = "Normal"
+AceSpeedMethods = {
+"Velocity", "AssemblyLinearVelocity", "Velocity Lerp", "AssemblyLinearVelocity Lerp",
+"CFrame", "CFrame Lerp", "Hyper CFrame", "Anchored CFrame", "PivotTo", "Model PivotTo", "Tween CFrame",
+"WalkSpeed", "Humanoid Move", "Humanoid MoveTo",
+"BodyVelocity", "BodyPosition", "BodyForce", "BodyThrust",
+"LinearVelocity", "VectorForce", "AlignPosition",
+"ApplyImpulse", "RocketPropulsion",
+}
+aceSpeedMethod = aceSpeedMethod or "Velocity"
+aceHyperMult = aceHyperMult or 4
+MOVE_KEYS = {
+[Enum.KeyCode.W] = true,
+[Enum.KeyCode.A] = true,
+[Enum.KeyCode.S] = true,
+[Enum.KeyCode.D] = true,
+[Enum.KeyCode.Up] = true,
+[Enum.KeyCode.Left] = true,
+[Enum.KeyCode.Down] = true,
+[Enum.KeyCode.Right] = true,
+}
 autoCarrySpeedEnabled = false
 setAutoCarrySpeedVisual = nil
 _G.AceAutoCarryWasCarrying = false
@@ -854,6 +874,7 @@ CS = CS,
 LAGGER_SPEED = LAGGER_SPEED,
 LAGGER_CARRY_SPEED = LAGGER_CARRY_SPEED,
 currentSpeedMode = currentSpeedMode,
+aceSpeedMethod = aceSpeedMethod,
 autoCarrySpeedEnabled = autoCarrySpeedEnabled == true,
 autoTPEnabled = autoTPEnabled,
 autoTPHeight = autoTPHeight,
@@ -954,6 +975,13 @@ LAGGER_SPEED = tonumber(data.LAGGER_SPEED) or LAGGER_SPEED
 LAGGER_CARRY_SPEED = tonumber(data.LAGGER_CARRY_SPEED) or LAGGER_CARRY_SPEED
 currentSpeedMode = data.currentSpeedMode or currentSpeedMode
 if currentSpeedMode ~= "Normal" and currentSpeedMode ~= "Carry" and currentSpeedMode ~= "Lagger" and currentSpeedMode ~= "Lagger Carry" then currentSpeedMode = "Normal" end
+if type(data.aceSpeedMethod) == "string" then
+-- Only accept a method this build actually implements; a stale config
+-- naming a removed one would leave movement doing nothing at all.
+for _, name in ipairs(AceSpeedMethods or {}) do
+if name == data.aceSpeedMethod then aceSpeedMethod = name break end
+end
+end
 autoCarrySpeedEnabled = data.autoCarrySpeedEnabled == true
 autoTPEnabled = data.autoTPEnabled == true
 autoTPHeight = tonumber(data.autoTPHeight) or autoTPHeight
@@ -2777,8 +2805,235 @@ while task.wait(30) do
 saveAceConfig()
 end
 end)
+-- ═══════════════════════════════════════════════════════════════
+-- SPEED ENGINE
+-- Ported from the Vynx build. Rather than writing hrp.Velocity every
+-- frame, movement goes through a selectable method: the default drives
+-- the assembly with a mass-scaled impulse, and the rest cover the
+-- CFrame, mover-instance and humanoid approaches. Switching method
+-- tears down whatever the previous one left on the character.
+-- ═══════════════════════════════════════════════════════════════
+do
+-- Everything the active method parented to the character, so the next
+-- method can clear it without hunting through the model.
+local SO = {}
+function AceDestroySpeedObjects()
+if SO.anchored then pcall(function() SO.anchored.Anchored = false end); SO.anchored = nil end
+for _, key in ipairs({"bodyVel", "bodyPosition", "bodyForce", "bodyThrust", "linearVel",
+"vectorForce", "alignPos", "rocket", "rocketTarget", "attLinVel", "attVecForce", "attAlign"}) do
+if SO[key] then pcall(function() SO[key]:Destroy() end); SO[key] = nil end
+end
+if SO.tween then pcall(function() SO.tween:Cancel() end); SO.tween = nil end
+end
+local function ensureAttachment(hrp, key, name)
+local att = SO[key]
+if not att or att.Parent ~= hrp then
+if att then pcall(function() att:Destroy() end) end
+att = Instance.new("Attachment")
+att.Name = name or "AceSpeedAtt"
+att.Parent = hrp
+SO[key] = att
+end
+return att
+end
+-- Push the assembly to the target planar speed in one impulse, scaled by
+-- its own mass so a heavy carry moves the same as an empty character.
+local function massImpulse(hrp, direction, targetSpeed)
+local mass = hrp.AssemblyMass or 1
+local current = hrp.AssemblyLinearVelocity
+local desired = Vector3.new(direction.X * targetSpeed, current.Y, direction.Z * targetSpeed)
+local delta = desired - current
+pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+end
+local function lerpImpulse(hrp, dir, spd)
+local current = hrp.AssemblyLinearVelocity
+local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
+local blended = current:Lerp(desired, 0.6)
+local mass = hrp.AssemblyMass or 1
+pcall(function() hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass) end)
+end
+function AceApplySpeedMethod(hrp, hum, dir, spd, dt)
+local step = dt or 1/60
+local m = aceSpeedMethod
+if SO.lastMethod ~= m then
+AceDestroySpeedObjects()
+-- Only the WalkSpeed methods are allowed to leave it off default.
+if m ~= "WalkSpeed" and m ~= "Humanoid Move" and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
+SO.lastMethod = m
+end
+local char = hrp.Parent
+local targetPos = hrp.Position + (dir * spd * step)
+if m == "Velocity" or m == "AssemblyLinearVelocity" or m == "ApplyImpulse" then
+massImpulse(hrp, dir, spd)
+elseif m == "Velocity Lerp" or m == "AssemblyLinearVelocity Lerp" then
+lerpImpulse(hrp, dir, spd)
+elseif m == "CFrame" then
+hrp.CFrame = hrp.CFrame + (dir * spd * step)
+elseif m == "CFrame Lerp" then
+hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + (dir * spd * step), 0.5)
+elseif m == "Hyper CFrame" then
+hrp.CFrame = hrp.CFrame + (dir * spd * (aceHyperMult or 4) * step)
+elseif m == "Anchored CFrame" then
+if not hrp.Anchored then
+hrp.Anchored = true
+SO.anchored = hrp
+end
+hrp.CFrame = hrp.CFrame + (dir * spd * step)
+elseif m == "PivotTo" then
+hrp:PivotTo(hrp.CFrame + (dir * spd * step))
+elseif m == "Model PivotTo" then
+if char and char:IsA("Model") then
+char:PivotTo(char:GetPivot() + (dir * spd * step))
+else
+hrp:PivotTo(hrp.CFrame + (dir * spd * step))
+end
+elseif m == "Tween CFrame" then
+if SO.tween then pcall(function() SO.tween:Cancel() end) end
+SO.tween = TweenService:Create(hrp, TweenInfo.new(step, Enum.EasingStyle.Linear), {CFrame = hrp.CFrame + (dir * spd * step)})
+SO.tween:Play()
+elseif m == "WalkSpeed" then
+hum.WalkSpeed = spd
+elseif m == "Humanoid Move" then
+hum.WalkSpeed = spd
+hum:Move(dir)
+elseif m == "Humanoid MoveTo" then
+hum:MoveTo(targetPos, hrp)
+elseif m == "BodyVelocity" then
+if not SO.bodyVel or SO.bodyVel.Parent ~= hrp then
+if SO.bodyVel then pcall(function() SO.bodyVel:Destroy() end) end
+SO.bodyVel = Instance.new("BodyVelocity")
+SO.bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+SO.bodyVel.Parent = hrp
+end
+SO.bodyVel.Velocity = Vector3.new(dir.X * spd, SO.bodyVel.Velocity.Y, dir.Z * spd)
+elseif m == "BodyPosition" then
+if not SO.bodyPosition or SO.bodyPosition.Parent ~= hrp then
+if SO.bodyPosition then pcall(function() SO.bodyPosition:Destroy() end) end
+SO.bodyPosition = Instance.new("BodyPosition")
+SO.bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+SO.bodyPosition.P = 500
+SO.bodyPosition.D = 50
+SO.bodyPosition.Parent = hrp
+end
+SO.bodyPosition.Position = targetPos
+elseif m == "BodyForce" then
+if not SO.bodyForce or SO.bodyForce.Parent ~= hrp then
+if SO.bodyForce then pcall(function() SO.bodyForce:Destroy() end) end
+SO.bodyForce = Instance.new("BodyForce")
+SO.bodyForce.Parent = hrp
+end
+SO.bodyForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
+elseif m == "BodyThrust" then
+if not SO.bodyThrust or SO.bodyThrust.Parent ~= hrp then
+if SO.bodyThrust then pcall(function() SO.bodyThrust:Destroy() end) end
+SO.bodyThrust = Instance.new("BodyThrust")
+SO.bodyThrust.Force = Vector3.new(math.huge, math.huge, math.huge)
+SO.bodyThrust.Parent = hrp
+end
+SO.bodyThrust.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
+elseif m == "LinearVelocity" then
+if not SO.linearVel or SO.linearVel.Parent ~= hrp then
+if SO.linearVel then pcall(function() SO.linearVel:Destroy() end) end
+local att = ensureAttachment(hrp, "attLinVel", "AceLinVelAtt")
+SO.linearVel = Instance.new("LinearVelocity")
+SO.linearVel.Attachment0 = att
+SO.linearVel.MaxForce = 1e8
+SO.linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
+SO.linearVel.Parent = hrp
+end
+SO.linearVel.VectorVelocity = Vector3.new(dir.X * spd, SO.linearVel.VectorVelocity.Y, dir.Z * spd)
+elseif m == "VectorForce" then
+if not SO.vectorForce or SO.vectorForce.Parent ~= hrp then
+if SO.vectorForce then pcall(function() SO.vectorForce:Destroy() end) end
+local att = ensureAttachment(hrp, "attVecForce", "AceVecForceAtt")
+SO.vectorForce = Instance.new("VectorForce")
+SO.vectorForce.Attachment0 = att
+SO.vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+SO.vectorForce.Parent = hrp
+end
+SO.vectorForce.Force = Vector3.new(dir.X * spd, 0, dir.Z * spd) * 100
+elseif m == "AlignPosition" then
+if not SO.alignPos or SO.alignPos.Parent ~= hrp then
+if SO.alignPos then pcall(function() SO.alignPos:Destroy() end) end
+local att = ensureAttachment(hrp, "attAlign", "AceAlignAtt")
+SO.alignPos = Instance.new("AlignPosition")
+SO.alignPos.Attachment0 = att
+SO.alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
+SO.alignPos.MaxForce = math.huge
+SO.alignPos.Responsiveness = 15
+SO.alignPos.RigidityEnabled = false
+SO.alignPos.Parent = hrp
+end
+SO.alignPos.Position = targetPos
+elseif m == "RocketPropulsion" then
+if not SO.rocket or SO.rocket.Parent ~= hrp or not SO.rocketTarget then
+if SO.rocket then pcall(function() SO.rocket:Destroy() end) end
+if SO.rocketTarget then pcall(function() SO.rocketTarget:Destroy() end) end
+SO.rocketTarget = Instance.new("Part")
+SO.rocketTarget.Name = "AceRocketTarget"
+SO.rocketTarget.Anchored = true
+SO.rocketTarget.CanCollide = false
+SO.rocketTarget.Transparency = 1
+SO.rocketTarget.Size = Vector3.new(1, 1, 1)
+SO.rocketTarget.Parent = Workspace
+SO.rocket = Instance.new("RocketPropulsion")
+SO.rocket.MaxThrust = 3000
+SO.rocket.MaxTorque = 1000
+SO.rocket.ThrustP = 100
+SO.rocket.ThrustD = 20
+SO.rocket.TurnP = 100
+SO.rocket.TurnD = 10
+SO.rocket.Target = SO.rocketTarget
+SO.rocket.Parent = hrp
+end
+SO.rocketTarget.Position = targetPos
+pcall(function() SO.rocket:Fire() end)
+end
+end
+end
+function AceCycleSpeedMethod(delta)
+local index = 1
+for i, name in ipairs(AceSpeedMethods) do
+if name == aceSpeedMethod then index = i break end
+end
+index = index + (delta or 1)
+if index < 1 then index = #AceSpeedMethods end
+if index > #AceSpeedMethods then index = 1 end
+aceSpeedMethod = AceSpeedMethods[index]
+-- The character keeps whatever the old method attached until it is told
+-- otherwise, so clear it the moment the choice changes.
+if AceDestroySpeedObjects then AceDestroySpeedObjects() end
+local char = LP.Character
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if hum and aceSpeedMethod ~= "WalkSpeed" and aceSpeedMethod ~= "Humanoid Move" then
+pcall(function() hum.WalkSpeed = 16 end)
+end
+if refreshSpeedMethodRow then refreshSpeedMethodRow() end
+saveAceConfig()
+return aceSpeedMethod
+end
+
 local lastMoveDir = Vector3.new(0, 0, 0)
+-- A brainrot in hand pins you to the lagger carry figure whatever the
+-- mode says — the Vynx rule. Auto Carry Speed drives the mode itself, so
+-- when it is on the mode is already the answer.
+local function hasBrainrotInHand()
+local char = LP.Character
+if not char then return false end
+for _, item in ipairs(char:GetChildren()) do
+if item:IsA("Tool") then
+local name = item.Name:lower()
+if name:find("brainrot", 1, true) or name:find("skibidi", 1, true) or name:find("toilet", 1, true) then
+return true
+end
+end
+end
+return false
+end
 local function getCurrentSpeedValue()
+if autoCarrySpeedEnabled ~= true and hasBrainrotInHand() then
+return LAGGER_CARRY_SPEED
+end
 if currentSpeedMode == "Carry" then
 return CS
 elseif currentSpeedMode == "Lagger" then
@@ -3342,7 +3597,7 @@ task.wait(0.5)
 setupOverheadInfo(char)
 if ragdollCountdownEnabled then hookRagdollCountdown(char) end
 end)
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 local char = LP.Character
 if not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -3354,13 +3609,37 @@ or state == Enum.HumanoidStateType.Physics
 or state == Enum.HumanoidStateType.Ragdoll
 or state == Enum.HumanoidStateType.FallingDown then
 lastMoveDir = Vector3.new(0, 0, 0)
+-- Ragdolled: hand the character back to the game rather than fighting
+-- it with a mover that is still attached.
+AceDestroySpeedObjects()
 return
 end
+if not autoLeftEnabled and not autoRightEnabled then
 local md = hum.MoveDirection
 local spd = getCurrentSpeedValue()
-if not autoLeftEnabled and not autoRightEnabled and md.Magnitude > 0 then
+local dir = Vector3.new(0, 0, 0)
+if md.Magnitude > 0 then
 lastMoveDir = md
-hrp.Velocity = Vector3.new(md.X * spd, hrp.Velocity.Y, md.Z * spd)
+dir = md
+elseif antiRagdollEnabled and lastMoveDir.Magnitude > 0 then
+-- MoveDirection drops to zero the instant a ragdoll starts, so with
+-- anti ragdoll on we keep driving the last heading while the key is
+-- still down instead of stalling mid-stride.
+local anyHeld = false
+for key in pairs(MOVE_KEYS) do
+if UserInputService:IsKeyDown(key) then anyHeld = true break end
+end
+if anyHeld then dir = lastMoveDir end
+end
+if dir.Magnitude > 0 then
+AceApplySpeedMethod(hrp, hum, dir, spd, dt)
+else
+AceDestroySpeedObjects()
+end
+else
+-- Auto path drives the character itself; leaving a mover attached
+-- would have it fighting the walk.
+AceDestroySpeedObjects()
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -5001,6 +5280,95 @@ if animationPackValueLabel then
 animationPackValueLabel.Text = selectedAnimationPack
 end
 end
+speedMethodValueLabel = nil
+function refreshSpeedMethodRow()
+if speedMethodValueLabel then
+speedMethodValueLabel.Text = tostring(aceSpeedMethod)
+end
+end
+-- Cycles the movement method the speed engine drives the character with.
+function speedMethodRow(parent, order)
+local row = baseRow(parent, "Speed Method", order)
+row.Size = UDim2.new(1, -4, 0, 42)
+local label = row:FindFirstChild("Label")
+if label then
+label.Text = "Speed Method"
+label.Size = UDim2.new(0, 96, 1, 0)
+label.TextSize = 11
+end
+local left = Instance.new("TextButton")
+left.Name = "LeftArrow"
+left.BackgroundColor3 = COLORS.accentSoft
+left.BackgroundTransparency = 0.18
+left.Text = "<"
+left.TextColor3 = COLORS.white
+left.TextSize = 12
+left.Font = Enum.Font.GothamSemibold
+left.Size = UDim2.new(0, 36, 0, 28)
+left.Position = UDim2.new(1, -170, 0.5, -14)
+left.BorderSizePixel = 0
+left.ZIndex = 6
+left.AutoButtonColor = false
+left.Parent = row
+corner(left, 8)
+stroke(left, COLORS.strokeSoft, 1, 0.45)
+local holder = Instance.new("Frame")
+holder.Name = "SpeedMethodValueHolder"
+holder.BackgroundColor3 = COLORS.accentSoft
+holder.BackgroundTransparency = 0.18
+holder.BorderSizePixel = 0
+holder.Size = UDim2.new(0, 88, 0, 28)
+holder.Position = UDim2.new(1, -130, 0.5, -14)
+holder.ClipsDescendants = true
+holder.ZIndex = 6
+holder.Parent = row
+corner(holder, 8)
+stroke(holder, COLORS.strokeSoft, 1, 0.45)
+speedMethodValueLabel = Instance.new("TextLabel")
+speedMethodValueLabel.Name = "SpeedMethodValue"
+speedMethodValueLabel.BackgroundTransparency = 1
+speedMethodValueLabel.Text = tostring(aceSpeedMethod)
+speedMethodValueLabel.TextColor3 = COLORS.white
+speedMethodValueLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+speedMethodValueLabel.TextStrokeTransparency = 0.35
+speedMethodValueLabel.Font = Enum.Font.GothamSemibold
+speedMethodValueLabel.TextXAlignment = Enum.TextXAlignment.Center
+-- Names run from "CFrame" to "AssemblyLinearVelocity Lerp", so let the
+-- long ones shrink to fit rather than truncating to an ambiguous stub.
+speedMethodValueLabel.TextScaled = true
+speedMethodValueLabel.Size = UDim2.new(1, -6, 1, -8)
+speedMethodValueLabel.Position = UDim2.new(0, 3, 0, 4)
+speedMethodValueLabel.ZIndex = 7
+speedMethodValueLabel.Parent = holder
+local sizeLimit = Instance.new("UITextSizeConstraint")
+sizeLimit.MaxTextSize = 10
+sizeLimit.MinTextSize = 6
+sizeLimit.Parent = speedMethodValueLabel
+local right = Instance.new("TextButton")
+right.Name = "RightArrow"
+right.BackgroundColor3 = COLORS.accentSoft
+right.BackgroundTransparency = 0.18
+right.Text = ">"
+right.TextColor3 = COLORS.white
+right.TextSize = 12
+right.Font = Enum.Font.GothamSemibold
+right.Size = UDim2.new(0, 36, 0, 28)
+right.Position = UDim2.new(1, -38, 0.5, -14)
+right.BorderSizePixel = 0
+right.ZIndex = 6
+right.AutoButtonColor = false
+right.Parent = row
+corner(right, 8)
+stroke(right, COLORS.strokeSoft, 1, 0.45)
+left.MouseButton1Click:Connect(function()
+AceCycleSpeedMethod(-1)
+end)
+right.MouseButton1Click:Connect(function()
+AceCycleSpeedMethod(1)
+end)
+refreshSpeedMethodRow()
+return row
+end
 function animationPackRow(parent, order)
 local row = baseRow(parent, "Animation Pack", order)
 row.Size = UDim2.new(1, -4, 0, 42)
@@ -5553,6 +5921,8 @@ end
 -- loadstring does not monopolize the client thread and visibly freeze play.
 task.wait()
 Movement = pages.MOVEMENT
+section(Movement, "SPEED ENGINE", -4)
+speedMethodRow(Movement, -3)
 section(Movement, "AUTO SPEED", -2)
 _, setAutoCarrySpeedVisual = toggleRow(Movement, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
 do

@@ -3413,7 +3413,10 @@ end
 -- ═══════════════════════════════════════════════════════════════
 -- DICE
 -- Drawn from frames, so there is no image asset to load and the faces
--- can be repainted at will. Returns the die and a face setter.
+-- can be repainted at will. Each die is a stack — contact shadow, the
+-- block's extruded edge, a lit face under a bevelled rim, and pips
+-- drilled into the surface — lit consistently from the top left.
+-- Returns the die and a face setter.
 -- ═══════════════════════════════════════════════════════════════
 local DIE_PIPS = {
 [1] = {{0.5, 0.5}},
@@ -3425,17 +3428,110 @@ local DIE_PIPS = {
 }
 function makeDie(parent, sizePx, value, dark, fade)
 fade = tonumber(fade) or 0
+-- Every layer dims together, so transparencies are quoted at full
+-- strength and pushed through this.
+local function dim(t) return t + (1 - t) * fade end
+-- Below ~20px the sheen and the drilled pip rims land on half a pixel
+-- and just muddy the face; past half transparency nobody can see them
+-- either. Either way they are instances the backdrop need not pay for.
+local detailed = sizePx >= 20 and fade < 0.5
+local radius = math.max(3, math.floor(sizePx * 0.2))
+local depth = math.max(1, math.floor(sizePx * 0.085))
 local die = Instance.new("Frame")
 die.Name = "Die"
 die.Size = UDim2.new(0, sizePx, 0, sizePx)
-die.BackgroundColor3 = dark and Color3.fromRGB(14, 14, 16) or Color3.fromRGB(246, 246, 250)
-die.BackgroundTransparency = fade
+die.BackgroundTransparency = 1
 die.BorderSizePixel = 0
 die.ZIndex = (parent.ZIndex or 1) + 1
 die.Parent = parent
-corner(die, math.max(3, math.floor(sizePx * 0.22)))
-stroke(die, dark and COLORS.stroke or Color3.fromRGB(255, 255, 255), 1, 0.4 + fade * 0.55)
-local pipColor = dark and Color3.fromRGB(242, 242, 246) or Color3.fromRGB(16, 16, 18)
+local z = die.ZIndex
+-- Contact shadow, softened by stacking two offset layers.
+for i = 1, (detailed and 2 or 1) do
+local shade = Instance.new("Frame")
+shade.Name = "Shadow" .. i
+shade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shade.BackgroundTransparency = dim(0.42 + (i - 1) * 0.26)
+shade.BorderSizePixel = 0
+shade.Position = UDim2.new(0, depth + i, 0, depth + i + 1)
+shade.Size = UDim2.new(1, i, 1, i)
+shade.ZIndex = z
+shade.Parent = die
+corner(shade, radius + i)
+end
+-- The extruded edge of the block, offset down-right and turned away
+-- from the light, so the face reads as the top of a cube.
+local block = Instance.new("Frame")
+block.Name = "Block"
+block.BackgroundColor3 = dark and Color3.fromRGB(8, 8, 10) or Color3.fromRGB(126, 126, 132)
+block.BackgroundTransparency = dim(0)
+block.BorderSizePixel = 0
+block.Position = UDim2.new(0, depth, 0, depth)
+block.Size = UDim2.new(1, 0, 1, 0)
+block.ZIndex = z + 1
+block.Parent = die
+corner(block, radius)
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(32, 32, 36) or Color3.fromRGB(170, 170, 176),
+dark and Color3.fromRGB(3, 3, 4) or Color3.fromRGB(88, 88, 94))
+g.Rotation = 90
+g.Parent = block
+end
+-- The lit face.
+local face = Instance.new("Frame")
+face.Name = "Face"
+face.BackgroundColor3 = dark and Color3.fromRGB(24, 24, 28) or Color3.fromRGB(248, 248, 251)
+face.BackgroundTransparency = dim(0)
+face.BorderSizePixel = 0
+face.Size = UDim2.new(1, 0, 1, 0)
+face.ZIndex = z + 2
+face.Parent = die
+corner(face, radius)
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, dark and Color3.fromRGB(58, 58, 64) or Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(0.5, dark and Color3.fromRGB(26, 26, 30) or Color3.fromRGB(237, 237, 242)),
+ColorSequenceKeypoint.new(1, dark and Color3.fromRGB(9, 9, 11) or Color3.fromRGB(196, 196, 204)),
+})
+g.Rotation = 118
+g.Parent = face
+end
+-- Bevelled rim: bright along the lit edge, dark where it turns away.
+local rim = Instance.new("UIStroke")
+rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+rim.Thickness = math.max(1, sizePx * 0.05)
+rim.Transparency = dim(0.12)
+rim.Color = Color3.fromRGB(255, 255, 255)
+rim.Parent = face
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(104, 104, 112) or Color3.fromRGB(255, 255, 255),
+dark and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(112, 112, 120))
+g.Rotation = 118
+g.Parent = rim
+end
+if detailed then
+local sheen = Instance.new("Frame")
+sheen.Name = "Sheen"
+sheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sheen.BackgroundTransparency = dim(dark and 0.8 or 0.55)
+sheen.BorderSizePixel = 0
+sheen.Position = UDim2.new(0, math.floor(sizePx * 0.1), 0, math.floor(sizePx * 0.08))
+sheen.Size = UDim2.new(1, -math.floor(sizePx * 0.2), 0, math.max(2, math.floor(sizePx * 0.34)))
+sheen.ZIndex = z + 3
+sheen.Parent = face
+corner(sheen, math.max(2, math.floor(radius * 0.8)))
+local g = Instance.new("UIGradient")
+g.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+g.Rotation = 90
+g.Parent = sheen
+end
 local pipSize = math.max(2, math.floor(sizePx * 0.19))
 -- Six pips is the most any face needs; the rest are hidden per value.
 local pips = {}
@@ -3444,13 +3540,38 @@ local pip = Instance.new("Frame")
 pip.Name = "Pip" .. i
 pip.AnchorPoint = Vector2.new(0.5, 0.5)
 pip.Size = UDim2.new(0, pipSize, 0, pipSize)
-pip.BackgroundColor3 = pipColor
-pip.BackgroundTransparency = fade
+pip.BackgroundColor3 = dark and Color3.fromRGB(238, 238, 244) or Color3.fromRGB(20, 20, 23)
+pip.BackgroundTransparency = dim(0)
 pip.BorderSizePixel = 0
 pip.Visible = false
-pip.ZIndex = die.ZIndex + 1
-pip.Parent = die
+pip.ZIndex = z + 4
+pip.Parent = face
 corner(pip, 999)
+-- Drilled, not painted. With the key light up at the top left, the
+-- near wall of the hole shades itself and the far wall catches the
+-- bounce, so the gradient runs along the same axis as the face.
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(252, 252, 255) or Color3.fromRGB(4, 4, 6),
+dark and Color3.fromRGB(172, 172, 180) or Color3.fromRGB(84, 84, 92))
+g.Rotation = 118
+g.Parent = pip
+if detailed then
+local lip = Instance.new("UIStroke")
+lip.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+lip.Thickness = math.max(0.5, sizePx * 0.018)
+lip.Transparency = dim(0.45)
+lip.Color = dark and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+lip.Parent = pip
+-- The polished edge of the bore only catches light on the far side.
+local lg = Instance.new("UIGradient")
+lg.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(1, 0),
+})
+lg.Rotation = 118
+lg.Parent = lip
+end
 pips[i] = pip
 end
 local function setFace(v)
@@ -4179,7 +4300,7 @@ TitleDieA.Position = UDim2.new(0, 14, 0, 18)
 TitleDieA.Rotation = -9
 local TitleDieB, setTitleDieB = makeDie(TopBar, 16, 2, true)
 TitleDieB.Name = "TitleDieB"
-TitleDieB.Position = UDim2.new(0, 32, 0, 18)
+TitleDieB.Position = UDim2.new(0, 35, 0, 18)
 TitleDieB.Rotation = 8
 -- Re-rolled whenever you change tab, so the pair is never dead weight.
 function rollTitleDice()
@@ -7577,51 +7698,135 @@ skipStroke.Color = Color3.fromRGB(255,255,255)
 skipStroke.Thickness = 1
 skipStroke.Transparency = 0.12
 skipBtn.MouseButton1Click:Connect(finishIntro)
--- The intro tumbles dice rather than playing cards. Same shell as the
--- panel motif: a white face, black pips, no image assets involved.
+-- The intro tumbles dice rather than playing cards, built from the same
+-- stack as the panel motif. Returns the die plus the layers to fade,
+-- each paired with the transparency it settles at.
 function makeIntroDie(parent, size, z, face)
+local zi = z or 6
+local radius = math.max(5, math.floor(size * 0.2))
+local depth = math.max(2, math.floor(size * 0.085))
 local die = Instance.new("Frame", parent)
 die.Size = UDim2.new(0, size, 0, size)
 die.AnchorPoint = Vector2.new(0.5, 0.5)
-die.BackgroundColor3 = Color3.fromRGB(240, 240, 244)
 die.BackgroundTransparency = 1
 die.BorderSizePixel = 0
-die.ZIndex = z or 6
-Instance.new("UICorner", die).CornerRadius = UDim.new(0, math.max(5, math.floor(size * 0.2)))
-local stroke = Instance.new("UIStroke", die)
-stroke.Color = Color3.fromRGB(190,190,194)
-stroke.Thickness = 1
+die.ZIndex = zi
+local parts = {}
+local shade = Instance.new("Frame", die)
+shade.Name = "Shadow"
+shade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shade.BackgroundTransparency = 1
+shade.BorderSizePixel = 0
+shade.Position = UDim2.new(0, depth + 2, 0, depth + 3)
+shade.Size = UDim2.new(1, 2, 1, 2)
+shade.ZIndex = zi
+Instance.new("UICorner", shade).CornerRadius = UDim.new(0, radius + 2)
+table.insert(parts, {obj = shade, t = 0.5})
+local block = Instance.new("Frame", die)
+block.Name = "Block"
+block.BackgroundColor3 = Color3.fromRGB(126, 126, 132)
+block.BackgroundTransparency = 1
+block.BorderSizePixel = 0
+block.Position = UDim2.new(0, depth, 0, depth)
+block.Size = UDim2.new(1, 0, 1, 0)
+block.ZIndex = zi + 1
+Instance.new("UICorner", block).CornerRadius = UDim.new(0, radius)
+local blockGrad = Instance.new("UIGradient", block)
+blockGrad.Color = ColorSequence.new(Color3.fromRGB(170,170,176), Color3.fromRGB(88,88,94))
+blockGrad.Rotation = 90
+table.insert(parts, {obj = block, t = 0.06})
+local faceFrame = Instance.new("Frame", die)
+faceFrame.Name = "Face"
+faceFrame.BackgroundColor3 = Color3.fromRGB(248, 248, 251)
+faceFrame.BackgroundTransparency = 1
+faceFrame.BorderSizePixel = 0
+faceFrame.Size = UDim2.new(1, 0, 1, 0)
+faceFrame.ZIndex = zi + 2
+Instance.new("UICorner", faceFrame).CornerRadius = UDim.new(0, radius)
+local grad = Instance.new("UIGradient", faceFrame)
+grad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+ColorSequenceKeypoint.new(0.5, Color3.fromRGB(237,237,242)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(196,196,204)),
+})
+grad.Rotation = 118
+table.insert(parts, {obj = faceFrame, t = 0.02})
+local stroke = Instance.new("UIStroke", faceFrame)
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Thickness = math.max(1, size * 0.05)
 stroke.Transparency = 1
-local grad = Instance.new("UIGradient", die)
-grad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(196,196,200))
-grad.Rotation = 125
-local pips = {}
+local rimGrad = Instance.new("UIGradient", stroke)
+rimGrad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(112,112,120))
+rimGrad.Rotation = 118
+local sheen = Instance.new("Frame", faceFrame)
+sheen.Name = "Sheen"
+sheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sheen.BackgroundTransparency = 1
+sheen.BorderSizePixel = 0
+sheen.Position = UDim2.new(0, math.floor(size * 0.1), 0, math.floor(size * 0.08))
+sheen.Size = UDim2.new(1, -math.floor(size * 0.2), 0, math.max(2, math.floor(size * 0.34)))
+sheen.ZIndex = zi + 3
+Instance.new("UICorner", sheen).CornerRadius = UDim.new(0, math.max(2, math.floor(radius * 0.8)))
+local sheenGrad = Instance.new("UIGradient", sheen)
+sheenGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+sheenGrad.Rotation = 90
+table.insert(parts, {obj = sheen, t = 0.55})
 local spots = DIE_PIPS[math.clamp(math.floor(tonumber(face) or 1), 1, 6)]
 local pipSize = math.max(2, math.floor(size * 0.17))
 for _, spot in ipairs(spots) do
-local pip = Instance.new("Frame", die)
+local pip = Instance.new("Frame", faceFrame)
 pip.AnchorPoint = Vector2.new(0.5, 0.5)
 pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
 pip.Size = UDim2.new(0, pipSize, 0, pipSize)
-pip.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+pip.BackgroundColor3 = Color3.fromRGB(20, 20, 23)
 pip.BackgroundTransparency = 1
 pip.BorderSizePixel = 0
-pip.ZIndex = (z or 6) + 1
+pip.ZIndex = zi + 4
 Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
-table.insert(pips, pip)
+local pipGrad = Instance.new("UIGradient", pip)
+pipGrad.Color = ColorSequence.new(Color3.fromRGB(4,4,6), Color3.fromRGB(84,84,92))
+pipGrad.Rotation = 118
+local lip = Instance.new("UIStroke", pip)
+lip.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+lip.Color = Color3.fromRGB(255, 255, 255)
+lip.Thickness = math.max(0.5, size * 0.018)
+lip.Transparency = 1
+local lipGrad = Instance.new("UIGradient", lip)
+lipGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(1, 0),
+})
+lipGrad.Rotation = 118
+table.insert(parts, {obj = pip, t = 0})
 end
-return die, pips, stroke
+return die, parts, stroke
+end
+-- Each layer settles at its own transparency, so fading a die in is a
+-- walk over its parts rather than one tween on the frame.
+local function fadeDieIn(parts, time)
+for _, part in ipairs(parts) do
+TS:Create(part.obj, TweenInfo.new(time), {BackgroundTransparency = part.t}):Play()
+end
+end
+local function fadeDieOut(parts, time)
+for _, part in ipairs(parts) do
+TS:Create(part.obj, TweenInfo.new(time), {BackgroundTransparency = 1}):Play()
+end
 end
 local cards = {}
 for i = 1, 24 do
 local size = math.random(34, 82)
-local card, labels, stroke = makeIntroDie(introGui, size, 5 + i, math.random(1, 6))
+local card, dieParts, stroke = makeIntroDie(introGui, size, 5 + i, math.random(1, 6))
 local side = (i % 2 == 0) and -0.35 or 1.35
 local targetSide = (i % 2 == 0) and 1.35 or -0.35
 local y = math.random(4, 96) / 100
 card.Position = UDim2.new(side, 0, y, 0)
 card.Rotation = math.random(-40, 40)
-cards[i] = {frame=card, labels=labels, stroke=stroke, startX=side, endX=targetSide, y=y, speed=0.09+math.random()*0.10, bob=math.random()*6.28, rot=math.random(-55,55), drift=math.random(-14,14)/100}
+cards[i] = {frame=card, parts=dieParts, stroke=stroke, startX=side, endX=targetSide, y=y, speed=0.09+math.random()*0.10, bob=math.random()*6.28, rot=math.random(-55,55), drift=math.random(-14,14)/100}
 end
 local introDie, introDiePips, introDieStroke = makeIntroDie(introGui, 130, 25, 5)
 introDie.Position = UDim2.new(0.5,0,-0.35,0)
@@ -7664,15 +7869,14 @@ TS:Create(darkBg, TweenInfo.new(0.65), {BackgroundTransparency = 0.22}):Play()
 for _, cd in ipairs(cards) do
 task.delay(math.random() * 0.9, function()
 if not introActive then return end
-TS:Create(cd.frame, TweenInfo.new(0.65), {BackgroundTransparency = 0.08}):Play()
+fadeDieIn(cd.parts, 0.65)
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.65), {Transparency = 0.25}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.65), {BackgroundTransparency = 0}):Play() end
 end)
 end
 task.wait(0.85); if not introActive then pcall(function() driftConn:Disconnect() end); return end
-TS:Create(introDie, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), BackgroundTransparency = 0.02, Rotation = 8}):Play()
+TS:Create(introDie, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), Rotation = 8}):Play()
 if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.55), {Transparency = 0.15}):Play() end
-for _, lbl in ipairs(introDiePips) do TS:Create(lbl, TweenInfo.new(0.55), {BackgroundTransparency = 0}):Play() end
+fadeDieIn(introDiePips, 0.55)
 task.wait(1.05); if not introActive then pcall(function() driftConn:Disconnect() end); return end
 TS:Create(lineTop, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
@@ -7694,14 +7898,13 @@ TS:Create(titleShadow, TweenInfo.new(0.36), {TextTransparency = 1}):Play()
 TS:Create(subtitle, TweenInfo.new(0.32), {TextTransparency = 1}):Play()
 TS:Create(lineTop, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
-TS:Create(introDie, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), BackgroundTransparency = 1, Rotation = 28}):Play()
-for _, lbl in ipairs(introDiePips) do TS:Create(lbl, TweenInfo.new(0.45), {BackgroundTransparency = 1}):Play() end
+TS:Create(introDie, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), Rotation = 28}):Play()
+fadeDieOut(introDiePips, 0.45)
 if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.45), {Transparency = 1}):Play() end
 TS:Create(darkBg, TweenInfo.new(0.75), {BackgroundTransparency = 1}):Play()
 for _, cd in ipairs(cards) do
-TS:Create(cd.frame, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play()
+fadeDieOut(cd.parts, 0.55)
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.55), {Transparency = 1}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play() end
 end
 Main.Visible = true
 MiniFrame.Visible = false

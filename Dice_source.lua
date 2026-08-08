@@ -231,7 +231,7 @@ if hrp.Position.Y<autoTPHeight then return end
 end
 hrp.CFrame=CFrame.new(hrp.Position.X,-7.00,hrp.Position.Z)
 *CFrame.Angles(0,select(2,hrp.CFrame:ToEulerAnglesYXZ()),0)
-hrp.AssemblyLinearVelocity=Vector3.zero
+diceStopMoveDrive(); hrp.AssemblyLinearVelocity=Vector3.zero
 end
 local function _clearAutoTPConnection()
 if autoTPConn then
@@ -931,6 +931,7 @@ ANTI_BYPASS_AIMBOT_SPEED = _G.DiceAntiBypassAimbotSpeed,
 ANTI_BYPASS_LAGGER_AIMBOT_SPEED = _G.DiceAntiBypassLaggerAimbotSpeed,
 ANTI_DESYNC_AIMBOT_SPEED = ANTI_DESYNC_AIMBOT_SPEED,
 autoSwingEnabled = autoSwingEnabled,
+physicsSpeed = _G.DicePhysicsSpeed ~= false,
 diceSwingRange = tonumber(_G.DiceSwingRange) or 14,
 diceSwingDelay = tonumber(_G.DiceSwingDelay) or 0.32,
 mirrorTPDownEnabled = mirrorTPDownEnabled,
@@ -1056,6 +1057,7 @@ _G.DiceAntiBypassLaggerAimbotSpeed = tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPE
 end
 ANTI_DESYNC_AIMBOT_SPEED = tonumber(data.ANTI_DESYNC_AIMBOT_SPEED) or ANTI_DESYNC_AIMBOT_SPEED or 58
 autoSwingEnabled = data.autoSwingEnabled == true
+_G.DicePhysicsSpeed = data.physicsSpeed ~= false
 _G.DiceSwingRange = math.clamp(tonumber(data.diceSwingRange) or 14, 4, 60)
 _G.DiceSwingDelay = math.clamp(tonumber(data.diceSwingDelay) or 0.32, 0.05, 3)
 mirrorTPDownEnabled = data.mirrorTPDownEnabled == true
@@ -2990,6 +2992,80 @@ return LAGGER_CARRY_SPEED
 end
 return NS
 end
+-- ═══════════════════════════════════════════════════════════════
+-- MOVEMENT DRIVE
+-- Speed is applied through a LinearVelocity constraint on the root
+-- instead of writing HumanoidRootPart.Velocity every frame. WalkSpeed
+-- is left at the game default and the movement resolves through the
+-- physics solver, so it replicates as ordinary motion rather than as a
+-- per-frame velocity override. Direction still comes from
+-- Humanoid.MoveDirection, so it follows normal input.
+-- ═══════════════════════════════════════════════════════════════
+_G.DicePhysicsSpeed = (_G.DicePhysicsSpeed ~= false)
+diceMoveDrive = {root = nil, lv = nil, att = nil, plane = false}
+function diceReleaseMoveDrive()
+if diceMoveDrive.lv then pcall(function() diceMoveDrive.lv:Destroy() end) end
+if diceMoveDrive.att then pcall(function() diceMoveDrive.att:Destroy() end) end
+diceMoveDrive.root, diceMoveDrive.lv, diceMoveDrive.att, diceMoveDrive.plane = nil, nil, nil, false
+end
+function diceEnsureMoveDrive(root)
+if diceMoveDrive.root == root and diceMoveDrive.lv and diceMoveDrive.lv.Parent then
+return diceMoveDrive
+end
+diceReleaseMoveDrive()
+if not root or not root.Parent then return diceMoveDrive end
+local okBuild = pcall(function()
+local att = Instance.new("Attachment")
+att.Name = "DiceMoveAttachment"
+att.Parent = root
+local lv = Instance.new("LinearVelocity")
+lv.Name = "DiceMoveDrive"
+lv.Attachment0 = att
+lv.RelativeTo = Enum.ActuatorRelativeTo.World
+lv.Enabled = false
+pcall(function() lv.MaxForce = math.huge end)
+pcall(function() lv.MaxAxesForce = Vector3.new(math.huge, 0, math.huge) end)
+-- Plane mode leaves the vertical axis to gravity. Not every client
+-- exposes it, so fall back to Vector mode and carry Y across by hand.
+local plane = pcall(function()
+lv.VelocityConstraintMode = Enum.LinearVelocityConstraintMode.Plane
+lv.PrimaryTangentAxis = Vector3.new(1, 0, 0)
+lv.SecondaryTangentAxis = Vector3.new(0, 0, 1)
+lv.PlaneVelocity = Vector2.new(0, 0)
+end)
+lv.Parent = root
+diceMoveDrive.root, diceMoveDrive.lv, diceMoveDrive.att, diceMoveDrive.plane = root, lv, att, plane
+end)
+if not okBuild then diceReleaseMoveDrive() end
+return diceMoveDrive
+end
+function diceStopMoveDrive()
+if diceMoveDrive.lv and diceMoveDrive.lv.Parent then
+pcall(function() diceMoveDrive.lv.Enabled = false end)
+end
+end
+-- Returns false when the constraint could not be used, so callers can
+-- fall back to the old direct velocity write.
+function diceApplyMoveDrive(root, dir, spd)
+if not root then return false end
+local d = diceEnsureMoveDrive(root)
+if not d.lv or not d.lv.Parent then return false end
+local flat = dir and Vector3.new(dir.X, 0, dir.Z) or Vector3.zero
+if flat.Magnitude <= 0.001 then
+d.lv.Enabled = false
+return true
+end
+flat = flat.Unit
+local ok = pcall(function()
+if d.plane then
+d.lv.PlaneVelocity = Vector2.new(flat.X * spd, flat.Z * spd)
+else
+d.lv.VectorVelocity = Vector3.new(flat.X * spd, root.AssemblyLinearVelocity.Y, flat.Z * spd)
+end
+d.lv.Enabled = true
+end)
+return ok
+end
 local refreshSpeedModeRows = nil
 local function setSpeedMode(mode)
 if mode ~= "Normal" and mode ~= "Carry" and mode ~= "Lagger" and mode ~= "Lagger Carry" then
@@ -3257,7 +3333,7 @@ local char=LP.Character
 local hum=char and char:FindFirstChildOfClass("Humanoid")
 local hrp=char and char:FindFirstChild("HumanoidRootPart")
 if hum then hum:Move(Vector3.zero,false) end
-if hrp then hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
+if hrp then diceStopMoveDrive(); hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
 end
 function _G.DiceStopAutoRight()
 local S=_G.DiceAutoPathState
@@ -3267,7 +3343,7 @@ local char=LP.Character
 local hum=char and char:FindFirstChildOfClass("Humanoid")
 local hrp=char and char:FindFirstChild("HumanoidRootPart")
 if hum then hum:Move(Vector3.zero,false) end
-if hrp then hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
+if hrp then diceStopMoveDrive(); hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
 end
 function _G.DiceSetAutoLeft(on, skipSave)
 if on and _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then
@@ -3328,18 +3404,18 @@ S.leftPhase=2
 local d=P.L2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 return
 end
 local d=P.L1-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 elseif S.leftPhase==2 then
 local tgt=Vector3.new(P.L2.X,hrp.Position.Y,P.L2.Z)
 if (tgt-hrp.Position).Magnitude<1 then
 hum:Move(Vector3.zero,false)
-hrp.AssemblyLinearVelocity=Vector3.zero
+diceStopMoveDrive(); hrp.AssemblyLinearVelocity=Vector3.zero
 autoLeftEnabled=false
 if S.leftConn then S.leftConn:Disconnect(); S.leftConn=nil end
 S.leftPhase=1
@@ -3353,7 +3429,7 @@ end
 local d=P.L2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 end
 end)
 end
@@ -3378,18 +3454,18 @@ S.rightPhase=2
 local d=P.R2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 return
 end
 local d=P.R1-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 elseif S.rightPhase==2 then
 local tgt=Vector3.new(P.R2.X,hrp.Position.Y,P.R2.Z)
 if (tgt-hrp.Position).Magnitude<1 then
 hum:Move(Vector3.zero,false)
-hrp.AssemblyLinearVelocity=Vector3.zero
+diceStopMoveDrive(); hrp.AssemblyLinearVelocity=Vector3.zero
 autoRightEnabled=false
 if S.rightConn then S.rightConn:Disconnect(); S.rightConn=nil end
 S.rightPhase=1
@@ -3403,7 +3479,7 @@ end
 local d=P.R2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd)
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
 end
 end)
 end
@@ -3542,6 +3618,7 @@ setupOverheadInfo(LP.Character)
 end)
 end
 LP.CharacterAdded:Connect(function(char)
+diceReleaseMoveDrive()
 task.wait(0.5)
 setupOverheadInfo(char)
 if ragdollCountdownEnabled then hookRagdollCountdown(char) end
@@ -3558,13 +3635,18 @@ or state == Enum.HumanoidStateType.Physics
 or state == Enum.HumanoidStateType.Ragdoll
 or state == Enum.HumanoidStateType.FallingDown then
 lastMoveDir = Vector3.new(0, 0, 0)
+diceStopMoveDrive()
 return
 end
 local md = hum.MoveDirection
 local spd = getCurrentSpeedValue()
 if not autoLeftEnabled and not autoRightEnabled and md.Magnitude > 0 then
 lastMoveDir = md
+if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, md, spd)) then
 hrp.Velocity = Vector3.new(md.X * spd, hrp.Velocity.Y, md.Z * spd)
+end
+elseif not autoLeftEnabled and not autoRightEnabled then
+diceStopMoveDrive()
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -4991,6 +5073,22 @@ if autoCarrySpeedEnabled ~= true and _G.AutoCarrySpeed and _G.AutoCarrySpeed.Dis
 _G.AutoCarrySpeed.Disable()
 end
 if setAutoCarrySpeedVisual then setAutoCarrySpeedVisual(autoCarrySpeedEnabled == true) end
+saveDiceConfig()
+end)
+end
+end
+do
+local row, setVisual = _G.DiceActionToggleRow(Movement, "Physics Speed (Anti Kick)", _G.DicePhysicsSpeed ~= false, 0)
+local lbl = row and row:FindFirstChild("Label")
+if lbl then lbl.TextSize = 11 end
+local btn = row and row:FindFirstChild("ToggleButton")
+if btn then
+btn.Activated:Connect(function()
+_G.DicePhysicsSpeed = not (_G.DicePhysicsSpeed ~= false)
+if setVisual then setVisual(_G.DicePhysicsSpeed ~= false) end
+-- Drop the constraint straight away when switching back to the
+-- old direct velocity write, or the two fight each other.
+if not _G.DicePhysicsSpeed then diceReleaseMoveDrive() end
 saveDiceConfig()
 end)
 end

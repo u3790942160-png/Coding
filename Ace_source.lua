@@ -3509,7 +3509,7 @@ Gui.Name = "AceDuelsAdaptReconstruct"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
-local FULL_MAIN_SIZE = UDim2.new(0, 520, 0, 470)
+local FULL_MAIN_SIZE = UDim2.new(0, 440, 0, 580)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0, 0.5)
@@ -3647,6 +3647,9 @@ applyBackground(currentBackground)
 -- BACKDROP — faded dice scattered behind the panels. Sits low in the
 -- stack so the translucent sidebar and content pane read over the top.
 -- ═══════════════════════════════════════════════════════════════
+-- Scoped so the panel's furniture does not eat main-chunk local
+-- slots; Luau caps a function at 200 of them and this file is close.
+do
 local DiceBackdrop = Instance.new("Frame")
 DiceBackdrop.Name = "DiceBackdrop"
 DiceBackdrop.BackgroundTransparency = 1
@@ -3685,6 +3688,8 @@ for _, setFace in ipairs(backdropDieSetters) do
 setFace(math.random(1, 6))
 end
 end
+end
+
 
 -- ═══════════════════════════════════════════════════════════════
 -- LIGHTNING STRIKES SYSTEM — detailed procedural lightning bolts
@@ -4128,29 +4133,53 @@ end
 -- ═══════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════
--- TOP BAR — inset title strip with the window controls on the right
+-- HEADER — title block on the left, player card on the right, and
+-- the window controls stacked beside it
 -- ═══════════════════════════════════════════════════════════════
+do
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
-TopBar.BackgroundTransparency = 0.12
+TopBar.BackgroundTransparency = 0.16
 TopBar.BorderSizePixel = 0
 TopBar.Position = UDim2.new(0, 10, 0, 10)
-TopBar.Size = UDim2.new(1, -20, 0, 42)
+TopBar.Size = UDim2.new(1, -20, 0, 86)
 TopBar.Active = true
 TopBar.ZIndex = 5
 TopBar.Parent = Main
-corner(TopBar, 10)
+corner(TopBar, 12)
 stroke(TopBar, COLORS.strokeSoft, 1, 0.5)
--- The title strip now covers the old bare-Main drag area, so make it a handle.
+-- The header covers the old bare-Main drag area, so make it a handle.
 makeDraggable(Main, TopBar)
-local TitleDieA, setTitleDieA = makeDie(TopBar, 18, 5, false)
+-- Hairline along the top edge of the header, the one bright line on
+-- the whole panel.
+local TopGlow = Instance.new("Frame")
+TopGlow.Name = "TopGlow"
+TopGlow.BackgroundColor3 = COLORS.accent
+TopGlow.BackgroundTransparency = 0.25
+TopGlow.BorderSizePixel = 0
+TopGlow.AnchorPoint = Vector2.new(0.5, 0)
+TopGlow.Position = UDim2.new(0.5, 0, 0, 0)
+TopGlow.Size = UDim2.new(0.55, 0, 0, 2)
+TopGlow.ZIndex = 7
+TopGlow.Parent = TopBar
+corner(TopGlow, 1)
+do
+local fade = Instance.new("UIGradient")
+fade.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.5, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+fade.Parent = TopGlow
+end
+local TitleDieA, setTitleDieA = makeDie(TopBar, 16, 5, false)
 TitleDieA.Name = "TitleDieA"
-TitleDieA.Position = UDim2.new(0, 14, 0.5, -9)
+TitleDieA.Position = UDim2.new(0, 14, 0, 18)
 TitleDieA.Rotation = -9
-local TitleDieB, setTitleDieB = makeDie(TopBar, 18, 2, true)
+local TitleDieB, setTitleDieB = makeDie(TopBar, 16, 2, true)
 TitleDieB.Name = "TitleDieB"
-TitleDieB.Position = UDim2.new(0, 34, 0.5, -9)
+TitleDieB.Position = UDim2.new(0, 32, 0, 18)
 TitleDieB.Rotation = 8
 -- Re-rolled whenever you change tab, so the pair is never dead weight.
 function rollTitleDice()
@@ -4165,41 +4194,133 @@ end
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(0, 44, 1, 0)
-Title.Position = UDim2.new(0, 60, 0, 0)
+Title.Size = UDim2.new(0, 48, 0, 24)
+Title.Position = UDim2.new(0, 56, 0, 15)
 Title.Text = "ACE"
 Title.TextColor3 = COLORS.white
 Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 17
+Title.TextSize = 19
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 6
 Title.Parent = TopBar
 local TitleSub = Instance.new("TextLabel")
 TitleSub.Name = "TitleSub"
 TitleSub.BackgroundTransparency = 1
-TitleSub.Size = UDim2.new(0, 90, 1, 0)
-TitleSub.Position = UDim2.new(0, 104, 0, 0)
+TitleSub.Size = UDim2.new(0, 90, 0, 24)
+TitleSub.Position = UDim2.new(0, 104, 0, 15)
 TitleSub.Text = "DUELS"
 TitleSub.TextColor3 = COLORS.accentDim
 TitleSub.TextStrokeTransparency = 0.7
 TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 TitleSub.Font = Enum.Font.GothamBlack
-TitleSub.TextSize = 17
+TitleSub.TextSize = 19
 TitleSub.TextXAlignment = Enum.TextXAlignment.Left
 TitleSub.ZIndex = 6
 TitleSub.Parent = TopBar
-local Close = Instance.new("TextButton")
+local Discord = Instance.new("TextLabel")
+Discord.Name = "Discord"
+Discord.BackgroundTransparency = 1
+Discord.Position = UDim2.new(0, 15, 0, 42)
+Discord.Size = UDim2.new(0, 170, 0, 14)
+Discord.Text = "discord.gg/aceduels"
+Discord.TextColor3 = COLORS.textDim
+Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+Discord.TextStrokeTransparency = 0.45
+Discord.Font = Enum.Font.GothamSemibold
+Discord.TextSize = 11
+Discord.TextXAlignment = Enum.TextXAlignment.Left
+Discord.ZIndex = 6
+Discord.Parent = TopBar
+-- ═══════════════════════════════════════════════════════════════
+-- PLAYER CARD — headshot, display name, @handle and a live dot
+-- ═══════════════════════════════════════════════════════════════
+local PlayerCard = Instance.new("Frame")
+PlayerCard.Name = "PlayerCard"
+PlayerCard.BackgroundColor3 = COLORS.row2
+PlayerCard.BackgroundTransparency = 0.2
+PlayerCard.BorderSizePixel = 0
+PlayerCard.AnchorPoint = Vector2.new(1, 0.5)
+PlayerCard.Position = UDim2.new(1, -46, 0.5, 0)
+PlayerCard.Size = UDim2.new(0, 152, 0, 58)
+PlayerCard.ZIndex = 6
+PlayerCard.Parent = TopBar
+corner(PlayerCard, 11)
+stroke(PlayerCard, COLORS.strokeSoft, 1, 0.42)
+local Avatar = Instance.new("ImageLabel")
+Avatar.Name = "Avatar"
+Avatar.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+Avatar.BackgroundTransparency = 0.15
+Avatar.BorderSizePixel = 0
+-- rbxthumb resolves on the client without the yielding thumbnail call.
+Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LP.UserId) .. "&w=150&h=150"
+Avatar.ScaleType = Enum.ScaleType.Fit
+Avatar.Position = UDim2.new(0, 7, 0.5, -19)
+Avatar.Size = UDim2.new(0, 38, 0, 38)
+Avatar.ZIndex = 7
+Avatar.Parent = PlayerCard
+corner(Avatar, 999)
+stroke(Avatar, COLORS.accent, 1.2, 0.35)
+local OnlineDot = Instance.new("Frame")
+OnlineDot.Name = "OnlineDot"
+OnlineDot.BackgroundColor3 = COLORS.accent
+OnlineDot.BorderSizePixel = 0
+OnlineDot.Position = UDim2.new(0, 36, 0.5, 8)
+OnlineDot.Size = UDim2.new(0, 9, 0, 9)
+OnlineDot.ZIndex = 8
+OnlineDot.Parent = PlayerCard
+corner(OnlineDot, 999)
+stroke(OnlineDot, Color3.fromRGB(12, 12, 14), 1.5, 0)
+local PlayerName = Instance.new("TextLabel")
+PlayerName.Name = "PlayerName"
+PlayerName.BackgroundTransparency = 1
+PlayerName.Position = UDim2.new(0, 52, 0.5, -18)
+PlayerName.Size = UDim2.new(1, -60, 0, 15)
+PlayerName.Text = tostring(LP.DisplayName)
+PlayerName.TextColor3 = COLORS.white
+PlayerName.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PlayerName.TextStrokeTransparency = 0.4
+PlayerName.Font = Enum.Font.GothamBold
+PlayerName.TextSize = 11
+PlayerName.TextXAlignment = Enum.TextXAlignment.Left
+PlayerName.TextTruncate = Enum.TextTruncate.AtEnd
+PlayerName.ZIndex = 7
+PlayerName.Parent = PlayerCard
+local PlayerHandle = Instance.new("TextLabel")
+PlayerHandle.Name = "PlayerHandle"
+PlayerHandle.BackgroundTransparency = 1
+PlayerHandle.Position = UDim2.new(0, 52, 0.5, -2)
+PlayerHandle.Size = UDim2.new(1, -60, 0, 13)
+PlayerHandle.Text = "@" .. tostring(LP.Name)
+PlayerHandle.TextColor3 = COLORS.textDim
+PlayerHandle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PlayerHandle.TextStrokeTransparency = 0.5
+PlayerHandle.Font = Enum.Font.GothamSemibold
+PlayerHandle.TextSize = 9
+PlayerHandle.TextXAlignment = Enum.TextXAlignment.Left
+PlayerHandle.TextTruncate = Enum.TextTruncate.AtEnd
+PlayerHandle.ZIndex = 7
+PlayerHandle.Parent = PlayerCard
+local CardUnderline = Instance.new("Frame")
+CardUnderline.Name = "CardUnderline"
+CardUnderline.BackgroundColor3 = COLORS.accent
+CardUnderline.BackgroundTransparency = 0.45
+CardUnderline.BorderSizePixel = 0
+CardUnderline.Position = UDim2.new(0, 52, 0.5, 14)
+CardUnderline.Size = UDim2.new(1, -66, 0, 1)
+CardUnderline.ZIndex = 7
+CardUnderline.Parent = PlayerCard
+Close = Instance.new("TextButton")
 Close.Name = "Close"
 Close.BackgroundColor3 = Color3.fromRGB(246, 246, 250)
 Close.BackgroundTransparency = 0.04
 Close.Text = "–"
 Close.TextColor3 = Color3.fromRGB(12, 12, 14)
-Close.TextSize = 20
+Close.TextSize = 18
 Close.Font = Enum.Font.GothamBold
-Close.Size = UDim2.new(0, 30, 0, 26)
-Close.Position = UDim2.new(1, -38, 0.5, -13)
+Close.Size = UDim2.new(0, 30, 0, 24)
+Close.Position = UDim2.new(1, -38, 0.5, -26)
 Close.AutoButtonColor = false
 Close.ZIndex = 6
 Close.Parent = TopBar
@@ -4212,13 +4333,14 @@ AceLockTopButton.BackgroundTransparency = 0.28
 AceLockTopButton.TextColor3 = COLORS.white
 AceLockTopButton.TextSize = 8
 AceLockTopButton.Font = Enum.Font.GothamBlack
-AceLockTopButton.Size = UDim2.new(0, 46, 0, 26)
-AceLockTopButton.Position = UDim2.new(1, -90, 0.5, -13)
+AceLockTopButton.Size = UDim2.new(0, 30, 0, 24)
+AceLockTopButton.Position = UDim2.new(1, -38, 0.5, 2)
 AceLockTopButton.AutoButtonColor = false
 AceLockTopButton.ZIndex = 6
 AceLockTopButton.Parent = TopBar
 corner(AceLockTopButton, 7)
 stroke(AceLockTopButton, COLORS.stroke, 1, 0.35)
+end
 function AceUpdateGuiLockVisual()
 if AceLockTopButton then
 AceLockTopButton.Text = (_G.AceGuiLocked == true) and "UNLOCK" or "LOCK"
@@ -4238,17 +4360,18 @@ saveAceConfig()
 end)
 AceUpdateGuiLockVisual()
 -- ═══════════════════════════════════════════════════════════════
--- SIDEBAR — vertical navigation rail with the credit card pinned
--- to the bottom, and the scrolling content pane beside it
+-- SIDEBAR — narrow navigation rail: a die badge per tab with its
+-- name beside it, and the scrolling content pane alongside
 -- ═══════════════════════════════════════════════════════════════
-local SIDEBAR_WIDTH = 140
+do
+local SIDEBAR_WIDTH = 108
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
 Sidebar.BackgroundTransparency = 0.34
 Sidebar.BorderSizePixel = 0
-Sidebar.Position = UDim2.new(0, 10, 0, 60)
-Sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -70)
+Sidebar.Position = UDim2.new(0, 10, 0, 104)
+Sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -114)
 Sidebar.ZIndex = 3
 Sidebar.Parent = Main
 corner(Sidebar, 12)
@@ -4256,22 +4379,22 @@ stroke(Sidebar, COLORS.strokeSoft, 1, 0.5)
 local NavCaption = Instance.new("TextLabel")
 NavCaption.Name = "NavCaption"
 NavCaption.BackgroundTransparency = 1
-NavCaption.Position = UDim2.new(0, 13, 0, 10)
-NavCaption.Size = UDim2.new(1, -26, 0, 12)
+NavCaption.Position = UDim2.new(0, 11, 0, 9)
+NavCaption.Size = UDim2.new(1, -22, 0, 12)
 NavCaption.Text = "NAVIGATION"
 NavCaption.TextColor3 = COLORS.textDim
 NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 NavCaption.TextStrokeTransparency = 0.5
 NavCaption.Font = Enum.Font.GothamBold
-NavCaption.TextSize = 9
+NavCaption.TextSize = 8
 NavCaption.TextXAlignment = Enum.TextXAlignment.Left
 NavCaption.ZIndex = 4
 NavCaption.Parent = Sidebar
-local Tabs = Instance.new("Frame")
+Tabs = Instance.new("Frame")
 Tabs.Name = "Tabs"
 Tabs.BackgroundTransparency = 1
-Tabs.Position = UDim2.new(0, 9, 0, 30)
-Tabs.Size = UDim2.new(1, -18, 1, -104)
+Tabs.Position = UDim2.new(0, 8, 0, 26)
+Tabs.Size = UDim2.new(1, -16, 1, -60)
 Tabs.ZIndex = 3
 Tabs.Parent = Sidebar
 local TabLayout = Instance.new("UIListLayout")
@@ -4280,50 +4403,22 @@ TabLayout.Padding = UDim.new(0, 6)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TabLayout.Parent = Tabs
-local ProfileCard = Instance.new("Frame")
-ProfileCard.Name = "ProfileCard"
-ProfileCard.BackgroundColor3 = COLORS.row2
-ProfileCard.BackgroundTransparency = 0.22
-ProfileCard.BorderSizePixel = 0
-ProfileCard.AnchorPoint = Vector2.new(0.5, 1)
-ProfileCard.Position = UDim2.new(0.5, 0, 1, -9)
-ProfileCard.Size = UDim2.new(1, -18, 0, 54)
-ProfileCard.ZIndex = 4
-ProfileCard.Parent = Sidebar
-corner(ProfileCard, 10)
-stroke(ProfileCard, COLORS.strokeSoft, 1, 0.42)
-local LogoDie = makeDie(ProfileCard, 32, 6, false)
-LogoDie.Name = "LogoDie"
-LogoDie.Position = UDim2.new(0, 8, 0.5, -16)
-LogoDie.Rotation = -6
+-- Credit strip along the foot of the rail.
 local MadeBy = Instance.new("TextLabel")
 MadeBy.Name = "MadeBy"
 MadeBy.BackgroundTransparency = 1
-MadeBy.Position = UDim2.new(0, 46, 0.5, -14)
-MadeBy.Size = UDim2.new(1, -52, 0, 14)
+MadeBy.AnchorPoint = Vector2.new(0.5, 1)
+MadeBy.Position = UDim2.new(0.5, 0, 1, -10)
+MadeBy.Size = UDim2.new(1, -16, 0, 12)
 MadeBy.Text = "ACE DUELS"
-MadeBy.TextColor3 = COLORS.white
+MadeBy.TextColor3 = COLORS.textDim
 MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-MadeBy.TextStrokeTransparency = 0.35
+MadeBy.TextStrokeTransparency = 0.45
 MadeBy.Font = Enum.Font.GothamBold
-MadeBy.TextSize = 10
-MadeBy.TextXAlignment = Enum.TextXAlignment.Left
-MadeBy.ZIndex = 5
-MadeBy.Parent = ProfileCard
-local Discord = Instance.new("TextLabel")
-Discord.Name = "Discord"
-Discord.BackgroundTransparency = 1
-Discord.Position = UDim2.new(0, 46, 0.5, 1)
-Discord.Size = UDim2.new(1, -52, 0, 13)
-Discord.Text = "discord.gg/aceduels"
-Discord.TextColor3 = Color3.fromRGB(166, 166, 172)
-Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Discord.TextStrokeTransparency = 0.45
-Discord.Font = Enum.Font.GothamSemibold
-Discord.TextSize = 8
-Discord.TextXAlignment = Enum.TextXAlignment.Left
-Discord.ZIndex = 5
-Discord.Parent = ProfileCard
+MadeBy.TextSize = 8
+MadeBy.TextXAlignment = Enum.TextXAlignment.Center
+MadeBy.ZIndex = 4
+MadeBy.Parent = Sidebar
 -- Content pane: the rows need a ground of their own, otherwise the
 -- backdrop dice read straight through the gaps between them.
 local ContentPane = Instance.new("Frame")
@@ -4331,33 +4426,62 @@ ContentPane.Name = "ContentPane"
 ContentPane.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
 ContentPane.BackgroundTransparency = 0.34
 ContentPane.BorderSizePixel = 0
-ContentPane.Position = UDim2.new(0, SIDEBAR_WIDTH + 18, 0, 60)
-ContentPane.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 28), 1, -70)
+ContentPane.Position = UDim2.new(0, SIDEBAR_WIDTH + 18, 0, 104)
+ContentPane.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 28), 1, -114)
 ContentPane.ZIndex = 3
 ContentPane.Parent = Main
 corner(ContentPane, 12)
 stroke(ContentPane, COLORS.strokeSoft, 1, 0.5)
-local PageTitle = Instance.new("TextLabel")
+-- Page heading: accent bar, the tab's name, and a die that re-rolls
+-- with it — the panel's answer to the reference's weather glyph.
+local PageAccent = Instance.new("Frame")
+PageAccent.Name = "PageAccent"
+PageAccent.BackgroundColor3 = COLORS.accent
+PageAccent.BackgroundTransparency = 0.15
+PageAccent.BorderSizePixel = 0
+PageAccent.Position = UDim2.new(0, 12, 0, 14)
+PageAccent.Size = UDim2.new(0, 3, 0, 16)
+PageAccent.ZIndex = 6
+PageAccent.Parent = ContentPane
+corner(PageAccent, 2)
+PageTitle = Instance.new("TextLabel")
 PageTitle.Name = "PageTitle"
 PageTitle.BackgroundTransparency = 1
-PageTitle.Position = UDim2.new(0, SIDEBAR_WIDTH + 30, 0, 70)
-PageTitle.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 40), 0, 22)
-PageTitle.Text = "MOVEMENT"
+PageTitle.Position = UDim2.new(0, 22, 0, 13)
+PageTitle.Size = UDim2.new(1, -60, 0, 18)
+PageTitle.Text = "MOVEMENT CONFIGURATION"
 PageTitle.TextColor3 = COLORS.white
 PageTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 PageTitle.TextStrokeTransparency = 0.4
 PageTitle.Font = Enum.Font.GothamBlack
-PageTitle.TextSize = 16
+PageTitle.TextSize = 12
 PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+PageTitle.TextTruncate = Enum.TextTruncate.AtEnd
 PageTitle.ZIndex = 6
-PageTitle.Parent = Main
-local Content = Instance.new("Frame")
+PageTitle.Parent = ContentPane
+local PageDie
+PageDie, setPageDieFace = makeDie(ContentPane, 22, 6, false)
+PageDie.Name = "PageDie"
+PageDie.AnchorPoint = Vector2.new(1, 0)
+PageDie.Position = UDim2.new(1, -12, 0, 11)
+PageDie.Rotation = 10
+local PageDivider = Instance.new("Frame")
+PageDivider.Name = "PageDivider"
+PageDivider.BackgroundColor3 = COLORS.stroke
+PageDivider.BackgroundTransparency = 0.5
+PageDivider.BorderSizePixel = 0
+PageDivider.Position = UDim2.new(0, 12, 0, 40)
+PageDivider.Size = UDim2.new(1, -24, 0, 1)
+PageDivider.ZIndex = 6
+PageDivider.Parent = ContentPane
+Content = Instance.new("Frame")
 Content.Name = "Content"
 Content.BackgroundTransparency = 1
-Content.Position = UDim2.new(0, SIDEBAR_WIDTH + 28, 0, 98)
-Content.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 48), 1, -108)
+Content.Position = UDim2.new(0, SIDEBAR_WIDTH + 28, 0, 152)
+Content.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 46), 1, -164)
 Content.ZIndex = 3
 Content.Parent = Main
+end
 local pages = {}
 local tabButtons = {}
 local tabNames = {"MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
@@ -4388,7 +4512,8 @@ activeTab = name
 for pageName, page in pairs(pages) do
 page.Visible = pageName == name
 end
-if PageTitle then PageTitle.Text = name end
+if PageTitle then PageTitle.Text = name .. " CONFIGURATION" end
+if setPageDieFace then setPageDieFace(math.random(1, 6)) end
 if rollTitleDice then rollTitleDice() end
 if rollBackdropDice then rollBackdropDice() end
 for tabName, btn in pairs(tabButtons) do
@@ -4404,8 +4529,17 @@ local accent = btn:FindFirstChild("Accent")
 if accent then
 tween(accent, {
 BackgroundTransparency = on and 0 or 1,
-Size = on and UDim2.new(0, 3, 0, 22) or UDim2.new(0, 3, 0, 0)
+Size = on and UDim2.new(0, 3, 0, 24) or UDim2.new(0, 3, 0, 0)
 })
+end
+local badge = btn:FindFirstChild("Badge")
+if badge then
+tween(badge, {BackgroundTransparency = on and 0.05 or 0.2})
+local bst = badge:FindFirstChildOfClass("UIStroke")
+if bst then
+bst.Color = on and COLORS.accent or COLORS.stroke
+bst.Transparency = on and 0.2 or 0.5
+end
 end
 end
 end
@@ -4413,7 +4547,7 @@ for i, name in ipairs(tabNames) do
 addPage(name)
 local btn = Instance.new("TextButton")
 btn.Name = name
-btn.Size = UDim2.new(1, 0, 0, 48)
+btn.Size = UDim2.new(1, 0, 0, 52)
 btn.BackgroundColor3 = Color3.fromRGB(22, 22, 25)
 btn.BackgroundTransparency = 0.68
 btn.BorderSizePixel = 0
@@ -4421,21 +4555,34 @@ btn.Text = name
 btn.TextColor3 = COLORS.textDim
 btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 btn.TextStrokeTransparency = 0.35
-btn.TextSize = 10
+btn.TextSize = 8
 btn.Font = Enum.Font.GothamBlack
 btn.TextXAlignment = Enum.TextXAlignment.Left
+btn.TextTruncate = Enum.TextTruncate.AtEnd
 btn.AutoButtonColor = false
 btn.ZIndex = 4
 btn.Parent = Tabs
 corner(btn, 9)
 stroke(btn, COLORS.stroke, 1, 0.6)
 local pad = Instance.new("UIPadding")
-pad.PaddingLeft = UDim.new(0, 46)
+pad.PaddingLeft = UDim.new(0, 38)
 pad.Parent = btn
--- Each tab carries its own face, one through five.
-local tabDie = makeDie(btn, 22, i, false)
+-- Each tab carries its own face, one through five, in a badge tile
+-- the way the reference rail carries two-letter codes.
+local badge = Instance.new("Frame")
+badge.Name = "Badge"
+badge.BackgroundColor3 = COLORS.accentSoft
+badge.BackgroundTransparency = 0.2
+badge.BorderSizePixel = 0
+badge.Position = UDim2.new(0, -30, 0.5, -13)
+badge.Size = UDim2.new(0, 26, 0, 26)
+badge.ZIndex = 5
+badge.Parent = btn
+corner(badge, 8)
+stroke(badge, COLORS.stroke, 1, 0.5)
+local tabDie = makeDie(badge, 16, i, false)
 tabDie.Name = "TabDie"
-tabDie.Position = UDim2.new(0, -34, 0.5, -11)
+tabDie.Position = UDim2.new(0.5, -8, 0.5, -8)
 tabDie.Rotation = (i % 2 == 0) and 7 or -7
 local accent = Instance.new("Frame")
 accent.Name = "Accent"
@@ -4443,9 +4590,9 @@ accent.BackgroundColor3 = COLORS.accent
 accent.BackgroundTransparency = 1
 accent.BorderSizePixel = 0
 accent.AnchorPoint = Vector2.new(0, 0.5)
-accent.Position = UDim2.new(0, -41, 0.5, 0)
+accent.Position = UDim2.new(0, -36, 0.5, 0)
 accent.Size = UDim2.new(0, 3, 0, 0)
-accent.ZIndex = 5
+accent.ZIndex = 7
 accent.Parent = btn
 corner(accent, 2)
 tabButtons[name] = btn
@@ -4515,8 +4662,10 @@ label.TextStrokeTransparency = 0.25
 label.TextSize = 12
 label.Font = Enum.Font.GothamSemibold
 label.TextXAlignment = Enum.TextXAlignment.Left
+label.TextTruncate = Enum.TextTruncate.AtEnd
 label.Position = UDim2.new(0, 12, 0, 0)
-label.Size = UDim2.new(1, -132, 1, 0)
+-- Leaves room for the widest right-hand control (the value pill).
+label.Size = UDim2.new(1, -90, 1, 0)
 label.ZIndex = 5
 label.Parent = row
 row.MouseEnter:Connect(function()
@@ -6292,7 +6441,7 @@ row.Size = UDim2.new(1, -4, 0, 42)
 row.ClipsDescendants = true
 local label = row:FindFirstChild("Label")
 if label then
-label.Size = UDim2.new(0, 92, 1, 0)
+label.Size = UDim2.new(0, 84, 1, 0)
 label.TextSize = 11
 end
 local left = Instance.new("TextButton")

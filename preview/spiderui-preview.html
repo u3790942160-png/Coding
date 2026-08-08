@@ -1,0 +1,863 @@
+<title>SpiderUI — interface preview</title>
+<style>
+	/* Committed to a single dark world: this page mocks a game overlay, so the
+	   ground is painted explicitly and never borrows the host theme. */
+	:root {
+		--page:        #08080d;
+		--page-raised: #0d0e15;
+		--rule:        #1c1e2a;
+		--ink:         #e8eaf4;
+		--ink-dim:     #878ca6;
+		--ink-faint:   #565a70;
+		--hot:         #e2202a;
+
+		--mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+		--geo:  "Avenir Next", Futura, "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+
+		/* Live theme tokens — rewritten by the suit switcher. */
+		--backdrop:   #070916;
+		--surface:    #0c0f22;
+		--surfaceAlt: #10142d;
+		--card:       #151a38;
+		--cardHover:  #1e254c;
+		--stroke:     #343e74;
+		--strokeSoft: #262d58;
+		--accent:     #e2202a;
+		--accentDeep: #8a0c16;
+		--secondary:  #2b5cdb;
+		--web:        #c6d6ff;
+		--text:       #eef2ff;
+		--subText:    #8591be;
+		--muted:      #58628a;
+	}
+
+	* { box-sizing: border-box; }
+
+	body {
+		margin: 0;
+		background: var(--page);
+		color: var(--ink);
+		font-family: var(--mono);
+		font-size: 13px;
+		line-height: 1.6;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	.wrap {
+		max-width: 860px;
+		margin: 0 auto;
+		padding: 48px 20px 80px;
+		display: flex;
+		flex-direction: column;
+		gap: 40px;
+	}
+
+	/* ---------------------------------------------------------- page head */
+	.masthead { display: flex; flex-direction: column; gap: 10px; }
+
+	.eyebrow {
+		font-size: 10px;
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: var(--ink-faint);
+	}
+
+	h1 {
+		margin: 0;
+		font-family: var(--geo);
+		font-size: 30px;
+		font-weight: 800;
+		letter-spacing: -0.01em;
+		text-wrap: balance;
+	}
+	h1 em { font-style: normal; color: var(--hot); }
+
+	.lede {
+		margin: 0;
+		max-width: 62ch;
+		color: var(--ink-dim);
+	}
+
+	/* ------------------------------------------------------------- stage */
+	.stage {
+		background:
+			radial-gradient(120% 90% at 70% 0%, #14152400 0%, transparent 70%),
+			var(--page-raised);
+		border: 1px solid var(--rule);
+		border-radius: 14px;
+		padding: 32px 20px;
+		overflow-x: auto;
+	}
+
+	.stage-inner { width: 720px; margin: 0 auto; }
+
+	/* --------------------------------------------------- the mock itself */
+	/* Every offset below mirrors SpiderUI.lua 1:1 so the preview verifies the
+	   real geometry rather than approximating it. */
+	.ui {
+		position: relative;
+		width: 720px;
+		height: 470px;
+		border-radius: 16px;
+		background: linear-gradient(115deg, var(--surface) 0%, var(--backdrop) 55%, var(--backdrop) 100%);
+		box-shadow: inset 0 0 0 1.4px color-mix(in srgb, var(--stroke) 65%, transparent),
+			0 30px 70px -20px #000c;
+		overflow: hidden;
+		font-family: var(--geo);
+		user-select: none;
+	}
+
+	.ui svg.web { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+	.bloom {
+		position: absolute; inset: 0 0 auto 0; height: 160px;
+		background: linear-gradient(to bottom,
+			color-mix(in srgb, var(--accent) 12%, transparent), transparent);
+		pointer-events: none;
+	}
+
+	.topbar { position: absolute; inset: 0 0 auto 0; height: 54px; }
+
+	.emblem { position: absolute; left: 18px; top: 12px; width: 30px; height: 30px; }
+
+	.title {
+		position: absolute; left: 58px; top: 12px; height: 18px;
+		display: flex; gap: 8px; align-items: center;
+		font-size: 16px; font-weight: 800; letter-spacing: 0.04em; color: var(--text);
+	}
+	.title span { color: var(--accent); }
+
+	.subtitle {
+		position: absolute; left: 58px; top: 30px;
+		font-size: 11px; color: var(--muted); letter-spacing: 0.02em;
+	}
+
+	.winbtn {
+		position: absolute; top: 13px; width: 28px; height: 28px; border-radius: 8px;
+		background: var(--card); border: 1px solid color-mix(in srgb, var(--strokeSoft) 40%, transparent);
+		color: var(--subText); font-family: var(--geo); font-size: 13px; font-weight: 700;
+		display: grid; place-items: center; cursor: pointer;
+		transition: background .16s, color .16s;
+	}
+	.winbtn:hover { color: var(--text); }
+	.winbtn.close:hover { background: var(--accent); }
+	.winbtn.min:hover { background: var(--secondary); }
+	.winbtn.close { right: 16px; }
+	.winbtn.min { right: 50px; }
+
+	.topdivider {
+		position: absolute; left: 16px; top: 54px; width: calc(100% - 32px); height: 1px;
+		background: linear-gradient(to right, transparent, color-mix(in srgb, var(--accent) 65%, transparent), transparent);
+	}
+
+	/* ----------------------------------------------------------- sidebar */
+	.sidebar {
+		position: absolute; left: 14px; top: 66px; width: 178px; height: 390px;
+		background: color-mix(in srgb, var(--surface) 75%, transparent);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 30%, transparent);
+		border-radius: 12px;
+	}
+
+	.navlabel {
+		position: absolute; left: 16px; top: 12px;
+		font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--muted);
+	}
+
+	.tabwrap { position: absolute; left: 12px; top: 34px; width: 154px; height: 276px; }
+
+	.tabs { display: flex; flex-direction: column; gap: 6px; }
+
+	.tab {
+		position: relative; height: 42px; border-radius: 9px; border: 0;
+		background: color-mix(in srgb, var(--card) 65%, transparent);
+		color: var(--subText); font-family: var(--geo);
+		font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+		text-align: left; padding-left: 18px; cursor: pointer; width: 100%;
+		transition: background .18s, color .18s;
+	}
+	.tab:hover { color: var(--text); }
+	.tab[aria-selected="true"] { background: var(--card); color: var(--text); }
+	.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+	.indicator {
+		position: absolute; left: 0; width: 3px; height: 22px; border-radius: 2px;
+		background: var(--accent);
+		transition: transform .45s cubic-bezier(.2,1.4,.4,1);
+	}
+
+	.footer {
+		position: absolute; left: 12px; bottom: 12px; width: 154px; height: 60px;
+		border-radius: 10px; background: var(--card);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 50%, transparent);
+	}
+	.avatar {
+		position: absolute; left: 10px; top: 11px; width: 38px; height: 38px; border-radius: 50%;
+		background: var(--surfaceAlt); border: 1.4px solid var(--accent);
+		display: grid; place-items: center;
+	}
+	.footer-name {
+		position: absolute; left: 56px; top: 12px; font-size: 12px; font-weight: 700; color: var(--text);
+	}
+	.footer-sub {
+		position: absolute; left: 56px; top: 30px; font-size: 10px; color: var(--muted);
+	}
+
+	/* ----------------------------------------------------------- content */
+	.content { position: absolute; left: 204px; top: 66px; width: 502px; height: 390px; }
+
+	.pagehead {
+		position: absolute; left: 2px; top: 0; font-size: 18px; font-weight: 800;
+		letter-spacing: 0.06em; color: var(--text);
+	}
+	.pagesub { position: absolute; left: 2px; top: 22px; font-size: 11px; color: var(--muted); }
+
+	.scroll {
+		position: absolute; top: 46px; left: 0; width: 100%; height: 344px;
+		overflow-y: auto; padding: 4px 12px 20px 2px;
+		display: flex; flex-direction: column; gap: 8px;
+		scrollbar-width: thin; scrollbar-color: var(--accent) transparent;
+	}
+	.scroll::-webkit-scrollbar { width: 3px; }
+	.scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+	.section { height: 34px; position: relative; flex: none; }
+	.section span {
+		position: absolute; left: 4px; top: 4px;
+		font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--subText);
+	}
+	.section::after {
+		content: ""; position: absolute; left: 4px; top: 28px; right: 4px; height: 1px;
+		background: linear-gradient(to right,
+			color-mix(in srgb, var(--accent) 75%, transparent),
+			color-mix(in srgb, var(--accent) 25%, transparent) 40%, transparent);
+	}
+
+	.card {
+		position: relative; flex: none; border-radius: 10px;
+		background: var(--card);
+		border: 1px solid color-mix(in srgb, var(--strokeSoft) 45%, transparent);
+		transition: background .16s, border-color .16s;
+	}
+	.card::before {
+		content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px;
+		background: var(--accent); opacity: 0; transition: opacity .16s;
+	}
+	.card:hover { background: var(--cardHover); border-color: color-mix(in srgb, var(--strokeSoft) 80%, transparent); }
+	.card:hover::before { opacity: 1; }
+
+	.card .label {
+		position: absolute; left: 16px; font-size: 14px; color: var(--text);
+	}
+	.card .desc { position: absolute; left: 16px; top: 27px; font-size: 11px; color: var(--subText); }
+
+	.row-toggle { height: 46px; }
+	.row-toggle.has-desc { height: 52px; }
+	.row-toggle .label { top: 50%; transform: translateY(-50%); }
+	.row-toggle.has-desc .label { top: 9px; transform: none; }
+
+	.switch {
+		position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+		width: 46px; height: 24px; border-radius: 12px; cursor: pointer;
+		background: var(--surfaceAlt);
+		border: 1px solid color-mix(in srgb, var(--stroke) 60%, transparent);
+		transition: border-color .28s;
+	}
+	.switch .fill {
+		position: absolute; inset: 0; border-radius: 12px;
+		background: linear-gradient(25deg, var(--accent), var(--accentDeep));
+		opacity: 0; transition: opacity .28s;
+	}
+	.switch .knob {
+		position: absolute; top: 50%; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+		background: var(--text); transform: translateY(-50%);
+		transition: left .45s cubic-bezier(.2,1.4,.4,1);
+	}
+	.switch[aria-checked="true"] { border-color: var(--accent); }
+	.switch[aria-checked="true"] .fill { opacity: 1; }
+	.switch[aria-checked="true"] .knob { left: 25px; }
+	.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+	.row-slider { height: 56px; }
+	.row-slider .label { top: 8px; }
+
+	.pill {
+		position: absolute; right: 14px; top: 6px; width: 62px; height: 22px; border-radius: 6px;
+		background: var(--accentDeep); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+		display: grid; place-items: center;
+		font-size: 12px; font-weight: 700; color: var(--text);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.track {
+		position: absolute; left: 16px; top: 38px; right: 16px; height: 6px; border-radius: 3px;
+		background: var(--surfaceAlt); cursor: pointer;
+	}
+	.track .fill {
+		position: absolute; inset: 0 auto 0 0; border-radius: 3px;
+		background: linear-gradient(to right, var(--secondary), var(--accent));
+	}
+	.track .grip {
+		position: absolute; top: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+		background: var(--text); border: 2px solid var(--accent); transform: translateY(-50%);
+	}
+
+	.row-drop { height: 46px; }
+	.row-drop .label { top: 50%; transform: translateY(-50%); }
+	.combo {
+		position: absolute; right: 12px; top: 10px; width: 132px; height: 26px; border-radius: 7px;
+		background: var(--surfaceAlt); border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
+		color: var(--text); font-family: var(--geo); font-size: 12px;
+		text-align: left; padding-left: 10px; cursor: pointer;
+	}
+	.combo::after {
+		content: "v"; position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+		color: var(--accent); font-weight: 700; font-size: 11px;
+	}
+
+	.row-btn { height: 46px; }
+	.row-btn .label { top: 50%; transform: translateY(-50%); }
+	.action {
+		position: absolute; right: 12px; top: 9px; width: 96px; height: 28px; border-radius: 7px;
+		background: linear-gradient(to bottom, var(--accent), var(--accentDeep));
+		border: 0; color: #fff; font-family: var(--geo);
+		font-size: 12px; font-weight: 700; letter-spacing: 0.06em; cursor: pointer;
+	}
+
+	.row-bind { height: 46px; }
+	.row-bind .label { top: 50%; transform: translateY(-50%); }
+	.bind {
+		position: absolute; right: 12px; top: 10px; width: 96px; height: 26px; border-radius: 7px;
+		background: var(--surfaceAlt); border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
+		color: var(--text); font-family: var(--geo); font-size: 11px; font-weight: 700;
+		display: grid; place-items: center;
+	}
+
+	/* --------------------------------------------------- notification */
+	.toast {
+		position: relative; margin: 16px 0 0 auto; width: 280px; height: 62px;
+		border-radius: 10px; background: var(--surface);
+		border: 1px solid color-mix(in srgb, var(--stroke) 65%, transparent);
+		overflow: hidden; font-family: var(--geo);
+	}
+	.stage-caption {
+		margin: 8px 0 0; text-align: right;
+		font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint);
+	}
+	.toast .sp { position: absolute; left: 14px; top: 19px; width: 24px; height: 24px; }
+	.toast .t { position: absolute; left: 48px; top: 12px; font-size: 12px; font-weight: 700; color: var(--text); }
+	.toast .b { position: absolute; left: 48px; top: 30px; font-size: 11px; color: var(--subText); }
+	.toast .bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 45%; background: var(--accent); }
+
+	/* ------------------------------------------------------------ suits */
+	.suits { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+	.suits .cap { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); margin-right: 4px; }
+
+	.suit {
+		display: inline-flex; align-items: center; gap: 8px;
+		padding: 7px 12px 7px 8px; border-radius: 999px; cursor: pointer;
+		background: var(--page-raised); border: 1px solid var(--rule);
+		color: var(--ink-dim); font-family: var(--mono); font-size: 11px;
+		letter-spacing: 0.06em; transition: color .18s, border-color .18s;
+	}
+	.suit:hover { color: var(--ink); }
+	.suit[aria-pressed="true"] { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+	.suit:focus-visible { outline: 2px solid var(--hot); outline-offset: 2px; }
+	.chip { width: 16px; height: 16px; border-radius: 50%; border: 1px solid #0006; }
+
+	/* ------------------------------------------------------------ specs */
+	.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1px; background: var(--rule);
+		border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+	.spec { background: var(--page-raised); padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+	.spec dt { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
+	.spec dd { margin: 0; font-size: 20px; font-family: var(--geo); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+	.spec p { margin: 0; font-size: 11.5px; color: var(--ink-dim); line-height: 1.55; }
+
+	.note { color: var(--ink-dim); max-width: 68ch; margin: 0; font-size: 12px; }
+	code { color: var(--ink); background: #ffffff0d; padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+	.anatomy { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+	.anatomy figure { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+	.anatomy figcaption { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); }
+	.anatomy .box { background: var(--backdrop); border: 1px solid var(--rule); border-radius: 10px; padding: 14px; }
+
+	@media (prefers-reduced-motion: reduce) {
+		* { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+	}
+</style>
+
+<div class="wrap">
+	<header class="masthead">
+		<div class="eyebrow">Roblox interface library · SpiderUI.lua</div>
+		<h1>Spider<em>UI</em> — every strand drawn at runtime</h1>
+		<p class="lede">
+			A faithful preview of the Lua library: identical palette, identical pixel offsets, and
+			the webbing and emblem generated by the same routines the Roblox build runs. Switch
+			suits and work the controls — this is the layout you'll get in game.
+		</p>
+	</header>
+
+	<div class="suits" id="suits">
+		<span class="cap">Suit</span>
+	</div>
+
+	<div class="stage">
+		<div class="stage-inner">
+			<div class="ui" id="ui">
+				<svg class="web" id="webLayer" aria-hidden="true"></svg>
+				<div class="bloom"></div>
+
+				<div class="topbar">
+					<svg class="emblem" id="emblemTop" viewBox="0 0 30 30" aria-hidden="true"></svg>
+					<div class="title">SPIDER<span>VERSE</span></div>
+					<div class="subtitle">friendly neighborhood build</div>
+					<button class="winbtn min" type="button" title="Minimise">—</button>
+					<button class="winbtn close" type="button" title="Close">X</button>
+				</div>
+				<div class="topdivider"></div>
+
+				<nav class="sidebar" aria-label="Sections">
+					<div class="navlabel">NAVIGATION</div>
+					<div class="tabwrap">
+						<div class="indicator" id="indicator"></div>
+						<div class="tabs" id="tabs" role="tablist"></div>
+					</div>
+					<div class="footer">
+						<div class="avatar">
+							<svg width="20" height="20" viewBox="0 0 20 20" id="emblemAvatar" aria-hidden="true"></svg>
+						</div>
+						<div class="footer-name">Peter</div>
+						<div class="footer-sub">with great power...</div>
+					</div>
+				</nav>
+
+				<main class="content">
+					<div class="pagehead" id="pagehead">SPEED</div>
+					<div class="pagesub" id="pagesub">walk, carry and lag-compensated movement</div>
+					<div class="scroll" id="scroll"></div>
+				</main>
+
+			</div>
+
+			<!-- Notifications live in their own ScreenGui, anchored to the screen
+			     rather than the window, so they sit outside the frame here too. -->
+			<aside class="toast">
+				<svg class="sp" viewBox="0 0 24 24" id="emblemToast" aria-hidden="true"></svg>
+				<div class="t">SPIDER-SENSE</div>
+				<div class="b">Interface loaded. Right Control hides it.</div>
+				<div class="bar"></div>
+			</aside>
+			<p class="stage-caption">Notification layer · separate ScreenGui, screen-anchored</p>
+		</div>
+	</div>
+
+	<div class="anatomy">
+		<figure>
+			<div class="box"><svg width="160" height="160" viewBox="0 0 160 160" id="emblemBig" aria-hidden="true"></svg></div>
+			<figcaption>Emblem · 16 leg segments + body</figcaption>
+		</figure>
+		<figure>
+			<div class="box"><svg width="220" height="160" viewBox="0 0 220 160" id="webSample" aria-hidden="true"></svg></div>
+			<figcaption>Orb web · spokes + sagging chords</figcaption>
+		</figure>
+		<p class="note">
+			Both are assembled from rotated <code>Frame</code> instances — no image assets, so the
+			menu loads instantly and never shows a broken texture. The emblem's legs bend at a knee
+			rather than radiating straight, which is what keeps the silhouette reading as a spider
+			at 24&nbsp;px.
+		</p>
+	</div>
+
+	<dl class="specs">
+		<div class="spec">
+			<dt>Instances</dt>
+			<dd id="statInstances">1,001</dd>
+			<p>Built once at load for the six-tab example. 298 of those are web strands, all static.</p>
+		</div>
+		<div class="spec">
+			<dt>Controls</dt>
+			<dd>8 types</dd>
+			<p>Toggle, slider, dropdown (single &amp; multi), button, keybind, input, label, paragraph.</p>
+		</div>
+		<div class="spec">
+			<dt>Suits</dt>
+			<dd>5</dd>
+			<p>Every themed property is registered, so <code>Window:SetTheme()</code> repaints live.</p>
+		</div>
+		<div class="spec">
+			<dt>Dependencies</dt>
+			<dd>None</dd>
+			<p>No asset IDs, no HTTP calls, no external libraries. One file, one <code>loadstring</code>.</p>
+		</div>
+	</dl>
+</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ themes
+   Mirrors the Themes table in SpiderUI.lua exactly.                        */
+const THEMES = {
+	Classic: { backdrop:"#070916", surface:"#0c0f22", surfaceAlt:"#10142d", card:"#151a38",
+		cardHover:"#1e254c", stroke:"#343e74", strokeSoft:"#262d58", accent:"#e2202a",
+		accentDeep:"#8a0c16", secondary:"#2b5cdb", web:"#c6d6ff", text:"#eef2ff",
+		subText:"#8591be", muted:"#58628a" },
+	Miles: { backdrop:"#06060a", surface:"#0b0b11", surfaceAlt:"#0f0f17", card:"#14141e",
+		cardHover:"#1f1f2d", stroke:"#3a3a4e", strokeSoft:"#262634", accent:"#ff2a3c",
+		accentDeep:"#7a0814", secondary:"#00e0ff", web:"#e2e8ff", text:"#f5f6ff",
+		subText:"#8c90a8", muted:"#5c6076" },
+	Noir: { backdrop:"#0a0a0b", surface:"#101012", surfaceAlt:"#151518", card:"#1b1b1f",
+		cardHover:"#28282e", stroke:"#46464e", strokeSoft:"#2e2e34", accent:"#ceced6",
+		accentDeep:"#606068", secondary:"#961820", web:"#b4b4be", text:"#f0f0f4",
+		subText:"#8a8a94", muted:"#60606a" },
+	Symbiote: { backdrop:"#06080a", surface:"#0a0d10", surfaceAlt:"#0e1216", card:"#13181d",
+		cardHover:"#1d242b", stroke:"#3e4a54", strokeSoft:"#283038", accent:"#e8eef0",
+		accentDeep:"#788288", secondary:"#7e3ec6", web:"#c8d4d8", text:"#ecf2f4",
+		subText:"#7e8a94", muted:"#545e66" },
+	"2099": { backdrop:"#04121c", surface:"#071c2a", surfaceAlt:"#0a2636", card:"#0d3244",
+		cardHover:"#14465c", stroke:"#206c86", strokeSoft:"#164c62", accent:"#ff2e4e",
+		accentDeep:"#8a0c28", secondary:"#00ead6", web:"#96f0ff", text:"#e8faff",
+		subText:"#76acbe", muted:"#507c90" },
+};
+
+const root = document.documentElement;
+let theme = THEMES.Classic;
+
+function applyTheme(name) {
+	theme = THEMES[name];
+	for (const [key, value] of Object.entries(theme)) {
+		root.style.setProperty("--" + key, value);
+	}
+	drawWeb();
+	drawEmblems();
+	document.querySelectorAll(".suit").forEach(b =>
+		b.setAttribute("aria-pressed", String(b.dataset.suit === name)));
+}
+
+/* --------------------------------------------------------------- geometry
+   Direct ports of buildWeb() and buildSpider() from the Lua.               */
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function svgLine(parent, x1, y1, x2, y2, width, color, opacity, cap) {
+	const line = document.createElementNS(SVGNS, "line");
+	line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+	line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+	line.setAttribute("stroke", color);
+	line.setAttribute("stroke-width", width);
+	line.setAttribute("stroke-opacity", opacity);
+	if (cap) line.setAttribute("stroke-linecap", cap);
+	parent.appendChild(line);
+	return line;
+}
+
+function buildWeb(svg, cfg) {
+	const { ox, oy, spokes, rings, spacing, inner, a0, a1, sag = 0.96,
+		color, fadeAngle = 35 } = cfg;
+
+	const gradId = "fade-" + Math.random().toString(36).slice(2);
+	const defs = document.createElementNS(SVGNS, "defs");
+	const grad = document.createElementNS(SVGNS, "linearGradient");
+	grad.setAttribute("id", gradId);
+	grad.setAttribute("gradientTransform", `rotate(${fadeAngle} .5 .5)`);
+	[["0%", "1"], ["55%", "0.4"], ["100%", "0"]].forEach(([offset, stop]) => {
+		const s = document.createElementNS(SVGNS, "stop");
+		s.setAttribute("offset", offset);
+		s.setAttribute("stop-color", "#fff");
+		s.setAttribute("stop-opacity", stop);
+		grad.appendChild(s);
+	});
+	const mask = document.createElementNS(SVGNS, "mask");
+	mask.setAttribute("id", "m" + gradId);
+	mask.setAttribute("maskUnits", "userSpaceOnUse");
+	mask.setAttribute("x", "-500"); mask.setAttribute("y", "-500");
+	mask.setAttribute("width", "2000"); mask.setAttribute("height", "2000");
+	const rect = document.createElementNS(SVGNS, "rect");
+	rect.setAttribute("x", "-500"); rect.setAttribute("y", "-500");
+	rect.setAttribute("width", "2000"); rect.setAttribute("height", "2000");
+	rect.setAttribute("fill", `url(#${gradId})`);
+	mask.appendChild(rect);
+	defs.appendChild(grad); defs.appendChild(mask);
+	svg.appendChild(defs);
+
+	const group = document.createElementNS(SVGNS, "g");
+	group.setAttribute("mask", `url(#m${gradId})`);
+	svg.appendChild(group);
+
+	const point = (r, s) => {
+		const radius = inner + spacing * r;
+		const angle = a0 + (a1 - a0) * (s / spokes);
+		return [ox + Math.cos(angle) * radius, oy + Math.sin(angle) * radius];
+	};
+
+	for (let s = 0; s <= spokes; s++) {
+		const [x1, y1] = point(0, s), [x2, y2] = point(rings, s);
+		svgLine(group, x1, y1, x2, y2, 1, color, 0.30);
+	}
+
+	for (let r = 1; r <= rings; r++) {
+		for (let s = 0; s < spokes; s++) {
+			const [x1, y1] = point(r, s), [x2, y2] = point(r, s + 1);
+			// Chord midpoint pulled back toward the hub so the ring sags.
+			const mx = ox + ((x1 + x2) / 2 - ox) * sag;
+			const my = oy + ((y1 + y2) / 2 - oy) * sag;
+			svgLine(group, x1, y1, mx, my, 1, color, 0.20);
+			svgLine(group, mx, my, x2, y2, 1, color, 0.20);
+		}
+	}
+}
+
+function buildSpider(svg, size, color) {
+	svg.textContent = "";
+	const unit = size / 24;
+	const cx = size / 2, cy = size / 2;
+	const g = document.createElementNS(SVGNS, "g");
+	svg.appendChild(g);
+
+	const legAngles = [-68, -28, 20, 58];
+	for (const baseAngle of legAngles) {
+		for (const side of [-1, 1]) {
+			const a = baseAngle * Math.PI / 180;
+			const rx = cx + side * unit * 1.6, ry = cy + unit * 0.4;
+			const kx = rx + side * Math.cos(a) * unit * 5.4;
+			const ky = ry + Math.sin(a) * unit * 5.4;
+			const tx = kx + side * Math.cos(a) * unit * 4.4;
+			const ty = ky + Math.sin(a) * unit * 4.4 + unit * 2.2;
+			svgLine(g, rx, ry, kx, ky, Math.max(2, unit * 1.05), color, 1, "round");
+			svgLine(g, kx, ky, tx, ty, Math.max(2, unit * 0.9), color, 1, "round");
+		}
+	}
+
+	const body = document.createElementNS(SVGNS, "rect");
+	const bw = Math.max(4, unit * 4.6), bh = Math.max(6, unit * 9.4);
+	body.setAttribute("x", cx - bw / 2);
+	body.setAttribute("y", size * 0.56 - bh / 2);
+	body.setAttribute("width", bw); body.setAttribute("height", bh);
+	body.setAttribute("rx", unit * 2.3);
+	body.setAttribute("fill", color);
+	g.appendChild(body);
+
+	const head = document.createElementNS(SVGNS, "rect");
+	const hs = Math.max(4, unit * 3.4);
+	head.setAttribute("x", cx - hs / 2);
+	head.setAttribute("y", size * 0.26 - hs / 2);
+	head.setAttribute("width", hs); head.setAttribute("height", hs);
+	head.setAttribute("rx", unit * 1.7);
+	head.setAttribute("fill", color);
+	g.appendChild(head);
+}
+
+const RAD = deg => deg * Math.PI / 180;
+
+function drawWeb() {
+	const svg = document.getElementById("webLayer");
+	svg.textContent = "";
+	svg.setAttribute("viewBox", "0 0 720 470");
+	buildWeb(svg, { ox: 720, oy: 0, spokes: 10, rings: 9, spacing: 44, inner: 26,
+		a0: RAD(90), a1: RAD(180), color: theme.web, fadeAngle: 215 });
+	buildWeb(svg, { ox: 0, oy: 470, spokes: 8, rings: 6, spacing: 40, inner: 22,
+		a0: RAD(-90), a1: RAD(0), color: theme.web, fadeAngle: 35 });
+
+	const sample = document.getElementById("webSample");
+	sample.textContent = "";
+	buildWeb(sample, { ox: 10, oy: 10, spokes: 8, rings: 5, spacing: 40, inner: 18,
+		a0: RAD(4), a1: RAD(86), color: theme.web, fadeAngle: 215 });
+}
+
+function drawEmblems() {
+	buildSpider(document.getElementById("emblemTop"), 30, theme.accent);
+	buildSpider(document.getElementById("emblemAvatar"), 20, theme.accent);
+	buildSpider(document.getElementById("emblemToast"), 24, theme.accent);
+	buildSpider(document.getElementById("emblemBig"), 160, theme.accent);
+}
+
+/* ------------------------------------------------------------------- data
+   The same tabs the example script builds.                                */
+const TABS = [
+	{ name: "SPEED", sub: "walk, carry and lag-compensated movement", rows: [
+		{ t: "section", text: "Speeds" },
+		{ t: "slider", label: "Normal Speed", value: 70, min: 16, max: 250 },
+		{ t: "slider", label: "Carry Speed", value: 34, min: 16, max: 250 },
+		{ t: "toggle", label: "Carry Mode", desc: "swap to carry speed while holding", on: true },
+		{ t: "section", text: "Lagger" },
+		{ t: "slider", label: "Lagger Normal", value: 45, min: 16, max: 250 },
+		{ t: "slider", label: "Lagger Carry", value: 29, min: 16, max: 250 },
+		{ t: "toggle", label: "Auto Lagger", on: false },
+	]},
+	{ name: "COMBAT", sub: "reach, prediction and target logic", rows: [
+		{ t: "section", text: "Targeting" },
+		{ t: "drop", label: "Target Priority", value: "Closest" },
+		{ t: "slider", label: "Hit Range", value: 22, min: 5, max: 60, suffix: "" },
+		{ t: "slider", label: "Prediction", value: 0.14, min: 0, max: 1, step: 0.01 },
+		{ t: "section", text: "Automation" },
+		{ t: "toggle", label: "Auto Swing", on: false },
+		{ t: "toggle", label: "Auto Parry", desc: "reacts on wind-up frames", on: true },
+		{ t: "toggle", label: "Spider-Sense", desc: "warn when someone locks on", on: true },
+		{ t: "button", label: "Reset Combat State", cta: "RESET" },
+	]},
+	{ name: "MOVEMENT", sub: "swing lines, jumps and flight", rows: [
+		{ t: "section", text: "Web Swinging" },
+		{ t: "toggle", label: "Web Swing", desc: "hold to shoot a line and swing", on: true },
+		{ t: "slider", label: "Line Length", value: 180, min: 20, max: 400 },
+		{ t: "slider", label: "Swing Force", value: 42, min: 1, max: 100 },
+		{ t: "section", text: "Traversal" },
+		{ t: "slider", label: "Jump Power", value: 50, min: 20, max: 350 },
+		{ t: "toggle", label: "Infinite Jump", on: false },
+		{ t: "toggle", label: "Wall Crawl", on: true },
+		{ t: "toggle", label: "No Fall Damage", on: true },
+	]},
+	{ name: "STEAL", sub: "grab routes and auto-return", rows: [
+		{ t: "section", text: "Auto Steal" },
+		{ t: "toggle", label: "Auto Steal", on: false },
+		{ t: "slider", label: "Steal Delay", value: 0.4, min: 0, max: 5, step: 0.1 },
+		{ t: "drop", label: "Return Route", value: "Web Line" },
+		{ t: "section", text: "Filters" },
+		{ t: "drop", label: "Rarity Filter", value: "Legendary, Mythic" },
+	]},
+	{ name: "SETTINGS", sub: "look and feel", rows: [
+		{ t: "section", text: "Appearance" },
+		{ t: "drop", label: "Suit", value: "Classic" },
+		{ t: "slider", label: "UI Scale", value: 1, min: 0.6, max: 1.4, step: 0.05 },
+		{ t: "section", text: "Menu" },
+		{ t: "button", label: "Minimise To Emblem", cta: "HIDE" },
+		{ t: "button", label: "Unload Interface", cta: "UNLOAD" },
+	]},
+	{ name: "KEYBINDS", sub: "bind anything to a key", rows: [
+		{ t: "section", text: "Bindings" },
+		{ t: "bind", label: "Toggle Menu", key: "RightControl" },
+		{ t: "bind", label: "Web Swing", key: "Q" },
+		{ t: "bind", label: "Carry Toggle", key: "C" },
+		{ t: "bind", label: "Panic / Unload", key: "Delete" },
+	]},
+];
+
+const fmt = (v, step) => (step && step < 1)
+	? v.toFixed(String(step).split(".")[1].length)
+	: String(Math.round(v));
+
+function renderRows(tab) {
+	const scroll = document.getElementById("scroll");
+	scroll.textContent = "";
+
+	for (const row of tab.rows) {
+		if (row.t === "section") {
+			const el = document.createElement("div");
+			el.className = "section";
+			el.innerHTML = `<span>${row.text.toUpperCase()}</span>`;
+			scroll.appendChild(el);
+			continue;
+		}
+
+		const card = document.createElement("div");
+		card.className = "card";
+
+		if (row.t === "toggle") {
+			card.classList.add("row-toggle");
+			if (row.desc) card.classList.add("has-desc");
+			card.innerHTML = `<div class="label">${row.label}</div>` +
+				(row.desc ? `<div class="desc">${row.desc}</div>` : "") +
+				`<div class="switch" role="switch" tabindex="0" aria-checked="${row.on}"
+					aria-label="${row.label}"><div class="fill"></div><div class="knob"></div></div>`;
+			const sw = card.querySelector(".switch");
+			const flip = () => {
+				row.on = sw.getAttribute("aria-checked") !== "true";
+				sw.setAttribute("aria-checked", String(row.on));
+			};
+			sw.addEventListener("click", flip);
+			sw.addEventListener("keydown", e => {
+				if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+			});
+		}
+
+		if (row.t === "slider") {
+			card.classList.add("row-slider");
+			const pct = (row.value - row.min) / (row.max - row.min);
+			card.innerHTML = `<div class="label">${row.label}</div>
+				<div class="pill">${fmt(row.value, row.step)}</div>
+				<div class="track"><div class="fill"></div><div class="grip"></div></div>`;
+			const track = card.querySelector(".track");
+			const fill = card.querySelector(".fill");
+			const grip = card.querySelector(".grip");
+			const pill = card.querySelector(".pill");
+			const paint = p => {
+				fill.style.width = (p * 100) + "%";
+				grip.style.left = (p * 100) + "%";
+			};
+			paint(pct);
+			const set = clientX => {
+				const box = track.getBoundingClientRect();
+				const p = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+				const step = row.step || 1;
+				row.value = Math.round((row.min + p * (row.max - row.min)) / step) * step;
+				pill.textContent = fmt(row.value, row.step);
+				paint((row.value - row.min) / (row.max - row.min));
+			};
+			let dragging = false;
+			track.addEventListener("pointerdown", e => {
+				dragging = true; track.setPointerCapture(e.pointerId); set(e.clientX);
+			});
+			track.addEventListener("pointermove", e => { if (dragging) set(e.clientX); });
+			track.addEventListener("pointerup", () => { dragging = false; });
+		}
+
+		if (row.t === "drop") {
+			card.classList.add("row-drop");
+			card.innerHTML = `<div class="label">${row.label}</div>
+				<button class="combo" type="button">${row.value}</button>`;
+		}
+
+		if (row.t === "button") {
+			card.classList.add("row-btn");
+			card.innerHTML = `<div class="label">${row.label}</div>
+				<button class="action" type="button">${row.cta}</button>`;
+		}
+
+		if (row.t === "bind") {
+			card.classList.add("row-bind");
+			card.innerHTML = `<div class="label">${row.label}</div>
+				<div class="bind">${row.key}</div>`;
+		}
+
+		scroll.appendChild(card);
+	}
+}
+
+/* ------------------------------------------------------------------- init */
+const tabsEl = document.getElementById("tabs");
+const indicator = document.getElementById("indicator");
+let active = 0;
+
+TABS.forEach((tab, i) => {
+	const b = document.createElement("button");
+	b.className = "tab";
+	b.type = "button";
+	b.role = "tab";
+	b.textContent = tab.name;
+	b.setAttribute("aria-selected", String(i === 0));
+	b.addEventListener("click", () => select(i));
+	tabsEl.appendChild(b);
+});
+
+function select(i) {
+	active = i;
+	[...tabsEl.children].forEach((b, n) => b.setAttribute("aria-selected", String(n === i)));
+	// (TAB_HEIGHT + TAB_PADDING) * index + (TAB_HEIGHT - 22) / 2, as in the Lua.
+	indicator.style.transform = `translateY(${i * 48 + 10}px)`;
+	document.getElementById("pagehead").textContent = TABS[i].name;
+	document.getElementById("pagesub").textContent = TABS[i].sub;
+	renderRows(TABS[i]);
+}
+
+const suitsEl = document.getElementById("suits");
+Object.keys(THEMES).forEach(name => {
+	const b = document.createElement("button");
+	b.className = "suit";
+	b.type = "button";
+	b.dataset.suit = name;
+	b.setAttribute("aria-pressed", String(name === "Classic"));
+	b.innerHTML = `<span class="chip" style="background:${THEMES[name].accent}"></span>${name}`;
+	b.addEventListener("click", () => applyTheme(name));
+	suitsEl.appendChild(b);
+});
+
+applyTheme("Classic");
+select(0);
+</script>

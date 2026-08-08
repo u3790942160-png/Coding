@@ -633,7 +633,6 @@ if not infJumpEnabled then
 _G.AceStopNormalInfJumpHoldState()
 end
 end
-local currentBackground = 0
 local aceGuiScaleValue = 0.52
 local aceProgressBarScaleValue = 0.83
 CONFIG_FILE = "AceDuels_MainGUI_Config_DefaultsV2.json"
@@ -908,7 +907,6 @@ skyTheme = skyTheme,
 lightningEnabled = _G.AceLightningEnabled ~= false,
 autoLeftEnabled = autoLeftEnabled,
 autoRightEnabled = autoRightEnabled,
-currentBackground = currentBackground,
 aceGuiScaleValue = aceGuiScaleValue,
 aceProgressBarScaleValue = aceProgressBarScaleValue,
 introEnabled = _introEnabled == true,
@@ -3296,7 +3294,7 @@ discordLbl.Name = "Discord"
 discordLbl.Size = UDim2.new(1, 0, 0, 30)
 discordLbl.Position = UDim2.new(0, 0, 0, 26)
 discordLbl.BackgroundTransparency = 1
-discordLbl.Text = "discord.gg/aceduels"
+discordLbl.Text = "discord.gg/qgwhrFZXd"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 discordLbl.TextStrokeTransparency = 0
@@ -3787,45 +3785,6 @@ Main.Size = FULL_MAIN_SIZE
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
 end
-local BackgroundIDs = {
-"99416158073201",
-"126860692354524",
-"73226092831324",
-"90280869222992",
-}
-currentBackground = tonumber(savedConfig.currentBackground) or currentBackground
-local BgImage = Instance.new("ImageLabel")
-BgImage.Name = "CustomBackground"
-BgImage.BackgroundTransparency = 1
-BgImage.ImageTransparency = 0
-BgImage.ScaleType = Enum.ScaleType.Crop
-BgImage.Size = UDim2.new(1, 0, 1, 0)
-BgImage.Position = UDim2.new(0, 0, 0, 0)
-BgImage.Visible = false
-BgImage.ZIndex = 1
-BgImage.Parent = Main
-corner(BgImage, 14)
-function applyBackground(index)
-currentBackground = index or 0
-if currentBackground == 0 then
-Main.BackgroundColor3 = COLORS.bg
-BgImage.Visible = false
-saveAceConfig()
-return "None"
-end
-local id = BackgroundIDs[currentBackground]
-if id then
-BgImage.Image = "rbxassetid://" .. id
-BgImage.Visible = true
-saveAceConfig()
-return "Image " .. tostring(currentBackground)
-end
-currentBackground = 0
-BgImage.Visible = false
-saveAceConfig()
-return "None"
-end
-applyBackground(currentBackground)
 
 -- ═══════════════════════════════════════════════════════════════
 -- BACKDROP — faded dice scattered behind the panels. Sits low in the
@@ -4408,7 +4367,7 @@ Discord.Name = "Discord"
 Discord.BackgroundTransparency = 1
 Discord.Position = UDim2.new(0, 15, 0, 42)
 Discord.Size = UDim2.new(0, 170, 0, 14)
-Discord.Text = "discord.gg/aceduels"
+Discord.Text = "discord.gg/qgwhrFZXd"
 Discord.TextColor3 = COLORS.textDim
 Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Discord.TextStrokeTransparency = 0.45
@@ -5947,7 +5906,7 @@ speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
 do
 THEME_ACCENT = THEME_ACCENT or Color3.fromRGB(230, 230, 230)
 THEME_ACCENT_DIM = THEME_ACCENT_DIM or Color3.fromRGB(145, 145, 145)
-PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/aceduels"}
+PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/qgwhrFZXd"}
 BoxedESPOptions = BoxedESPOptions or {box=false, tracer=false}
 BoxedESPData = BoxedESPData or {}
 BoxedESPConn = BoxedESPConn or nil
@@ -6905,92 +6864,6 @@ saveAceConfig()
 end)
 end
 end
-local bgRow = Instance.new("Frame")
-bgRow.Name = "Background Image Picker"
-bgRow.BackgroundColor3 = COLORS.row
-bgRow.BackgroundTransparency = 0.3
-bgRow.Size = UDim2.new(1, -4, 0, 58)
-bgRow.BorderSizePixel = 0
-bgRow.LayoutOrder = 2
-bgRow.ZIndex = 4
-bgRow.Parent = Settings
-corner(bgRow, 9)
-stroke(bgRow, COLORS.strokeSoft, 1.15, 0.38)
-local bgButtons = {}
-function updateBackgroundButtons()
-for index, button in pairs(bgButtons) do
-local selected = index == currentBackground
-button.BackgroundTransparency = selected and 0.12 or 0.42
-local st = button:FindFirstChildOfClass("UIStroke")
-if st then
-st.Color = selected and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft
-st.Transparency = selected and 0.12 or 0.55
-st.Thickness = selected and 1.15 or 1
-end
-end
-end
-function makeNoneButton(index, x)
-local btn = Instance.new("TextButton")
-btn.Name = "None"
-btn.BackgroundColor3 = COLORS.row
-btn.BackgroundTransparency = 0.12
-btn.BorderSizePixel = 0
-btn.Text = "None"
-btn.TextColor3 = COLORS.white
-btn.TextSize = 8
-btn.Font = Enum.Font.GothamSemibold
-btn.AutoButtonColor = false
-btn.Size = UDim2.new(0, 52, 0, 40)
-btn.Position = UDim2.new(0, x, 0.5, -20)
-btn.ZIndex = 6
-btn.ClipsDescendants = true
-btn.Parent = bgRow
-corner(btn, 8)
-stroke(btn, Color3.fromRGB(245, 245, 255), 1.15, 0.12)
-bgButtons[index] = btn
-btn.MouseButton1Click:Connect(function()
-applyBackground(index)
-updateBackgroundButtons()
-end)
-end
-function makeImageButton(index, x)
-local holder = Instance.new("Frame")
-holder.Name = "Image " .. tostring(index)
-holder.BackgroundColor3 = COLORS.row
-holder.BackgroundTransparency = 0.35
-holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, 58, 0, 40)
-holder.Position = UDim2.new(0, x, 0.5, -20)
-holder.ZIndex = 6
-holder.ClipsDescendants = true
-holder.Parent = bgRow
-corner(holder, 8)
-stroke(holder, COLORS.strokeSoft, 1, 0.45)
-local img = Instance.new("ImageLabel")
-img.Name = "Preview"
-img.BackgroundTransparency = 1
-img.Image = "rbxassetid://" .. BackgroundIDs[index]
-img.ScaleType = Enum.ScaleType.Crop
-img.Size = UDim2.new(1, 0, 1, 0)
-img.Position = UDim2.new(0, 0, 0, 0)
-img.ZIndex = 6
-img.Parent = holder
-corner(img, 8)
-local click = Instance.new("TextButton")
-click.Name = "Click"
-click.BackgroundTransparency = 1
-click.Text = ""
-click.AutoButtonColor = false
-click.Size = UDim2.new(1, 0, 1, 0)
-click.Position = UDim2.new(0, 0, 0, 0)
-click.ZIndex = 7
-click.Parent = holder
-bgButtons[index] = holder
-click.MouseButton1Click:Connect(function()
-applyBackground(index)
-updateBackgroundButtons()
-end)
-end
 function stepperRow(parent, labelText, defaultValue, order, callback, minValue, maxValue)
 local row = Instance.new("Frame")
 row.Name = labelText
@@ -7079,12 +6952,6 @@ setValue(value + 0.05)
 end)
 return row
 end
-makeNoneButton(0, 8)
-makeImageButton(1, 66)
-makeImageButton(2, 128)
-makeImageButton(3, 190)
-makeImageButton(4, 252)
-updateBackgroundButtons()
 stepperRow(Settings, "GUI Scale", aceGuiScaleValue, 3, function(v)
 aceGuiScaleValue = v
 aceMainScale.Scale = v
@@ -7324,7 +7191,7 @@ batCounterEnabled = false; medCounterEnabled = false; antiKickEnabled = false; a
 espEnabled = false; showTracerEnabled = false; ragdollCountdownEnabled = false
 fpsBoostEnabled = false; antiLagVisualEnabled = false; nukeOptimiserEnabled = false
 fovEnabled = false; fovValue = 70; noCamCollisionEnabled = false; _G.AceNoPlayerCollisionEnabled = false
-skyTheme = "Off"; currentBackground = 0
+skyTheme = "Off"
 selectedIntroMusic = 1; _introEnabled = true
 if setIntroVisual then setIntroVisual(_introEnabled) end
 if setIntroSongVisual then setIntroSongVisual() end
@@ -7333,8 +7200,6 @@ autoLeftEnabled = false; autoRightEnabled = false
 _G.AceGuiLocked = false; _G.AceHideMobileButtons = false; _G.AceMobileButtonScale = 0.75
 aceMainScale.Scale = aceGuiScaleValue
 applyAceProgressBarScale()
-applyBackground(0)
-updateBackgroundButtons()
 applyDefaultAceKeybinds()
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()

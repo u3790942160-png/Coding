@@ -931,7 +931,6 @@ ANTI_BYPASS_AIMBOT_SPEED = _G.DiceAntiBypassAimbotSpeed,
 ANTI_BYPASS_LAGGER_AIMBOT_SPEED = _G.DiceAntiBypassLaggerAimbotSpeed,
 ANTI_DESYNC_AIMBOT_SPEED = ANTI_DESYNC_AIMBOT_SPEED,
 autoSwingEnabled = autoSwingEnabled,
-physicsSpeed = _G.DicePhysicsSpeed ~= false,
 diceSwingRange = tonumber(_G.DiceSwingRange) or 14,
 diceSwingDelay = tonumber(_G.DiceSwingDelay) or 0.32,
 mirrorTPDownEnabled = mirrorTPDownEnabled,
@@ -1057,7 +1056,6 @@ _G.DiceAntiBypassLaggerAimbotSpeed = tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPE
 end
 ANTI_DESYNC_AIMBOT_SPEED = tonumber(data.ANTI_DESYNC_AIMBOT_SPEED) or ANTI_DESYNC_AIMBOT_SPEED or 58
 autoSwingEnabled = data.autoSwingEnabled == true
-_G.DicePhysicsSpeed = data.physicsSpeed ~= false
 _G.DiceSwingRange = math.clamp(tonumber(data.diceSwingRange) or 14, 4, 60)
 _G.DiceSwingDelay = math.clamp(tonumber(data.diceSwingDelay) or 0.32, 0.05, 3)
 mirrorTPDownEnabled = data.mirrorTPDownEnabled == true
@@ -2994,19 +2992,18 @@ return NS
 end
 -- ═══════════════════════════════════════════════════════════════
 -- MOVEMENT DRIVE
--- Roblox validates your position against the humanoid's replicated
--- WalkSpeed. Forcing velocity, or a constraint, while WalkSpeed sits at
--- the game default means the server sees you covering more ground than
--- it allows and snaps you back. That is the lagback, and changing *how*
--- the motion is produced does not avoid it.
--- So drive WalkSpeed itself: the server then expects that speed and
--- lets it stand. Direction stays with the humanoid, i.e. normal input.
--- Client-side reads of WalkSpeed can be masked to the original value.
+-- Speed is applied with ApplyImpulse on the root. Each frame the gap
+-- between current and target horizontal velocity is closed with one
+-- impulse scaled by assembly mass, so the motion goes through the
+-- physics solver rather than being written onto the part. Vertical
+-- motion is left to gravity and direction comes from
+-- Humanoid.MoveDirection, so it follows normal input.
 -- ═══════════════════════════════════════════════════════════════
-_G.DicePhysicsSpeed = (_G.DicePhysicsSpeed ~= false)
-_G.DiceWalkSpeedMaskOn = (_G.DiceWalkSpeedMaskOn ~= false)
-diceMoveDrive = diceMoveDrive or {base = nil, rawBase = nil, applied = nil, masked = false}
--- Strip anything left behind by the earlier constraint-based version.
+-- Neutralise the WalkSpeed mask any earlier build left on the game
+-- metatable; that hook survives re-injection and would keep spoofing.
+_G.DiceWalkSpeedMaskOn = false
+diceMoveDrive = diceMoveDrive or {}
+-- Strip leftovers from the constraint and WalkSpeed versions.
 function diceReleaseMoveDrive()
 local char = LP.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -3016,71 +3013,35 @@ local old = root:FindFirstChild(name)
 if old then pcall(function() old:Destroy() end) end
 end
 end
-diceMoveDrive.applied = nil
 end
--- Client-side scripts reading WalkSpeed get the game's own value back.
-function diceMaskWalkSpeed()
-if diceMoveDrive.masked then return true end
-if not (getrawmetatable and setreadonly and newcclosure) then return false end
-local ok = pcall(function()
-local mt = getrawmetatable(game)
-local oldIndex = mt.__index
-local hooked
-hooked = newcclosure(function(self, key)
-if key == "WalkSpeed" and _G.DiceWalkSpeedMaskOn and diceMoveDrive.base then
-if typeof(self) == "Instance" and self:IsA("Humanoid") then
-return diceMoveDrive.base
-end
-end
-return oldIndex(self, key)
-end)
-setreadonly(mt, false)
-mt.__index = hooked
-setreadonly(mt, true)
-end)
-diceMoveDrive.masked = ok
-return ok
-end
--- Hand the game's own WalkSpeed back when we stop driving it.
+-- Impulses are instantaneous, so there is no state to unwind on stop.
 function diceStopMoveDrive()
-local char = LP.Character
-local hum = char and char:FindFirstChildOfClass("Humanoid")
-if hum and diceMoveDrive.applied and diceMoveDrive.base then
-pcall(function() hum.WalkSpeed = diceMoveDrive.base end)
+diceMoveDrive.lastVel = nil
 end
-diceMoveDrive.applied = nil
-end
--- Returns false if WalkSpeed could not be driven, so callers fall back
--- to the old direct velocity write.
 function diceApplyMoveDrive(root, dir, spd)
-local char = root and root.Parent
-local hum = char and char:FindFirstChildOfClass("Humanoid")
-if not hum then return false end
+if not root then return false end
 spd = tonumber(spd)
 if not spd or spd <= 0 then return false end
-if not diceMoveDrive.base then
-diceMoveDrive.base = diceMoveDrive.rawBase or 16
-diceMaskWalkSpeed()
-end
--- Re-asserted every frame rather than only on change. The game can
--- reset WalkSpeed at any time, and with a write-once guard we would
--- never notice and never correct it. Reading it back is not an option
--- either, since the mask below hands us the spoofed value.
-local ok = pcall(function() hum.WalkSpeed = spd end)
-if not ok then return false end
-diceMoveDrive.applied = spd
-return true
-end
--- Capture the game's WalkSpeed before anything overwrites it.
-function diceCaptureBaseWalkSpeed(char)
-local hum = char and char:FindFirstChildOfClass("Humanoid")
-if not hum then return end
-local ok, v = pcall(function() return hum.WalkSpeed end)
-v = tonumber(v)
-if ok and v and v > 0 then
-diceMoveDrive.rawBase = v
-if not diceMoveDrive.applied then diceMoveDrive.base = v end
-end
+local flat = dir and Vector3.new(dir.X, 0, dir.Z) or Vector3.zero
+if flat.Magnitude <= 0.001 then return true end
+flat = flat.Unit
+return (pcall(function()
+local cur = root.AssemblyLinearVelocity
+-- Render can outrun physics. Velocity only changes on a physics step,
+-- so an unchanged reading means our last impulse has not been applied
+-- yet and firing another would stack on top of it and overshoot.
+local last = diceMoveDrive.lastVel
+if last and (cur - last).Magnitude < 1e-4 then return end
+diceMoveDrive.lastVel = cur
+local mass = root.AssemblyMass
+if not mass or mass <= 0 then mass = 1 end
+-- Impulse is a change in momentum, so scale the velocity gap by mass.
+root:ApplyImpulse(Vector3.new(
+(flat.X * spd - cur.X) * mass,
+0,
+(flat.Z * spd - cur.Z) * mass
+))
+end))
 end
 local refreshSpeedModeRows = nil
 local function setSpeedMode(mode)
@@ -3420,13 +3381,13 @@ S.leftPhase=2
 local d=P.L2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 return
 end
 local d=P.L1-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 elseif S.leftPhase==2 then
 local tgt=Vector3.new(P.L2.X,hrp.Position.Y,P.L2.Z)
 if (tgt-hrp.Position).Magnitude<1 then
@@ -3445,7 +3406,7 @@ end
 local d=P.L2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 end
 end)
 end
@@ -3470,13 +3431,13 @@ S.rightPhase=2
 local d=P.R2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 return
 end
 local d=P.R1-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 elseif S.rightPhase==2 then
 local tgt=Vector3.new(P.R2.X,hrp.Position.Y,P.R2.Z)
 if (tgt-hrp.Position).Magnitude<1 then
@@ -3495,7 +3456,7 @@ end
 local d=P.R2-hrp.Position
 local mv=Vector3.new(d.X,0,d.Z).Unit
 hum:Move(mv,false)
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, mv, spd)) then hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.Z*spd) end
+diceApplyMoveDrive(hrp, mv, spd)
 end
 end)
 end
@@ -3630,13 +3591,11 @@ end)
 end
 if LP.Character then
 task.spawn(function()
-diceCaptureBaseWalkSpeed(LP.Character)
 setupOverheadInfo(LP.Character)
 end)
 end
 LP.CharacterAdded:Connect(function(char)
 diceMoveDrive.applied = nil
-diceCaptureBaseWalkSpeed(char)
 diceReleaseMoveDrive()
 task.wait(0.5)
 setupOverheadInfo(char)
@@ -3661,9 +3620,7 @@ local md = hum.MoveDirection
 local spd = getCurrentSpeedValue()
 if not autoLeftEnabled and not autoRightEnabled and md.Magnitude > 0 then
 lastMoveDir = md
-if not (_G.DicePhysicsSpeed and diceApplyMoveDrive(hrp, md, spd)) then
-hrp.Velocity = Vector3.new(md.X * spd, hrp.Velocity.Y, md.Z * spd)
-end
+diceApplyMoveDrive(hrp, md, spd)
 elseif not autoLeftEnabled and not autoRightEnabled then
 diceStopMoveDrive()
 end
@@ -3729,19 +3686,70 @@ local DIE_PIPS = {
 [5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
 [6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
 }
+-- Shaded to read as a real die: the face is lit from the top left, the
+-- edge carries a bevel that follows that light, and the pips are drilled
+-- rather than printed. The mobile panel buttons draw their own flat pips
+-- and are deliberately left alone.
 function makeDie(parent, sizePx, value, dark, fade)
 fade = tonumber(fade) or 0
+local radius = math.max(3, math.floor(sizePx * 0.22))
 local die = Instance.new("Frame")
 die.Name = "Die"
 die.Size = UDim2.new(0, sizePx, 0, sizePx)
-die.BackgroundColor3 = dark and Color3.fromRGB(16, 16, 22) or Color3.fromRGB(244, 244, 250)
+-- White base so the gradient below defines the actual shading.
+die.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 die.BackgroundTransparency = fade
 die.BorderSizePixel = 0
 die.ZIndex = (parent.ZIndex or 1) + 1
 die.Parent = parent
-corner(die, math.max(3, math.floor(sizePx * 0.22)))
-stroke(die, dark and COLORS.stroke or Color3.fromRGB(255, 255, 255), 1, 0.4 + fade * 0.55)
-local pipColor = dark and Color3.fromRGB(240, 240, 248) or Color3.fromRGB(18, 18, 26)
+corner(die, radius)
+local faceGrad = Instance.new("UIGradient")
+faceGrad.Rotation = 125
+if dark then
+faceGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(64, 66, 78)),
+ColorSequenceKeypoint.new(0.45, Color3.fromRGB(30, 31, 40)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 17)),
+})
+else
+faceGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(0.45, Color3.fromRGB(238, 238, 244)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(194, 195, 208)),
+})
+end
+faceGrad.Parent = die
+-- Bevel: bright along the lit edge, dark along the shaded one.
+local edge = Instance.new("UIStroke")
+edge.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+edge.Thickness = math.max(1, sizePx * 0.05)
+edge.Transparency = 0.12 + fade * 0.85
+edge.Color = Color3.fromRGB(255, 255, 255)
+edge.Parent = die
+local edgeGrad = Instance.new("UIGradient")
+edgeGrad.Rotation = 125
+edgeGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, dark and Color3.fromRGB(124, 126, 144) or Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(0.5, dark and Color3.fromRGB(48, 49, 60) or Color3.fromRGB(212, 213, 224)),
+ColorSequenceKeypoint.new(1, dark and Color3.fromRGB(8, 8, 12) or Color3.fromRGB(132, 133, 146)),
+})
+edgeGrad.Parent = edge
+-- Sheen across the upper face.
+local gloss = Instance.new("Frame")
+gloss.Name = "Gloss"
+gloss.Size = UDim2.new(1, 0, 0.45, 0)
+gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+gloss.BorderSizePixel = 0
+gloss.ZIndex = die.ZIndex
+gloss.Parent = die
+corner(gloss, radius)
+local glossGrad = Instance.new("UIGradient")
+glossGrad.Rotation = 90
+glossGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, math.min(1, (dark and 0.8 or 0.6) + fade * 0.4)),
+NumberSequenceKeypoint.new(1, 1),
+})
+glossGrad.Parent = gloss
 local pipSize = math.max(2, math.floor(sizePx * 0.19))
 -- Six pips is the most any face needs; the rest are hidden per value.
 local pips = {}
@@ -3750,13 +3758,38 @@ local pip = Instance.new("Frame")
 pip.Name = "Pip" .. i
 pip.AnchorPoint = Vector2.new(0.5, 0.5)
 pip.Size = UDim2.new(0, pipSize, 0, pipSize)
-pip.BackgroundColor3 = pipColor
+pip.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 pip.BackgroundTransparency = fade
 pip.BorderSizePixel = 0
 pip.Visible = false
 pip.ZIndex = die.ZIndex + 1
 pip.Parent = die
 corner(pip, 999)
+-- Drilled, not printed: shadowed where the hole cuts in, lifting
+-- toward the bottom where light bounces back out of it.
+local pipGrad = Instance.new("UIGradient")
+pipGrad.Rotation = 90
+if dark then
+pipGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(188, 190, 208)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+})
+else
+pipGrad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(6, 6, 10)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(92, 94, 110)),
+})
+end
+pipGrad.Parent = pip
+-- A rim sells the depth, but only where there are pixels to spare.
+if sizePx >= 26 then
+local rim = Instance.new("UIStroke")
+rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+rim.Thickness = 1
+rim.Color = dark and Color3.fromRGB(10, 10, 14) or Color3.fromRGB(255, 255, 255)
+rim.Transparency = math.min(1, 0.5 + fade * 0.5)
+rim.Parent = pip
+end
 pips[i] = pip
 end
 local function setFace(v)
@@ -5092,22 +5125,6 @@ if autoCarrySpeedEnabled ~= true and _G.AutoCarrySpeed and _G.AutoCarrySpeed.Dis
 _G.AutoCarrySpeed.Disable()
 end
 if setAutoCarrySpeedVisual then setAutoCarrySpeedVisual(autoCarrySpeedEnabled == true) end
-saveDiceConfig()
-end)
-end
-end
-do
-local row, setVisual = _G.DiceActionToggleRow(Movement, "WalkSpeed Drive (No Lagback)", _G.DicePhysicsSpeed ~= false, 0)
-local lbl = row and row:FindFirstChild("Label")
-if lbl then lbl.TextSize = 11 end
-local btn = row and row:FindFirstChild("ToggleButton")
-if btn then
-btn.Activated:Connect(function()
-_G.DicePhysicsSpeed = not (_G.DicePhysicsSpeed ~= false)
-if setVisual then setVisual(_G.DicePhysicsSpeed ~= false) end
--- Hand WalkSpeed back at once when switching to the direct write,
--- otherwise the raised value stays on the humanoid.
-if not _G.DicePhysicsSpeed then diceStopMoveDrive() end
 saveDiceConfig()
 end)
 end

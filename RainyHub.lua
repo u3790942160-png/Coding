@@ -3255,6 +3255,7 @@ drop = Color3.fromRGB(158, 202, 255),
 good = Color3.fromRGB(64, 214, 132),
 }
 local SIDE_W = 206
+local ART_IMAGE = "rbxassetid://140603483625396"
 function corner(parent, radius)
 local c = Instance.new("UICorner")
 c.CornerRadius = UDim.new(0, radius or 8)
@@ -3549,205 +3550,115 @@ g.Rotation = 90
 g.Parent = wash
 end
 
--- ── sidebar artwork: a hand, drawn rather than imported ────────────────
--- Fingers are not one capsule per bone — that reads as a balloon animal.
--- Each digit is a centreline that spreads, curls and tapers, sampled every
--- few pixels and stamped with overlapping circles, so the silhouette comes
--- out smooth and continuous. The palm is a stack of bars whose width
--- follows a profile curve. Every stamp carries the same cross-axis light
--- ramp, so each form reads as rounded rather than flat, and shading,
--- finger pads and creases go on top.
---
--- Opaque pieces composited by a CanvasGroup: that is what stops the
--- overlaps from seaming, and the group transparency is what makes the
--- hand glassy over the storm.
+-- the artwork: a plain image, nothing drawn behind it
+RainyArt = Instance.new("ImageLabel")
+RainyArt.Name = "Artwork"
+RainyArt.BackgroundTransparency = 1
+RainyArt.BorderSizePixel = 0
+RainyArt.Image = ART_IMAGE
+RainyArt.ScaleType = Enum.ScaleType.Fit
+RainyArt.AnchorPoint = Vector2.new(0.5, 0.5)
+RainyArt.Size = UDim2.new(0, 182, 0, 168)
+RainyArt.Position = UDim2.new(0.5, 0, 0, 178)
+RainyArt.ZIndex = 4
+RainyArt.Parent = RainySidebar
+
+
+-- ── player card, sitting just above the tab column ─────────────────────
 do
-local HAND = {
-fill = Color3.fromRGB(46, 102, 180),
-light = Color3.fromRGB(112, 170, 238),
-lighter = Color3.fromRGB(170, 214, 255),
-shade = Color3.fromRGB(24, 58, 116),
-deep = Color3.fromRGB(14, 36, 80),
-crease = Color3.fromRGB(12, 32, 72),
-}
-local BARREL = ColorSequence.new({
-ColorSequenceKeypoint.new(0, HAND.deep),
-ColorSequenceKeypoint.new(0.18, HAND.fill),
-ColorSequenceKeypoint.new(0.40, HAND.light),
-ColorSequenceKeypoint.new(0.52, HAND.lighter),
-ColorSequenceKeypoint.new(0.74, HAND.fill),
-ColorSequenceKeypoint.new(0.92, HAND.shade),
-ColorSequenceKeypoint.new(1, HAND.deep),
-})
+local card = Instance.new("Frame")
+card.Name = "PlayerCard"
+card.BorderSizePixel = 0
+card.Size = UDim2.new(1, -28, 0, 64)
+card.Position = UDim2.new(0, 14, 0, 264)
+card.BackgroundColor3 = COLORS.row
+card.BackgroundTransparency = 0.18
+card.ZIndex = 6
+card.Parent = RainySidebar
+corner(card, 12)
+stroke(card, RAIN.accent, 1.2, 0.45)
 
--- mcp = knuckle, rot = spread from vertical, curl = total bend, w0/w1 =
--- width at the knuckle and at the tip
-local DIGITS = {
-{mcp = {72, 208}, len = 96, rot = -9, curl = 7, w0 = 25, w1 = 18, joints = {0.46, 0.75}},
-{mcp = {100, 198}, len = 110, rot = -2, curl = 5, w0 = 26, w1 = 19, joints = {0.44, 0.74}},
-{mcp = {128, 204}, len = 100, rot = 5, curl = 7, w0 = 25, w1 = 18, joints = {0.45, 0.75}},
-{mcp = {151, 220}, len = 80, rot = 13, curl = 9, w0 = 22, w1 = 16, joints = {0.45, 0.74}},
-{mcp = {76, 300}, len = 84, rot = -37, curl = -9, w0 = 32, w1 = 23, joints = {0.55}},
-}
-local PALM_PROFILE = {
-{200, 51}, {214, 52}, {236, 52}, {258, 51}, {280, 49},
-{300, 45}, {318, 40}, {336, 34}, {352, 30}, {368, 27}, {384, 25},
-}
+local ring = Instance.new("Frame")
+ring.BorderSizePixel = 0
+ring.Size = UDim2.new(0, 46, 0, 46)
+ring.Position = UDim2.new(0, 10, 0.5, -23)
+ring.BackgroundColor3 = Color3.fromRGB(9, 17, 33)
+ring.BackgroundTransparency = 0.1
+ring.ZIndex = 7
+ring.Parent = card
+corner(ring, 999)
+stroke(ring, RAIN.accentGlow, 1.6, 0.2)
 
-local function palmHalf(y)
-local first, last = PALM_PROFILE[1], PALM_PROFILE[#PALM_PROFILE]
-if y <= first[1] then return first[2] end
-if y >= last[1] then return last[2] end
-for i = 1, #PALM_PROFILE - 1 do
-local a, b = PALM_PROFILE[i], PALM_PROFILE[i + 1]
-if y >= a[1] and y <= b[1] then
-return a[2] + (b[2] - a[2]) * (y - a[1]) / (b[1] - a[1])
-end
-end
-return last[2]
-end
+local avatar = Instance.new("ImageLabel")
+avatar.Name = "Avatar"
+avatar.BackgroundTransparency = 1
+avatar.BorderSizePixel = 0
+avatar.Size = UDim2.new(1, -6, 1, -6)
+avatar.Position = UDim2.new(0, 3, 0, 3)
+avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LP.UserId) .. "&w=150&h=150"
+avatar.ZIndex = 8
+avatar.Parent = ring
+corner(avatar, 999)
 
-local function centreline(d)
-local pts = {}
-local n = math.max(2, math.floor(d.len / 3.5 + 0.5))
-local x, y = d.mcp[1], d.mcp[2]
-for i = 0, n do
-local tt = i / n
-local ang = d.rot + d.curl * (tt ^ 1.25)
-local w = d.w0 + (d.w1 - d.w0) * tt
-if tt > 0.80 then
-w = w * (1 + 0.07 * math.sin(((tt - 0.80) / 0.20) * math.pi))
-end
-table.insert(pts, {x = x, y = y, w = w, ang = ang})
-local rad = math.rad(ang)
-x = x + math.sin(rad) * (d.len / n)
-y = y - math.cos(rad) * (d.len / n)
-end
-return pts
-end
+-- online dot on the rim of the avatar
+local dot = Instance.new("Frame")
+dot.BorderSizePixel = 0
+dot.Size = UDim2.new(0, 13, 0, 13)
+dot.Position = UDim2.new(1, -13, 1, -13)
+dot.BackgroundColor3 = RAIN.good
+dot.ZIndex = 9
+dot.Parent = ring
+corner(dot, 999)
+stroke(dot, Color3.fromRGB(6, 12, 26), 2, 0)
 
-local function piece(parent, x, y, w, h, radius, rot, colour, transparency, z)
-local f = Instance.new("Frame")
-f.BorderSizePixel = 0
-f.AnchorPoint = Vector2.new(0.5, 0.5)
-f.Size = UDim2.new(0, w, 0, h)
-f.Position = UDim2.new(0, x, 0, y)
-f.Rotation = rot or 0
-f.BackgroundColor3 = colour
-f.BackgroundTransparency = transparency or 0
-f.ZIndex = z
-f.Parent = parent
-Instance.new("UICorner", f).CornerRadius = UDim.new(0, radius)
-return f
-end
+local name = Instance.new("TextLabel")
+name.Name = "DisplayName"
+name.BackgroundTransparency = 1
+name.Size = UDim2.new(1, -76, 0, 20)
+name.Position = UDim2.new(0, 68, 0, 12)
+name.Text = LP.DisplayName or LP.Name
+name.TextColor3 = COLORS.white
+name.TextSize = 15
+name.Font = Enum.Font.GothamBold
+name.TextXAlignment = Enum.TextXAlignment.Left
+name.TextTruncate = Enum.TextTruncate.AtEnd
+name.ZIndex = 7
+name.Parent = card
 
-local function barrel(parent, x, y, w, h, radius, rot, z, alpha)
-local f = piece(parent, x, y, w, h, radius, rot, HAND.fill, alpha, z)
-local g = Instance.new("UIGradient")
-g.Color = BARREL
-g.Rotation = 0
-g.Parent = f
-return f
-end
+local handle = Instance.new("TextLabel")
+handle.Name = "Handle"
+handle.BackgroundTransparency = 1
+handle.Size = UDim2.new(1, -76, 0, 16)
+handle.Position = UDim2.new(0, 68, 0, 31)
+handle.Text = "@" .. LP.Name
+handle.TextColor3 = RAIN.accentGlow
+handle.TextSize = 12
+handle.Font = Enum.Font.GothamSemibold
+handle.TextXAlignment = Enum.TextXAlignment.Left
+handle.TextTruncate = Enum.TextTruncate.AtEnd
+handle.ZIndex = 7
+handle.Parent = card
 
--- shading that fades out along its long axis, so it leaves no hard border
-local function softShade(parent, x, y, w, h, rot, colour, transparency, z)
-local f = piece(parent, x, y, w, h, 999, rot, colour, transparency, z)
-local g = Instance.new("UIGradient")
-g.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 1),
-NumberSequenceKeypoint.new(0.5, 0),
-NumberSequenceKeypoint.new(1, 1),
-})
-g.Parent = f
-return f
+local rule = Instance.new("Frame")
+rule.BorderSizePixel = 0
+rule.Size = UDim2.new(1, -80, 0, 2)
+rule.Position = UDim2.new(0, 68, 0, 50)
+rule.BackgroundColor3 = RAIN.accent
+rule.BackgroundTransparency = 0.25
+rule.ZIndex = 7
+rule.Parent = card
+corner(rule, 2)
+local rg = Instance.new("UIGradient")
+rg.Color = ColorSequence.new(RAIN.accentGlow, RAIN.accent)
+rg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.85)})
+rg.Parent = rule
 end
 
-local function hairline(parent, x, y, len, thick, rot, transparency, z)
-local f = piece(parent, x, y, len, thick, thick, rot, HAND.crease, transparency, z)
-local g = Instance.new("UIGradient")
-g.Transparency = NumberSequence.new({
-NumberSequenceKeypoint.new(0, 1),
-NumberSequenceKeypoint.new(0.26, 0),
-NumberSequenceKeypoint.new(0.74, 0),
-NumberSequenceKeypoint.new(1, 1),
-})
-g.Parent = f
-return f
-end
-
--- the drawing lives in its own 206-wide space and is scaled into the
--- sidebar, so the geometry above never has to be re-tuned
-local stage = Instance.new("Frame")
-stage.Name = "HandArt"
-stage.BackgroundTransparency = 1
-stage.BorderSizePixel = 0
-stage.Size = UDim2.new(0, 206, 0, 400)
-stage.Position = UDim2.new(0, 15, 0, 24)
-stage.ZIndex = 4
-stage.Parent = RainySidebar
-local stageScale = Instance.new("UIScale")
-stageScale.Scale = 0.88
-stageScale.Parent = stage
-
-local ok, body = pcall(function() return Instance.new("CanvasGroup") end)
-if not ok or not body then body = Instance.new("Frame") end
-body.Name = "HandBody"
-body.BackgroundTransparency = 1
-body.BorderSizePixel = 0
-body.Size = UDim2.new(1, 0, 1, 0)
-body.ZIndex = 4
-body.Parent = stage
-local grouped = body:IsA("CanvasGroup")
-if grouped then body.GroupTransparency = 0.3 end
-local alpha = grouped and 0 or 0.3
-RainyHandArt = body
-
-local lines = {}
-for _, d in ipairs(DIGITS) do
-table.insert(lines, {def = d, pts = centreline(d)})
-end
-
--- palm, then the thumb mound pushing its left edge out
-for y = 198, 388, 4 do
-barrel(body, 103, y, palmHalf(y) * 2, 20, 10, 0, 5, alpha)
-end
-for y = 250, 320, 4 do
-local bulge = 16 * math.sin(((y - 250) / 70) * math.pi)
-barrel(body, 103 - bulge / 2, y, palmHalf(y) * 2 + bulge, 20, 10, 0, 5, alpha)
-end
--- digits
-for _, line in ipairs(lines) do
-for _, pt in ipairs(line.pts) do
-barrel(body, pt.x, pt.y, pt.w, pt.w, pt.w / 2, pt.ang, 6, alpha)
-end
-end
-
--- form shading
-softShade(body, 82, 282, 58, 90, -12, HAND.light, 0.58, 7)
-softShade(body, 140, 288, 36, 82, 6, HAND.shade, 0.5, 7)
-softShade(body, 103, 232, 92, 28, -2, HAND.shade, 0.66, 7)
-softShade(body, 105, 288, 66, 60, 0, HAND.light, 0.78, 7)
-softShade(body, 103, 356, 78, 40, 0, HAND.shade, 0.6, 7)
-for _, line in ipairs(lines) do
-local first = line.pts[1]
-softShade(body, first.x, first.y + 4, first.w * 1.3, 16, first.ang, HAND.shade, 0.6, 7)
-local pad = line.pts[math.max(1, math.floor(#line.pts * 0.9))]
-softShade(body, pad.x, pad.y, pad.w * 0.66, pad.w * 1.1, pad.ang, HAND.lighter, 0.68, 8)
-end
-
--- knuckle and joint creases, then the palm creases
-for _, line in ipairs(lines) do
-for _, j in ipairs(line.def.joints) do
-local pt = line.pts[math.max(1, math.floor(j * (#line.pts - 1) + 0.5) + 1)]
-if pt then hairline(body, pt.x, pt.y, pt.w * 0.8, 1.8, pt.ang, 0.55, 9) end
-end
-local k = line.pts[1]
-hairline(body, k.x, k.y + 4, k.w * 0.86, 2, k.ang, 0.66, 9)
-end
-hairline(body, 100, 246, 72, 2, -8, 0.78, 9)
-hairline(body, 98, 268, 60, 1.8, 6, 0.8, 9)
-hairline(body, 86, 276, 62, 1.8, 78, 0.8, 9)
+function _G.RainySetArt(assetId)
+if not assetId then return end
+local id = tostring(assetId)
+if not string.find(id, "://") then id = "rbxassetid://" .. id end
+RainyArt.Image = id
 end
 
 -- vignettes so the title and tabs stay readable over the artwork

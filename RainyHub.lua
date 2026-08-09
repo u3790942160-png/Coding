@@ -2,7 +2,7 @@
 	═══════════════════════════════════════════════════════════════
 	  R A I N Y   H U B
 	  Rainy-themed interface — storm backdrop, live rainfall,
-	  and a procedurally drawn translucent blue hand in the sidebar.
+	  and a procedurally drawn blue skull in the sidebar.
 	═══════════════════════════════════════════════════════════════
 ]]
 
@@ -109,7 +109,7 @@ RH.Flags = {
 	playerESP         = false,
 	tracers           = false,
 	stormFlashes      = true,
-	boneGlow          = true,
+	skullGlow          = true,
 	rainOnHud         = true,
 	customAnims       = false,
 	ragdollCountdown  = false,
@@ -499,7 +499,7 @@ local function stormFlash()
 	if not RH.Flags.stormFlashes or RH.Dead then return end
 	local peak = rng:NextNumber(0.86, 0.94)
 	FlashOverlay.BackgroundTransparency = peak
-	if RH.Refs.BoneFlash then RH.Refs.BoneFlash.BackgroundTransparency = 0.62 end
+	if RH.Refs.SkullFlash then RH.Refs.SkullFlash.BackgroundTransparency = 0.62 end
 	if RH.Refs.Outline then RH.Refs.Outline.Transparency = 0 end
 	task.wait(0.05)
 	tween(FlashOverlay, {BackgroundTransparency = 1}, 0.12)
@@ -509,7 +509,7 @@ local function stormFlash()
 		task.wait(0.04)
 		tween(FlashOverlay, {BackgroundTransparency = 1}, 0.3)
 	end
-	if RH.Refs.BoneFlash then tween(RH.Refs.BoneFlash, {BackgroundTransparency = 1}, 0.7) end
+	if RH.Refs.SkullFlash then tween(RH.Refs.SkullFlash, {BackgroundTransparency = 1}, 0.7) end
 	if RH.Refs.Outline then tween(RH.Refs.Outline, {Transparency = 0.15}, 0.7) end
 end
 
@@ -533,7 +533,7 @@ RH.Refs.Sidebar = Sidebar
 
 local SIDE_H = WIN_H - 24
 local ArtLayer = newFrame(Sidebar, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.sidebar, 5)
-ArtLayer.Name = "SkeletonArt"
+ArtLayer.Name = "SkullArt"
 ArtLayer.BackgroundTransparency = 1
 ArtLayer.ClipsDescendants = true
 corner(ArtLayer, 13)
@@ -547,149 +547,124 @@ do
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- HAND ART — translucent blue hand, drawn from primitives
+-- SKULL ART — detailed blue skull, drawn from primitives
 -- ═══════════════════════════════════════════════════════════════
-local BoneRoot = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.sidebar, 6)
-BoneRoot.Name = "Bones"
-BoneRoot.BackgroundTransparency = 1
-BoneRoot.ClipsDescendants = true
+local SkullRoot = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.sidebar, 6)
+SkullRoot.Name = "Skull"
+SkullRoot.BackgroundTransparency = 1
+SkullRoot.ClipsDescendants = true
 
--- The hand is laid out in the sidebar's own 206-wide space.
---
--- Fingers are not capsules-per-bone — that reads as a balloon animal.
--- Each digit is a centreline that spreads, curls and tapers, stamped
--- with overlapping circles so the silhouette comes out smooth and
--- continuous. The palm is a stack of bars whose width follows a profile
--- curve. Every stamp carries the same cross-axis light ramp, so each
--- form reads as rounded rather than flat.
---
--- All of it is opaque and composited by a CanvasGroup, which is what
--- keeps overlapping pieces from showing seams; the group's transparency
--- is what makes the hand glassy.
+local CX = SIDE_W / 2
 
-local HAND_COLORS = {
-	fill    = Color3.fromRGB(46, 102, 180),
-	light   = Color3.fromRGB(112, 170, 238),
-	lighter = Color3.fromRGB(170, 214, 255),
-	shade   = Color3.fromRGB(24, 58, 116),
-	deep    = Color3.fromRGB(14, 36, 80),
-	crease  = Color3.fromRGB(12, 32, 72),
+-- The skull is laid out in the sidebar's own 206-wide space.
+--
+-- The silhouette is one continuous profile — half-width sampled down the
+-- skull and stamped as thin overlapping bars — so the cranium, cheeks and
+-- jaw come out as a single smooth outline. Everything that reads as
+-- structure sits inside that outline: the cheekbone is shading rather
+-- than added geometry, because anything protruding out there just looks
+-- like an ear. Orbits, nasal aperture, teeth and sutures go on top.
+--
+-- Each bar carries the same cross-axis light ramp, so the vault reads as
+-- domed. It is all opaque and composited by a CanvasGroup, which is what
+-- keeps the overlapping pieces from seaming; the group transparency is
+-- what makes the skull glassy.
+
+local SKULL_COLORS = {
+	fill       = Color3.fromRGB(58, 116, 196),
+	light      = Color3.fromRGB(126, 182, 244),
+	lighter    = Color3.fromRGB(186, 222, 255),
+	shade      = Color3.fromRGB(28, 64, 124),
+	deep       = Color3.fromRGB(16, 40, 86),
+	socket     = Color3.fromRGB(6, 15, 36),
+	socketEdge = Color3.fromRGB(10, 26, 58),
+	tooth      = Color3.fromRGB(198, 228, 255),
+	toothShade = Color3.fromRGB(116, 162, 218),
+	crease     = Color3.fromRGB(12, 32, 72),
+	void       = Color3.fromRGB(2, 5, 16),
 }
 
 -- dark edge -> lit centre -> darker edge, across the short axis
 local BARREL = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, HAND_COLORS.deep),
-	ColorSequenceKeypoint.new(0.18, HAND_COLORS.fill),
-	ColorSequenceKeypoint.new(0.40, HAND_COLORS.light),
-	ColorSequenceKeypoint.new(0.52, HAND_COLORS.lighter),
-	ColorSequenceKeypoint.new(0.74, HAND_COLORS.fill),
-	ColorSequenceKeypoint.new(0.92, HAND_COLORS.shade),
-	ColorSequenceKeypoint.new(1, HAND_COLORS.deep),
+	ColorSequenceKeypoint.new(0, SKULL_COLORS.deep),
+	ColorSequenceKeypoint.new(0.12, SKULL_COLORS.shade),
+	ColorSequenceKeypoint.new(0.30, SKULL_COLORS.fill),
+	ColorSequenceKeypoint.new(0.46, SKULL_COLORS.light),
+	ColorSequenceKeypoint.new(0.54, SKULL_COLORS.lighter),
+	ColorSequenceKeypoint.new(0.72, SKULL_COLORS.fill),
+	ColorSequenceKeypoint.new(0.90, SKULL_COLORS.shade),
+	ColorSequenceKeypoint.new(1, SKULL_COLORS.deep),
+})
+local HOLLOW = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, SKULL_COLORS.socketEdge),
+	ColorSequenceKeypoint.new(0.5, SKULL_COLORS.socket),
+	ColorSequenceKeypoint.new(1, SKULL_COLORS.socketEdge),
 })
 
-local DIGITS = {
-	{mcp = {72, 208},  len = 96,  rot = -9,  curl = 7,  w0 = 25, w1 = 18, joints = {0.46, 0.75}}, -- index
-	{mcp = {100, 198}, len = 110, rot = -2,  curl = 5,  w0 = 26, w1 = 19, joints = {0.44, 0.74}}, -- middle
-	{mcp = {128, 204}, len = 100, rot = 5,   curl = 7,  w0 = 25, w1 = 18, joints = {0.45, 0.75}}, -- ring
-	{mcp = {151, 220}, len = 80,  rot = 13,  curl = 9,  w0 = 22, w1 = 16, joints = {0.45, 0.74}}, -- little
-	{mcp = {76, 300},  len = 84,  rot = -37, curl = -9, w0 = 32, w1 = 23, joints = {0.55}},       -- thumb
+-- half-width of the skull at a given y, crown through chin
+local SKULL_PROFILE = {
+	{61, 9}, {64, 18}, {68, 27}, {72, 35}, {77, 43}, {82, 49}, {88, 55},
+	{100, 64}, {112, 69}, {126, 71}, {140, 71}, {152, 69}, {162, 66}, {172, 62},
+	{180, 60}, {188, 60}, {196, 62}, {204, 63}, {212, 61}, {220, 56}, {228, 51},
+	{236, 46}, {244, 45}, {252, 46}, {262, 45}, {272, 42}, {282, 37}, {290, 30},
+	{298, 21}, {304, 11},
 }
 
--- half-width of the palm at a given y
-local PALM_PROFILE = {
-	{200, 51}, {214, 52}, {236, 52}, {258, 51}, {280, 49},
-	{300, 45}, {318, 40}, {336, 34}, {352, 30}, {368, 27}, {384, 25},
-}
+local ORBIT = {dx = 34, y = 180, w = 44, h = 42, r = 17, rot = 7}
 
-local function palmHalfWidth(y)
-	if y <= PALM_PROFILE[1][1] then return PALM_PROFILE[1][2] end
-	local last = PALM_PROFILE[#PALM_PROFILE]
+local function skullHalfWidth(y)
+	local first, last = SKULL_PROFILE[1], SKULL_PROFILE[#SKULL_PROFILE]
+	if y <= first[1] then return first[2] end
 	if y >= last[1] then return last[2] end
-	for i = 1, #PALM_PROFILE - 1 do
-		local a, b = PALM_PROFILE[i], PALM_PROFILE[i + 1]
+	for i = 1, #SKULL_PROFILE - 1 do
+		local a, b = SKULL_PROFILE[i], SKULL_PROFILE[i + 1]
 		if y >= a[1] and y <= b[1] then
-			local t = (y - a[1]) / (b[1] - a[1])
-			return a[2] + (b[2] - a[2]) * t
+			return a[2] + (b[2] - a[2]) * (y - a[1]) / (b[1] - a[1])
 		end
 	end
 	return last[2]
 end
 
--- sample points down a digit, each with its local width and heading
-local function centreline(d, step)
-	local pts = {}
-	local n = math.max(2, math.floor(d.len / (step or 3.5) + 0.5))
-	local x, y = d.mcp[1], d.mcp[2]
-	for i = 0, n do
-		local t = i / n
-		local ang = d.rot + d.curl * (t ^ 1.25)
-		local w = d.w0 + (d.w1 - d.w0) * t
-		if t > 0.80 then
-			w = w * (1 + 0.07 * math.sin(((t - 0.80) / 0.20) * math.pi)) -- finger pad
-		end
-		table.insert(pts, {x = x, y = y, w = w, ang = ang, t = t})
-		local rad = math.rad(ang)
-		x = x + math.sin(rad) * (d.len / n)
-		y = y - math.cos(rad) * (d.len / n)
-	end
-	return pts
-end
-
-local function barrelPaint(obj, rotation)
+local function paint(obj, sequence, rotation)
 	local g = Instance.new("UIGradient")
-	g.Color = BARREL
+	g.Color = sequence
 	g.Rotation = rotation or 0
 	g.Parent = obj
 	return g
 end
 
-local function stamp(parent, x, y, d, ang, z, alpha)
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Size = UDim2.new(0, d, 0, d)
-	f.Position = UDim2.new(0, x, 0, y)
-	f.Rotation = ang
-	f.BackgroundColor3 = HAND_COLORS.fill
-	f.BackgroundTransparency = alpha or 0
-	f.ZIndex = z
-	f.Parent = parent
-	corner(f, 999)
-	barrelPaint(f, 0)
-	return f
-end
-
-local function bar(parent, cx, y, w, h, z, alpha)
+local function piece(parent, x, y, w, h, radius, rot, color, transparency, z)
 	local f = Instance.new("Frame")
 	f.BorderSizePixel = 0
 	f.AnchorPoint = Vector2.new(0.5, 0.5)
 	f.Size = UDim2.new(0, w, 0, h)
-	f.Position = UDim2.new(0, cx, 0, y)
-	f.BackgroundColor3 = HAND_COLORS.fill
-	f.BackgroundTransparency = alpha or 0
+	f.Position = UDim2.new(0, x, 0, y)
+	f.Rotation = rot or 0
+	f.BackgroundColor3 = color or SKULL_COLORS.fill
+	f.BackgroundTransparency = transparency or 0
 	f.ZIndex = z
 	f.Parent = parent
-	corner(f, h / 2)
-	barrelPaint(f, 0)
+	corner(f, radius)
 	return f
 end
 
--- shading blob: an ellipse that fades out along its long axis so the
--- shading has no hard border
+local function boneBar(parent, y, w, h, z, alpha)
+	local f = piece(parent, CX, y, w, h, h / 2, 0, SKULL_COLORS.fill, alpha, z)
+	paint(f, BARREL, 0)
+	return f
+end
+
+local function boneBox(parent, x, y, w, h, radius, rot, z, alpha)
+	local f = piece(parent, x, y, w, h, radius, rot, SKULL_COLORS.fill, alpha, z)
+	paint(f, BARREL, 0)
+	return f
+end
+
+-- shading blob that fades out along its long axis, so nothing it covers
+-- picks up a hard border
 local function softShade(parent, x, y, w, h, rot, color, transparency, z)
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Size = UDim2.new(0, w, 0, h)
-	f.Position = UDim2.new(0, x, 0, y)
-	f.Rotation = rot
-	f.BackgroundColor3 = color
-	f.BackgroundTransparency = transparency
-	f.ZIndex = z
-	f.Parent = parent
-	corner(f, 999)
+	local f = piece(parent, x, y, w, h, 999, rot, color, transparency, z)
 	local g = Instance.new("UIGradient")
-	g.Rotation = 0
 	g.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
 		NumberSequenceKeypoint.new(0.5, 0),
@@ -699,34 +674,23 @@ local function softShade(parent, x, y, w, h, rot, color, transparency, z)
 	return f
 end
 
--- skin crease: a hairline that fades out at both ends
-local function crease(parent, x, y, len, thick, rot, transparency, z)
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Size = UDim2.new(0, len, 0, thick)
-	f.Position = UDim2.new(0, x, 0, y)
-	f.Rotation = rot
-	f.BackgroundColor3 = HAND_COLORS.crease
-	f.BackgroundTransparency = transparency
-	f.ZIndex = z
-	f.Parent = parent
-	corner(f, thick)
+-- hairline that fades out at both ends: sutures, rims, creases
+local function hairline(parent, x, y, len, thick, rot, color, transparency, z)
+	local f = piece(parent, x, y, len, thick, thick, rot, color, transparency, z)
 	local g = Instance.new("UIGradient")
-	g.Rotation = 0
 	g.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.26, 0),
-		NumberSequenceKeypoint.new(0.74, 0),
+		NumberSequenceKeypoint.new(0.24, 0),
+		NumberSequenceKeypoint.new(0.76, 0),
 		NumberSequenceKeypoint.new(1, 1),
 	})
 	g.Parent = f
 	return f
 end
 
--- CanvasGroup composites the whole hand as one layer, so overlapping
--- opaque pieces never seam. Older clients without it fall back to a
--- plain Frame, where the transparency has to go on each piece instead.
+-- CanvasGroup composites the whole skull as one layer, so overlapping
+-- opaque pieces never seam. Older clients without it fall back to a plain
+-- Frame, where the transparency has to go on each piece instead.
 local function newLayer(parent, name, groupTransparency, z)
 	local ok, layer = pcall(function() return Instance.new("CanvasGroup") end)
 	if not ok or not layer then
@@ -746,104 +710,138 @@ local function newLayer(parent, name, groupTransparency, z)
 	return layer, grouped
 end
 
-local function buildSkeleton()
-	BoneRoot:ClearAllChildren()
+local function buildSkull()
+	SkullRoot:ClearAllChildren()
 
-	local lines = {}
-	for _, d in ipairs(DIGITS) do
-		table.insert(lines, {def = d, pts = centreline(d)})
-	end
+	-- halo behind the skull
+	if RH.Flags.skullGlow then
+		local bloom = newFrame(SkullRoot, UDim2.new(0, 182, 0, 300), UDim2.new(0, 12, 0, 44), THEME.accent, 5)
+		bloom.BackgroundTransparency = 0.86
+		corner(bloom, 91)
+		gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.62, 1)
 
-	-- halo behind the hand
-	if RH.Flags.boneGlow then
-		local bloom = newFrame(BoneRoot, UDim2.new(0, 190, 0, 310), UDim2.new(0, 8, 0, 66), THEME.accent, 5)
-		bloom.BackgroundTransparency = 0.84
-		corner(bloom, 95)
-		gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.6, 1)
-
-		local halo, grouped = newLayer(BoneRoot, "HandHalo", 0.5, 6)
-		RH.Refs.HandHalo = grouped and halo or nil
+		local halo, grouped = newLayer(SkullRoot, "SkullHalo", 0.5, 6)
+		RH.Refs.SkullHalo = grouped and halo or nil
 		local haloAlpha = grouped and 0 or 0.6
-		for _, line in ipairs(lines) do
-			for i, p in ipairs(line.pts) do
-				if i % 2 == 1 or i == #line.pts then
-					local s = stamp(halo, p.x, p.y, p.w + 6, p.ang, 6, haloAlpha)
-					s.BackgroundColor3 = THEME.accent
-					local g = s:FindFirstChildOfClass("UIGradient")
-					if g then g:Destroy() end
-				end
-			end
-		end
-		for y = 198, 388, 9 do
-			local b = bar(halo, 104, y, palmHalfWidth(y) * 2 + 8, 24, 6, haloAlpha)
-			b.BackgroundColor3 = THEME.accent
-			local g = b:FindFirstChildOfClass("UIGradient")
-			if g then g:Destroy() end
+		for y = 61, 305, 4 do
+			piece(halo, CX, y, skullHalfWidth(y) * 2 + 7, 10, 5, 0, THEME.accent, haloAlpha, 6)
 		end
 	else
-		RH.Refs.HandHalo = nil
+		RH.Refs.SkullHalo = nil
 	end
 
-	-- the hand itself
-	local body, grouped = newLayer(BoneRoot, "HandBody", 0.34, 8)
-	local alpha = grouped and 0 or 0.34
+	local body, grouped = newLayer(SkullRoot, "SkullBody", 0.26, 8)
+	local a = grouped and 0 or 0.26
 
-	for y = 198, 388, 4 do
-		bar(body, 104, y, palmHalfWidth(y) * 2, 20, 8, alpha)
+	-- ── silhouette ────────────────────────────────────────────────
+	for y = 61, 305, 2 do
+		boneBar(body, y, skullHalfWidth(y) * 2, 6, 8, a)
 	end
-	-- the thumb mound pushes the left edge of the palm outward
-	for y = 250, 320, 4 do
-		local bulge = 16 * math.sin(((y - 250) / 70) * math.pi)
-		bar(body, 104 - bulge / 2, y, palmHalfWidth(y) * 2 + bulge, 20, 8, alpha)
+	-- brow ridges standing proud over each orbit, glabella between them
+	for _, s in ipairs({-1, 1}) do
+		boneBox(body, CX + s * 33, 159, 54, 16, 8, s * -6, 9, a)
 	end
-	for _, line in ipairs(lines) do
-		for _, p in ipairs(line.pts) do
-			stamp(body, p.x, p.y, p.w, p.ang, 9, alpha)
+	boneBox(body, CX, 163, 20, 14, 7, 0, 9, a)
+
+	-- ── form shading ──────────────────────────────────────────────
+	softShade(body, CX - 26, 106, 70, 78, 0, SKULL_COLORS.light, 0.66, 10)   -- frontal highlight
+	softShade(body, CX + 46, 128, 44, 100, 0, SKULL_COLORS.shade, 0.6, 10)   -- far side of the vault
+	softShade(body, CX - 58, 172, 32, 46, 0, SKULL_COLORS.shade, 0.5, 10)    -- temporal fossa
+	softShade(body, CX + 58, 172, 32, 46, 0, SKULL_COLORS.shade, 0.42, 10)
+	softShade(body, CX - 62, 204, 20, 34, 0, SKULL_COLORS.shade, 0.5, 10)    -- hollow behind the arch
+	softShade(body, CX + 62, 204, 20, 34, 0, SKULL_COLORS.shade, 0.45, 10)
+	softShade(body, CX, 210, 46, 30, 0, SKULL_COLORS.shade, 0.58, 10)        -- under the nasal root
+	softShade(body, CX, 244, 84, 22, 0, SKULL_COLORS.shade, 0.6, 10)         -- above the tooth row
+	softShade(body, CX, 286, 60, 32, 0, SKULL_COLORS.light, 0.68, 10)        -- chin catch
+	softShade(body, CX, 302, 70, 22, 0, SKULL_COLORS.shade, 0.55, 10)        -- jaw falls away
+	-- cheekbones: read as light and shadow, never as extra geometry
+	softShade(body, CX - 45, 199, 42, 20, -20, SKULL_COLORS.lighter, 0.55, 10)
+	softShade(body, CX + 45, 199, 42, 20, 20, SKULL_COLORS.light, 0.66, 10)
+	for _, s in ipairs({-1, 1}) do
+		softShade(body, CX + s * 44, 214, 40, 16, s * 16, SKULL_COLORS.shade, 0.5, 10)
+		hairline(body, CX + s * 44, 208, 40, 2, s * -16, SKULL_COLORS.lighter, 0.7, 10)
+	end
+
+	-- ── orbits ────────────────────────────────────────────────────
+	for _, s in ipairs({-1, 1}) do
+		local ox = CX + s * ORBIT.dx
+		piece(body, ox, ORBIT.y, ORBIT.w, ORBIT.h, ORBIT.r, s * ORBIT.rot, SKULL_COLORS.socketEdge, 0, 11)
+		local inner = piece(body, ox + s * 1.5, ORBIT.y + 2, ORBIT.w - 8, ORBIT.h - 8,
+			ORBIT.r - 4, s * ORBIT.rot, SKULL_COLORS.socket, 0, 12)
+		paint(inner, HOLLOW, 120)
+		softShade(body, ox - s * 8, ORBIT.y + 8, 14, 12, 0, SKULL_COLORS.void, 0.3, 13) -- optic canal
+		-- lit rims: bright along the top, softer down the outer edge
+		hairline(body, ox, ORBIT.y - ORBIT.h / 2 + 1.5, ORBIT.w - 8, 2.4, s * ORBIT.rot, SKULL_COLORS.lighter, 0.55, 13)
+		hairline(body, ox + s * (ORBIT.w / 2 - 2), ORBIT.y + 3, ORBIT.h - 14, 2.2, 90 + s * ORBIT.rot, SKULL_COLORS.light, 0.7, 13)
+		hairline(body, ox, ORBIT.y + ORBIT.h / 2 - 1, ORBIT.w - 14, 1.8, s * ORBIT.rot, SKULL_COLORS.light, 0.78, 13)
+		softShade(body, ox - s * 7, ORBIT.y - ORBIT.h / 2 + 2, 8, 5, 0, SKULL_COLORS.crease, 0.55, 13) -- supraorbital notch
+		softShade(body, ox + s * 2, ORBIT.y + ORBIT.h / 2 + 9, 6, 5, 0, SKULL_COLORS.crease, 0.5, 13)  -- infraorbital foramen
+	end
+
+	-- ── nasal aperture ────────────────────────────────────────────
+	for y = 198, 236, 2 do
+		local t = (y - 198) / 38
+		local w = 6 + 24 * (t ^ 1.8)
+		local n = piece(body, CX, y, w, 5, 2.5, 0, SKULL_COLORS.socket, 0, 12)
+		paint(n, HOLLOW, 0)
+	end
+	hairline(body, CX, 222, 20, 2.2, 90, SKULL_COLORS.light, 0.74, 13)      -- vomer
+	for _, s in ipairs({-1, 1}) do
+		hairline(body, CX + s * 7, 200, 16, 2, s * 74, SKULL_COLORS.lighter, 0.7, 13) -- nasal bones
+	end
+	piece(body, CX, 240, 10, 7, 3, 0, SKULL_COLORS.lighter, 0.5, 13)        -- nasal spine
+
+	-- ── teeth ─────────────────────────────────────────────────────
+	local UPPER = {-31, -23.5, -16, -8.5, -1.5, 5.5, 13, 20.5, 28, 34.5}
+	local LOWER = {-29, -22, -15, -8, -1.5, 5, 12, 19, 26, 32}
+	local function toothRow(row, yBase, heightAtCentre, upper)
+		for _, dx in ipairs(row) do
+			local k = math.abs(dx) / 32
+			local t = piece(body, CX + dx, yBase - k * k * 3.5,
+				8.6 - k * 3.0, heightAtCentre - k * 4, 3, dx * 0.16,
+				SKULL_COLORS.tooth, k * 0.35, 13)
+			paint(t, ColorSequence.new(
+				upper and SKULL_COLORS.tooth or SKULL_COLORS.toothShade,
+				upper and SKULL_COLORS.toothShade or SKULL_COLORS.tooth
+			), 90)
 		end
 	end
+	toothRow(UPPER, 251, 15, true)
+	toothRow(LOWER, 266, 13, false)
+	hairline(body, CX + 1, 258.5, 70, 2.4, 0, SKULL_COLORS.crease, 0.45, 14) -- bite line
 
-	-- form shading
-	softShade(body, 82, 282, 58, 90, -12, HAND_COLORS.light, 0.58, 10)  -- thumb mound catches light
-	softShade(body, 140, 288, 36, 82, 6, HAND_COLORS.shade, 0.5, 10)    -- shaded pinky edge
-	softShade(body, 104, 232, 92, 28, -2, HAND_COLORS.shade, 0.66, 10)  -- occlusion under the knuckles
-	softShade(body, 106, 288, 66, 60, 0, HAND_COLORS.light, 0.78, 10)   -- pool of light in the palm
-	softShade(body, 104, 356, 78, 40, 0, HAND_COLORS.shade, 0.6, 10)    -- wrist falls away
-	for _, line in ipairs(lines) do
-		local first = line.pts[1]
-		softShade(body, first.x, first.y + 4, first.w * 1.3, 16, first.ang, HAND_COLORS.shade, 0.6, 10)
-		local pad = line.pts[math.max(1, math.floor(#line.pts * 0.9))]
-		softShade(body, pad.x, pad.y, pad.w * 0.66, pad.w * 1.1, pad.ang, HAND_COLORS.lighter, 0.68, 11)
+	-- ── sutures and fine detail ───────────────────────────────────
+	for i = 0, 16 do
+		local t = i / 16
+		local x = CX - 60 + t * 120
+		local y = 110 + ((math.abs(t - 0.5) * 2) ^ 2) * 18 + (i % 2 == 1 and 1.4 or -1.4)
+		hairline(body, x, y, 10, 1.7, (t - 0.5) * 52, SKULL_COLORS.crease, 0.6, 13)
 	end
-
-	-- creases at the knuckle and each joint
-	for _, line in ipairs(lines) do
-		for _, j in ipairs(line.def.joints) do
-			local p = line.pts[math.max(1, math.floor(j * (#line.pts - 1) + 0.5) + 1)]
-			if p then crease(body, p.x, p.y, p.w * 0.8, 1.8, p.ang, 0.55, 12) end
-		end
-		local k = line.pts[1]
-		crease(body, k.x, k.y + 4, k.w * 0.86, 2, k.ang, 0.66, 12)
+	hairline(body, CX, 86, 40, 1.7, 90, SKULL_COLORS.crease, 0.7, 13)        -- sagittal
+	for _, s in ipairs({-1, 1}) do
+		hairline(body, CX + s * 55, 148, 44, 1.7, s * 60, SKULL_COLORS.crease, 0.7, 13)  -- temporal line
+		hairline(body, CX + s * 60, 184, 28, 1.6, s * 14, SKULL_COLORS.crease, 0.74, 13) -- squamosal
+		hairline(body, CX + s * 40, 228, 24, 1.6, s * 66, SKULL_COLORS.crease, 0.76, 13) -- zygomaticomaxillary
+		hairline(body, CX + s * 41, 258, 42, 1.8, s * 66, SKULL_COLORS.crease, 0.7, 13)  -- jaw line
+		softShade(body, CX + s * 26, 282, 7, 6, 0, SKULL_COLORS.crease, 0.55, 13)        -- mental foramen
 	end
-	-- palm creases
-	crease(body, 100, 246, 72, 2, -8, 0.78, 12)
-	crease(body, 98, 268, 60, 1.8, 6, 0.8, 12)
-	crease(body, 86, 276, 62, 1.8, 78, 0.8, 12)
+	hairline(body, CX, 292, 20, 1.8, 90, SKULL_COLORS.crease, 0.72, 13)      -- mental symphysis
 end
-RH.BuildSkeleton = buildSkeleton
-buildSkeleton()
+RH.BuildSkull = buildSkull
+buildSkull()
 
--- Bone bloom that flares with the storm.
-local BoneFlash = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.accentGlow, 14)
-BoneFlash.Name = "BoneFlash"
-BoneFlash.BackgroundTransparency = 1
-corner(BoneFlash, 13)
-RH.Refs.BoneFlash = BoneFlash
+-- Bloom over the skull that flares with the storm.
+local SkullFlash = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.accentGlow, 14)
+SkullFlash.Name = "SkullFlash"
+SkullFlash.BackgroundTransparency = 1
+corner(SkullFlash, 13)
+RH.Refs.SkullFlash = SkullFlash
 
--- Slow breathing pulse on the glow behind the hand.
+-- Slow breathing pulse on the glow behind the skull.
 task.spawn(function()
 	local up = true
 	while not RH.Dead do
-		local halo = RH.Refs.HandHalo
+		local halo = RH.Refs.SkullHalo
 		if halo and halo.Parent then
 			tween(halo, {GroupTransparency = up and 0.4 or 0.62}, 1.9, Enum.EasingStyle.Sine)
 		end
@@ -1753,8 +1751,8 @@ end)
 toggleRow(VisualPage, "Storm Flashes", "stormFlashes", 4, function(on)
 	if not on and RH.Refs.Flash then RH.Refs.Flash.BackgroundTransparency = 1 end
 end)
-toggleRow(VisualPage, "Hand Glow", "boneGlow", 5, function()
-	buildSkeleton()
+toggleRow(VisualPage, "Skull Glow", "skullGlow", 5, function()
+	buildSkull()
 end)
 cycleRow(VisualPage, "Window Opacity", "windowOpacity", {"Solid", "Glass", "Ghost"}, 6, function(mode)
 	local map = {Solid = 0, Glass = 0.16, Ghost = 0.34}

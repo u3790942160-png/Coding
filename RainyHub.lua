@@ -3255,7 +3255,6 @@ drop = Color3.fromRGB(158, 202, 255),
 good = Color3.fromRGB(64, 214, 132),
 }
 local SIDE_W = 206
-local ART_IMAGE = "rbxassetid://140603483625396"
 function corner(parent, radius)
 local c = Instance.new("UICorner")
 c.CornerRadius = UDim.new(0, radius or 8)
@@ -3550,131 +3549,289 @@ g.Rotation = 90
 g.Parent = wash
 end
 
--- the artwork: a plain image, nothing drawn behind it
-RainyArt = Instance.new("ImageLabel")
-RainyArt.Name = "Artwork"
-RainyArt.BackgroundTransparency = 1
-RainyArt.BorderSizePixel = 0
-RainyArt.Image = ART_IMAGE
-RainyArt.ScaleType = Enum.ScaleType.Fit
-RainyArt.AnchorPoint = Vector2.new(0.5, 0.5)
-RainyArt.Size = UDim2.new(0, 182, 0, 168)
-RainyArt.Position = UDim2.new(0.5, 0, 0, 178)
-RainyArt.ZIndex = 4
-RainyArt.Parent = RainySidebar
-
--- Say so in the console when the asset does not resolve, rather than just
--- showing an empty slot. A Decal id used where an Image id is needed is
--- the usual cause, and the two look identical in a URL.
-task.spawn(function()
-local ok = pcall(function()
-game:GetService("ContentProvider"):PreloadAsync({RainyArt})
-end)
-if (not ok) or (RainyArt.IsLoaded == false) then
-warn("[Rainy Hub] artwork " .. tostring(RainyArt.Image) .. " did not load. "
-.. "If that number is a Decal id, use the Image id instead: "
-.. "_G.RainySetArt(\"rbxassetid://<image id>\")")
-else
-print("[Rainy Hub] artwork loaded: " .. tostring(RainyArt.Image))
-end
-end)
-
-
--- ── player card, sitting just above the tab column ─────────────────────
+-- ── sidebar artwork: the hand, traced from a photo ─────────────────────
+-- Roblox UI has no path or polygon primitive, so the outline is stored as
+-- scanline spans lifted off the source image: one row per entry as
+-- {y, x1, x2, and five brightness samples across the span}. Each span
+-- becomes a Frame carrying a five-stop gradient, so the silhouette is the
+-- real one and the shading is the real light on it, remapped to blue.
+-- 221 spans on a 176x214 grid.
 do
-local card = Instance.new("Frame")
-card.Name = "PlayerCard"
-card.BorderSizePixel = 0
-card.Size = UDim2.new(1, -28, 0, 64)
-card.Position = UDim2.new(0, 14, 0, 264)
-card.BackgroundColor3 = COLORS.row
-card.BackgroundTransparency = 0.18
-card.ZIndex = 6
-card.Parent = RainySidebar
-corner(card, 12)
-stroke(card, RAIN.accent, 1.2, 0.45)
+local HAND_ROWS = {
+{0,97,102,230,212,198,212,233},
+{2,94,105,230,194,184,216,255},
+{4,93,106,194,155,166,198,255},
+{6,92,107,177,123,155,194,255},
+{6,132,136,255,255,255,255,255},
+{8,92,107,148,102,141,184,251},
+{8,129,140,233,216,230,255,255},
+{10,92,107,131,92,131,177,247},
+{10,128,141,184,162,194,219,255},
+{12,92,107,127,92,127,177,244},
+{12,127,141,159,127,166,201,255},
+{14,57,61,255,255,255,255,255},
+{14,92,107,127,99,131,177,244},
+{14,126,141,166,106,141,191,251},
+{16,54,64,230,201,198,212,240},
+{16,91,107,159,99,138,177,244},
+{16,126,141,148,102,138,187,255},
+{18,53,66,194,159,162,187,240},
+{18,91,107,152,99,138,177,244},
+{18,126,140,138,106,141,177,230},
+{20,52,66,180,134,152,170,216},
+{20,91,107,148,95,134,177,244},
+{20,125,140,162,109,145,180,237},
+{22,52,67,155,123,145,170,230},
+{22,91,106,138,92,131,162,216},
+{22,125,140,152,109,152,184,244},
+{24,52,67,148,120,141,166,223},
+{24,91,106,131,92,131,159,219},
+{24,125,140,141,109,155,187,244},
+{26,51,67,173,120,141,166,219},
+{26,91,106,127,95,138,166,226},
+{26,124,140,159,106,148,191,247},
+{28,51,67,170,120,145,166,216},
+{28,90,106,162,99,134,180,233},
+{28,124,140,145,102,152,191,251},
+{30,51,67,166,120,152,170,208},
+{30,90,106,162,106,145,191,240},
+{30,124,139,134,102,141,187,226},
+{32,51,67,162,116,152,170,201},
+{32,90,106,159,109,152,198,247},
+{32,123,139,166,99,152,194,233},
+{34,51,67,159,113,148,166,194},
+{34,90,106,152,116,162,201,247},
+{34,123,139,155,102,162,201,240},
+{36,51,68,162,113,145,162,219},
+{36,90,106,148,123,170,205,251},
+{36,123,139,145,109,173,205,247},
+{38,52,68,134,113,148,173,223},
+{38,89,106,173,127,162,198,251},
+{38,123,138,138,116,177,201,233},
+{40,52,68,141,120,159,180,226},
+{40,89,106,166,131,162,198,251},
+{40,122,138,166,116,166,201,240},
+{42,52,68,148,127,166,191,233},
+{42,89,106,155,131,159,194,247},
+{42,122,138,159,120,170,205,251},
+{44,52,68,152,131,170,194,233},
+{44,89,106,145,134,159,191,244},
+{44,122,138,148,120,166,208,255},
+{46,52,68,148,134,173,198,233},
+{46,88,106,159,127,162,187,237},
+{46,121,138,170,116,152,198,255},
+{46,161,169,255,240,240,255,255},
+{48,52,68,145,134,177,198,230},
+{48,88,106,138,127,166,187,233},
+{48,121,137,152,109,148,198,240},
+{48,159,171,223,191,198,230,251},
+{50,51,68,166,134,170,191,226},
+{50,88,106,123,127,170,184,226},
+{50,120,137,170,109,145,187,240},
+{50,158,171,201,166,184,198,219},
+{52,51,68,155,134,166,187,216},
+{52,87,106,148,116,177,184,219},
+{52,120,137,152,109,145,184,240},
+{52,157,171,194,159,173,198,223},
+{54,51,69,148,127,170,184,226},
+{54,87,106,148,127,184,191,223},
+{54,119,137,166,116,141,184,240},
+{54,156,170,194,155,170,191,226},
+{56,51,69,138,120,166,180,216},
+{56,87,106,145,138,191,205,226},
+{56,119,137,152,127,155,187,237},
+{56,155,170,194,152,173,194,244},
+{58,51,69,134,116,162,180,208},
+{58,87,106,145,145,201,212,230},
+{58,118,137,177,138,166,191,237},
+{58,154,169,198,152,162,191,233},
+{60,51,69,134,116,166,187,208},
+{60,87,106,138,148,205,216,230},
+{60,118,137,166,148,184,201,240},
+{60,153,169,198,159,170,194,247},
+{62,11,21,247,223,219,230,247},
+{62,51,70,134,120,180,198,230},
+{62,87,106,134,148,208,216,230},
+{62,117,137,177,159,198,205,244},
+{62,152,168,198,159,177,191,237},
+{64,11,24,205,177,184,201,237},
+{64,51,70,138,123,187,205,230},
+{64,86,106,148,148,201,216,230},
+{64,116,137,180,155,205,208,247},
+{64,151,167,194,159,177,198,233},
+{66,10,26,208,162,173,187,223},
+{66,51,71,138,138,191,212,233},
+{66,86,106,134,148,198,212,233},
+{66,116,136,159,159,201,208,233},
+{66,150,166,187,155,177,201,233},
+{68,10,27,194,159,170,173,194},
+{68,51,71,138,138,194,216,212},
+{68,86,106,123,152,194,208,237},
+{68,115,136,162,148,191,208,240},
+{68,148,166,201,152,173,201,251},
+{70,10,29,180,159,170,166,173},
+{70,51,72,138,141,194,216,194},
+{70,85,105,134,138,180,201,223},
+{70,114,135,170,141,191,208,226},
+{70,147,165,194,145,170,201,247},
+{72,9,30,194,159,170,162,141},
+{72,52,72,113,155,198,208,177},
+{72,85,105,127,138,177,194,219},
+{72,114,135,148,141,187,205,233},
+{72,146,164,184,145,166,198,237},
+{74,9,30,177,162,173,159,123},
+{74,52,73,113,148,194,191,155},
+{74,85,105,123,134,173,187,216},
+{74,113,134,166,138,170,201,223},
+{74,145,164,180,148,170,201,247},
+{76,8,31,187,159,177,155,106},
+{76,52,73,109,138,180,180,155},
+{76,84,105,145,127,170,180,208},
+{76,113,134,155,148,177,198,233},
+{76,143,163,198,162,170,187,237},
+{78,8,31,170,162,180,155,109},
+{78,52,79,99,148,173,170,159},
+{78,84,106,145,138,170,180,208},
+{78,111,133,187,148,180,194,219},
+{78,142,162,191,170,180,187,226},
+{80,7,32,155,166,180,159,102},
+{80,52,133,116,173,159,194,191},
+{80,140,161,205,170,187,194,219},
+{82,6,32,155,162,177,159,120},
+{82,52,132,120,184,159,180,187},
+{82,139,160,194,173,191,198,219},
+{84,5,32,155,166,173,159,116},
+{84,52,132,123,187,159,184,180},
+{84,138,159,184,173,194,198,223},
+{86,5,32,138,166,173,159,113},
+{86,52,158,134,187,187,177,198},
+{88,4,32,131,159,177,162,109},
+{88,51,157,131,198,191,170,198},
+{90,3,32,113,148,177,173,109},
+{90,51,156,131,201,191,166,198},
+{92,3,32,95,152,184,180,123},
+{92,51,155,131,205,187,166,194},
+{94,3,32,95,155,187,187,138},
+{94,50,154,120,208,187,162,198},
+{96,4,32,102,166,191,191,148},
+{96,50,154,123,208,187,159,205},
+{98,4,32,106,166,191,191,152},
+{98,50,153,138,205,194,152,212},
+{100,4,32,113,162,191,194,159},
+{100,48,152,138,208,201,148,212},
+{102,5,33,109,162,191,194,155},
+{102,47,152,145,212,205,145,216},
+{104,5,33,109,159,191,194,159},
+{104,46,152,152,216,198,145,216},
+{106,5,33,109,159,184,187,159},
+{106,42,152,159,212,198,148,212},
+{108,5,35,113,155,177,170,155},
+{108,38,151,162,212,201,155,212},
+{110,5,151,155,173,212,170,198},
+{112,5,151,148,180,205,166,201},
+{114,5,151,145,180,198,162,205},
+{116,5,151,138,180,194,162,208},
+{118,4,151,131,177,191,159,212},
+{120,4,151,120,177,184,152,216},
+{122,4,151,109,173,180,145,219},
+{124,3,151,92,173,177,141,223},
+{126,3,151,81,177,173,138,223},
+{128,3,151,74,177,173,138,226},
+{130,3,151,70,180,173,138,226},
+{132,3,151,67,177,173,141,226},
+{134,3,151,63,173,170,145,230},
+{136,3,151,56,170,173,145,230},
+{138,4,151,49,162,177,145,230},
+{140,5,151,42,159,180,145,233},
+{142,6,151,31,152,184,145,233},
+{144,7,151,24,145,184,148,230},
+{146,9,151,21,148,184,155,230},
+{148,10,151,10,145,187,162,226},
+{150,12,151,10,148,191,170,223},
+{152,13,151,7,148,194,173,219},
+{154,14,150,7,145,198,180,219},
+{156,15,150,7,145,201,184,216},
+{158,17,150,14,141,205,187,212},
+{160,18,150,17,138,205,191,205},
+{162,19,150,17,134,201,194,198},
+{164,20,149,21,127,198,198,198},
+{166,21,149,24,120,194,201,194},
+{168,21,148,21,109,191,201,194},
+{170,22,148,24,99,187,201,191},
+{172,23,147,17,92,180,201,187},
+{174,24,147,21,85,173,205,184},
+{176,25,146,21,85,170,201,184},
+{178,26,145,24,81,162,205,184},
+{180,26,145,21,81,159,208,180},
+{182,28,144,31,88,152,212,180},
+{184,29,144,38,92,152,216,177},
+{186,29,143,38,88,152,223,180},
+{188,30,142,38,85,148,226,184},
+{190,30,142,35,77,145,226,180},
+{192,31,141,35,77,138,219,184},
+{194,31,140,28,77,131,212,187},
+{196,31,140,21,85,131,208,184},
+{198,32,140,17,92,148,205,177},
+{200,32,139,14,95,162,194,184},
+{202,32,139,14,99,177,187,180},
+{204,32,138,10,99,187,177,184},
+{206,32,138,10,99,191,173,180},
+{208,32,137,14,95,191,173,177},
+{210,32,137,14,102,194,184,166},
+{212,31,136,7,99,191,191,155},
+}
 
-local ring = Instance.new("Frame")
-ring.BorderSizePixel = 0
-ring.Size = UDim2.new(0, 46, 0, 46)
-ring.Position = UDim2.new(0, 10, 0.5, -23)
-ring.BackgroundColor3 = Color3.fromRGB(9, 17, 33)
-ring.BackgroundTransparency = 0.1
-ring.ZIndex = 7
-ring.Parent = card
-corner(ring, 999)
-stroke(ring, RAIN.accentGlow, 1.6, 0.2)
-
-local avatar = Instance.new("ImageLabel")
-avatar.Name = "Avatar"
-avatar.BackgroundTransparency = 1
-avatar.BorderSizePixel = 0
-avatar.Size = UDim2.new(1, -6, 1, -6)
-avatar.Position = UDim2.new(0, 3, 0, 3)
-avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LP.UserId) .. "&w=150&h=150"
-avatar.ZIndex = 8
-avatar.Parent = ring
-corner(avatar, 999)
-
--- online dot on the rim of the avatar
-local dot = Instance.new("Frame")
-dot.BorderSizePixel = 0
-dot.Size = UDim2.new(0, 13, 0, 13)
-dot.Position = UDim2.new(1, -13, 1, -13)
-dot.BackgroundColor3 = RAIN.good
-dot.ZIndex = 9
-dot.Parent = ring
-corner(dot, 999)
-stroke(dot, Color3.fromRGB(6, 12, 26), 2, 0)
-
-local name = Instance.new("TextLabel")
-name.Name = "DisplayName"
-name.BackgroundTransparency = 1
-name.Size = UDim2.new(1, -76, 0, 20)
-name.Position = UDim2.new(0, 68, 0, 12)
-name.Text = LP.DisplayName or LP.Name
-name.TextColor3 = COLORS.white
-name.TextSize = 15
-name.Font = Enum.Font.GothamBold
-name.TextXAlignment = Enum.TextXAlignment.Left
-name.TextTruncate = Enum.TextTruncate.AtEnd
-name.ZIndex = 7
-name.Parent = card
-
-local handle = Instance.new("TextLabel")
-handle.Name = "Handle"
-handle.BackgroundTransparency = 1
-handle.Size = UDim2.new(1, -76, 0, 16)
-handle.Position = UDim2.new(0, 68, 0, 31)
-handle.Text = "@" .. LP.Name
-handle.TextColor3 = RAIN.accentGlow
-handle.TextSize = 12
-handle.Font = Enum.Font.GothamSemibold
-handle.TextXAlignment = Enum.TextXAlignment.Left
-handle.TextTruncate = Enum.TextTruncate.AtEnd
-handle.ZIndex = 7
-handle.Parent = card
-
-local rule = Instance.new("Frame")
-rule.BorderSizePixel = 0
-rule.Size = UDim2.new(1, -80, 0, 2)
-rule.Position = UDim2.new(0, 68, 0, 50)
-rule.BackgroundColor3 = RAIN.accent
-rule.BackgroundTransparency = 0.25
-rule.ZIndex = 7
-rule.Parent = card
-corner(rule, 2)
-local rg = Instance.new("UIGradient")
-rg.Color = ColorSequence.new(RAIN.accentGlow, RAIN.accent)
-rg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.85)})
-rg.Parent = rule
+local DEEP = Color3.fromRGB(14, 36, 80)
+local MID = Color3.fromRGB(46, 102, 180)
+local LIGHT = Color3.fromRGB(176, 216, 255)
+local function ramp(v)
+local t = v / 255
+if t < 0.55 then return DEEP:Lerp(MID, t / 0.55) end
+return MID:Lerp(LIGHT, (t - 0.55) / 0.45)
 end
 
-function _G.RainySetArt(assetId)
-if not assetId then return end
-local id = tostring(assetId)
-if not string.find(id, "://") then id = "rbxassetid://" .. id end
-RainyArt.Image = id
+local stage = Instance.new("Frame")
+stage.Name = "HandArt"
+stage.BackgroundTransparency = 1
+stage.BorderSizePixel = 0
+stage.Size = UDim2.new(0, 176, 0, 214)
+stage.Position = UDim2.new(0, 15, 0, 68)
+stage.ZIndex = 4
+stage.Parent = RainySidebar
+
+local ok, body = pcall(function() return Instance.new("CanvasGroup") end)
+if not ok or not body then body = Instance.new("Frame") end
+body.Name = "HandBody"
+body.BackgroundTransparency = 1
+body.BorderSizePixel = 0
+body.Size = UDim2.new(1, 0, 1, 0)
+body.ZIndex = 4
+body.Parent = stage
+local grouped = body:IsA("CanvasGroup")
+if grouped then body.GroupTransparency = 0.18 end
+local alpha = grouped and 0 or 0.18
+RainyHandArt = body
+
+for _, r in ipairs(HAND_ROWS) do
+local y, x1, x2 = r[1], r[2], r[3]
+local strip = Instance.new("Frame")
+strip.BorderSizePixel = 0
+strip.Size = UDim2.new(0, x2 - x1 + 1, 0, 3)
+strip.Position = UDim2.new(0, x1, 0, y)
+strip.BackgroundColor3 = MID
+strip.BackgroundTransparency = alpha
+strip.ZIndex = 5
+strip.Parent = body
+local g = Instance.new("UIGradient")
+g.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, ramp(r[4])),
+ColorSequenceKeypoint.new(0.28, ramp(r[5])),
+ColorSequenceKeypoint.new(0.5, ramp(r[6])),
+ColorSequenceKeypoint.new(0.72, ramp(r[7])),
+ColorSequenceKeypoint.new(1, ramp(r[8])),
+})
+g.Parent = strip
+end
 end
 
 -- vignettes so the title and tabs stay readable over the artwork

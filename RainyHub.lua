@@ -3108,7 +3108,7 @@ discordLbl.Name = "Discord"
 discordLbl.Size = UDim2.new(1, 0, 0, 30)
 discordLbl.Position = UDim2.new(0, 0, 0, 26)
 discordLbl.BackgroundTransparency = 1
-discordLbl.Text = "discord.gg/aceduels"
+discordLbl.Text = "discord.gg/rainyhub"
 discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 discordLbl.TextStrokeTransparency = 0
@@ -3502,6 +3502,25 @@ g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSeq
 g.Parent = sheen
 end
 
+-- ── open animation ─────────────────────────────────────────────────────
+-- Reopening rises from slightly below and under-scale, then settles.
+-- aceMainScale is built later in the script, so it is looked up on the
+-- fly rather than captured.
+function RainyOpenAnimation()
+local scaler = Main:FindFirstChild("AceMainScale")
+local target = scaler and scaler.Scale or 1
+local home = Main.Position
+Main.Visible = true
+Main.Position = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset + 26)
+if scaler then scaler.Scale = target * 0.92 end
+TweenService:Create(Main, TweenInfo.new(0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+{Position = home}):Play()
+if scaler then
+TweenService:Create(scaler, TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+{Scale = target}):Play()
+end
+end
+
 -- ── sidebar ────────────────────────────────────────────────────────────
 RainySidebar = Instance.new("Frame")
 RainySidebar.Name = "Sidebar"
@@ -3539,9 +3558,9 @@ RainySkull.BorderSizePixel = 0
 RainySkull.Image = SKULL_IMAGE
 RainySkull.ScaleType = Enum.ScaleType.Fit
 RainySkull.AnchorPoint = Vector2.new(0.5, 0.5)
-RainySkull.Size = UDim2.new(0, 170, 0, 172)
-RainySkull.Position = UDim2.new(0.5, 0, 0, 168)
-RainySkull.ZIndex = 3
+RainySkull.Size = UDim2.new(0, 168, 0, 156)
+RainySkull.Position = UDim2.new(0.5, 0, 0, 176)
+RainySkull.ZIndex = 4
 RainySkull.Parent = RainySidebar
 
 
@@ -3766,28 +3785,28 @@ end)
 local MiniFrame = Instance.new("Frame")
 MiniFrame.Name = "MiniFrame"
 MiniFrame.AnchorPoint = Vector2.new(0, 0)
-MiniFrame.Size = UDim2.new(0, 78, 0, 28)
+MiniFrame.Size = UDim2.new(0, 96, 0, 40)
 local MINI_DEFAULT_POSITION = UDim2.new(0, 132, 0, 112)
 MiniFrame.Position = MINI_DEFAULT_POSITION
 savedMiniPositionTable = nil
-MiniFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MiniFrame.BackgroundColor3 = Color3.fromRGB(6, 11, 22)
 MiniFrame.BackgroundTransparency = 0
 MiniFrame.BorderSizePixel = 0
 MiniFrame.Visible = false
 MiniFrame.Active = true
 MiniFrame.ZIndex = 20
 MiniFrame.Parent = Gui
-corner(MiniFrame, 8)
-stroke(MiniFrame, Color3.fromRGB(120, 120, 130), 1, 0.22)
+corner(MiniFrame, 12)
+stroke(MiniFrame, RAIN.accentGlow, 1.6, 0.1)
 local MiniButton = Instance.new("TextButton")
 MiniButton.Name = "MiniButton"
 MiniButton.Size = UDim2.new(1, 0, 1, 0)
 MiniButton.BackgroundTransparency = 1
-MiniButton.Text = "ACE"
-MiniButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-MiniButton.TextStrokeTransparency = 0.18
-MiniButton.TextSize = 17
+MiniButton.Text = "RAINY  \u{25BC}"
+MiniButton.TextColor3 = Color3.fromRGB(240, 246, 255)
+MiniButton.TextStrokeColor3 = Color3.fromRGB(0, 6, 22)
+MiniButton.TextStrokeTransparency = 0.35
+MiniButton.TextSize = 14
 MiniButton.Font = Enum.Font.GothamBlack
 MiniButton.AutoButtonColor = false
 MiniButton.ZIndex = 21
@@ -3796,12 +3815,12 @@ local MiniShade = Instance.new("Frame")
 MiniShade.Name = "MiniShade"
 MiniShade.Size = UDim2.new(1, -4, 1, -4)
 MiniShade.Position = UDim2.new(0, 2, 0, 2)
-MiniShade.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MiniShade.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
 MiniShade.BackgroundTransparency = 0.12
 MiniShade.BorderSizePixel = 0
 MiniShade.ZIndex = 20
 MiniShade.Parent = MiniFrame
-corner(MiniShade, 7)
+corner(MiniShade, 10)
 do
 local miniDragging = false
 local miniDragStart = nil
@@ -3843,9 +3862,13 @@ miniStartPos = nil
 if wasDrag then
 return
 end
-Main.Visible = true
 MiniFrame.Visible = false
 Main.Size = FULL_MAIN_SIZE
+if RainyOpenAnimation then
+RainyOpenAnimation()
+else
+Main.Visible = true
+end
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
 end
@@ -3903,7 +3926,7 @@ Title.Name = "Title"
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(0, 110, 0, 30)
 Title.Position = UDim2.new(0, 28, 0, 24)
-Title.Text = "RAINY HUB"
+Title.Text = "RAINY "
 Title.TextColor3 = COLORS.white
 Title.TextStrokeTransparency = 0.65
 Title.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -3916,18 +3939,60 @@ Title.Parent = Main
 local Discord = Instance.new("TextLabel")
 Discord.Name = "Discord"
 Discord.BackgroundTransparency = 1
-Discord.Size = UDim2.new(0, 176, 0, 18)
-Discord.Position = UDim2.new(0, 29, 0, 56)
-Discord.Text = "FPS: -- | PING: --ms"
+Discord.Size = UDim2.new(0, 176, 0, 16)
+Discord.Position = UDim2.new(0, 29, 0, 50)
+Discord.Text = "discord.gg/rainyhub"
 Discord.TextColor3 = RAIN.accentGlow
 Discord.Font = Enum.Font.GothamSemibold
-Discord.TextSize = 14
+Discord.TextSize = 12
 Discord.TextXAlignment = Enum.TextXAlignment.Left
 Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Discord.TextStrokeTransparency = 0.25
 Discord.ZIndex = 6
 Discord.Parent = Main
-RainyStatLabel = Discord
+
+-- "HUB" in the accent, picking up where the white "RAINY " ends
+local TitleAccent = Instance.new("TextLabel")
+TitleAccent.Name = "TitleAccent"
+TitleAccent.BackgroundTransparency = 1
+TitleAccent.Size = UDim2.new(0, 70, 0, 30)
+TitleAccent.Position = UDim2.new(0, 96, 0, 24)
+TitleAccent.Text = "HUB"
+TitleAccent.TextColor3 = RAIN.accentGlow
+TitleAccent.TextStrokeColor3 = Color3.fromRGB(0, 8, 30)
+TitleAccent.TextStrokeTransparency = 0.2
+TitleAccent.Font = Enum.Font.GothamBlack
+TitleAccent.TextSize = 19
+TitleAccent.TextXAlignment = Enum.TextXAlignment.Left
+TitleAccent.ZIndex = 6
+TitleAccent.Parent = Main
+
+-- framed header block behind the wordmark and the handle
+local HeaderBox = Instance.new("Frame")
+HeaderBox.Name = "HeaderBox"
+HeaderBox.BorderSizePixel = 0
+HeaderBox.Size = UDim2.new(0, 178, 0, 54)
+HeaderBox.Position = UDim2.new(0, 22, 0, 18)
+HeaderBox.BackgroundColor3 = COLORS.row
+HeaderBox.BackgroundTransparency = 0.55
+HeaderBox.ZIndex = 5
+HeaderBox.Parent = Main
+corner(HeaderBox, 10)
+stroke(HeaderBox, RAIN.accent, 1.2, 0.5)
+
+-- the FPS/ping readout moves onto its own line under the header
+RainyStatLabel = Instance.new("TextLabel")
+RainyStatLabel.Name = "StatLine"
+RainyStatLabel.BackgroundTransparency = 1
+RainyStatLabel.Size = UDim2.new(0, 176, 0, 16)
+RainyStatLabel.Position = UDim2.new(0, 29, 0, 76)
+RainyStatLabel.Text = "FPS: -- | PING: --ms"
+RainyStatLabel.TextColor3 = COLORS.textDim
+RainyStatLabel.Font = Enum.Font.GothamSemibold
+RainyStatLabel.TextSize = 12
+RainyStatLabel.TextXAlignment = Enum.TextXAlignment.Left
+RainyStatLabel.ZIndex = 6
+RainyStatLabel.Parent = Main
 local HeaderDivider = Instance.new("Frame")
 HeaderDivider.Name = "HeaderDivider"
 HeaderDivider.BackgroundColor3 = Color3.fromRGB(70, 70, 82)
@@ -4640,6 +4705,55 @@ end
 return row, setVisual
 end
 _G.AceAimbotSelectorRow = function(parent, order)
+-- Rows that carry a second version (Aimbot: Normal/Anti Bypass, Auto
+-- Steal: Normal/Semi) start collapsed showing only the active mode. The
+-- chevron opens them so the other version can be picked.
+function RainyAddModeArrow(holder, altName)
+local slide = holder:FindFirstChild("SelectedSlide")
+local primary = holder:FindFirstChild("NormalText")
+local alt = holder:FindFirstChild(altName)
+if not (slide and primary and alt) then return end
+
+local arrow = Instance.new("TextButton")
+arrow.Name = "ModeArrow"
+arrow.BackgroundTransparency = 1
+arrow.Text = "\u{25BC}"
+arrow.TextColor3 = RAIN.accentGlow
+arrow.TextSize = 12
+arrow.Font = Enum.Font.GothamBold
+arrow.AutoButtonColor = false
+arrow.Size = UDim2.new(0, 26, 1, 0)
+arrow.Position = UDim2.new(1, -28, 0, 0)
+arrow.ZIndex = 10
+arrow.Parent = holder
+
+local open = false
+local function paint()
+arrow.Text = open and "\u{25B2}" or "\u{25BC}"
+slide.Visible = open
+alt.Visible = open
+if open then
+primary.Size = UDim2.new(0.5, 0, 1, 0)
+primary.Position = UDim2.new(0, 0, 0, 0)
+else
+primary.Size = UDim2.new(1, -30, 1, 0)
+primary.Position = UDim2.new(0, 0, 0, 0)
+-- collapsed, the label reports whichever mode is actually live
+primary.Text = (slide.Position.X.Scale > 0.25) and alt.Text or "NORMAL"
+end
+end
+
+arrow.MouseButton1Click:Connect(function()
+open = not open
+paint()
+end)
+slide:GetPropertyChangedSignal("Position"):Connect(function()
+if not open then paint() end
+end)
+paint()
+return arrow
+end
+
 local holder = Instance.new("Frame")
 holder.Name = "Aimbot Mode"
 holder.BackgroundColor3 = COLORS.row
@@ -4757,6 +4871,7 @@ bypassClick.MouseButton1Click:Connect(function()
 setMode("Anti Bypass")
 end)
 setMode(selectedAimbotMode)
+RainyAddModeArrow(holder, "BypassText")
 return holder, setMode
 end
 function autoStealSelectorRow(parent, order)
@@ -4881,6 +4996,7 @@ semiClick.MouseButton1Click:Connect(function()
 setMode("Semi")
 end)
 setMode(selectedStealMode)
+RainyAddModeArrow(holder, "SemiText")
 return holder, setMode
 end
 -- Spread the large one-time UI build over several frames so executing the
@@ -5198,7 +5314,7 @@ speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
 do
 THEME_ACCENT = THEME_ACCENT or Color3.fromRGB(230, 230, 230)
 THEME_ACCENT_DIM = THEME_ACCENT_DIM or Color3.fromRGB(145, 145, 145)
-PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/aceduels"}
+PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/rainyhub"}
 BoxedESPOptions = BoxedESPOptions or {box=false, tracer=false}
 BoxedESPData = BoxedESPData or {}
 BoxedESPConn = BoxedESPConn or nil
@@ -7009,11 +7125,11 @@ lineBot.AnchorPoint = Vector2.new(0.5,1); lineBot.Position = UDim2.new(0.5,0,1,-
 lineBot.BackgroundColor3 = Color3.fromRGB(225,225,225); lineBot.BorderSizePixel = 0; lineBot.ZIndex = 41
 local titleShadow = Instance.new("TextLabel", center)
 titleShadow.Size = UDim2.new(1,0,0,86); titleShadow.Position = UDim2.new(0,4,0,83); titleShadow.BackgroundTransparency = 1
-titleShadow.Text = "ACE DUELS"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.GothamBlack; titleShadow.TextSize = 72
+titleShadow.Text = "RAINY HUB"; titleShadow.TextColor3 = Color3.fromRGB(0,0,0); titleShadow.Font = Enum.Font.GothamBlack; titleShadow.TextSize = 72
 titleShadow.TextTransparency = 1; titleShadow.TextStrokeTransparency = 1; titleShadow.ZIndex = 42
 local title = Instance.new("TextLabel", center)
 title.Size = UDim2.new(1,0,0,86); title.Position = UDim2.new(0,0,0,78); title.BackgroundTransparency = 1
-title.Text = "ACE DUELS"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.GothamBlack; title.TextSize = 72
+title.Text = "RAINY HUB"; title.TextColor3 = Color3.fromRGB(245,245,245); title.Font = Enum.Font.GothamBlack; title.TextSize = 72
 title.TextTransparency = 1; title.TextStrokeTransparency = 1; title.TextStrokeColor3 = Color3.fromRGB(35,35,35); title.ZIndex = 43
 local subtitle = Instance.new("TextLabel", center)
 subtitle.Size = UDim2.new(1,0,0,26); subtitle.Position = UDim2.new(0,0,0,169); subtitle.BackgroundTransparency = 1

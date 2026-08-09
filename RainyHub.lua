@@ -3849,12 +3849,8 @@ Main.Size = FULL_MAIN_SIZE
 savedMainPositionTable = udim2ToTable(Main.Position)
 end)
 end
-local BackgroundIDs = {
-"99416158073201",
-"126860692354524",
-"73226092831324",
-"90280869222992",
-}
+-- background images removed; applyBackground now only ever clears
+local BackgroundIDs = {}
 currentBackground = tonumber(savedConfig.currentBackground) or currentBackground
 local BgImage = Instance.new("ImageLabel")
 BgImage.Name = "CustomBackground"
@@ -3968,6 +3964,7 @@ AceLockTopButton.Size = UDim2.new(0, 32, 0, 26)
 AceLockTopButton.Position = UDim2.new(0, 140, 0, 24)
 AceLockTopButton.AutoButtonColor = false
 AceLockTopButton.ZIndex = 5
+AceLockTopButton.Visible = false -- lock button removed from the header
 AceLockTopButton.Parent = Main
 corner(AceLockTopButton, 8)
 stroke(AceLockTopButton, COLORS.stroke, 1, 0.35)
@@ -5194,7 +5191,7 @@ section(Keybinds, "COMBAT KEYBINDS", 6)
 aimbotKeybindRow = speedKeybindRow(Keybinds, "Normal Aimbot", "Aimbot", 7)
 combatAimbotKeybindLabel = aimbotKeybindRow and aimbotKeybindRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
-speedKeybindRow(Keybinds, "Anti Desync Bat", "AntiDesyncAimbot", 8)
+speedKeybindRow(Keybinds, "TP Bat", "AntiDesyncAimbot", 8)
 speedKeybindRow(Keybinds, "Auto Left", "AutoLeft", 9)
 speedKeybindRow(Keybinds, "Auto Right", "AutoRight", 10)
 speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
@@ -6144,92 +6141,7 @@ saveAceConfig()
 end)
 end
 end
-local bgRow = Instance.new("Frame")
-bgRow.Name = "Background Image Picker"
-bgRow.BackgroundColor3 = COLORS.row
-bgRow.BackgroundTransparency = 0.3
-bgRow.Size = UDim2.new(1, -4, 0, 58)
-bgRow.BorderSizePixel = 0
-bgRow.LayoutOrder = 2
-bgRow.ZIndex = 4
-bgRow.Parent = Settings
-corner(bgRow, 9)
-stroke(bgRow, COLORS.strokeSoft, 1.15, 0.38)
-local bgButtons = {}
-function updateBackgroundButtons()
-for index, button in pairs(bgButtons) do
-local selected = index == currentBackground
-button.BackgroundTransparency = selected and 0.12 or 0.42
-local st = button:FindFirstChildOfClass("UIStroke")
-if st then
-st.Color = selected and Color3.fromRGB(245, 245, 255) or COLORS.strokeSoft
-st.Transparency = selected and 0.12 or 0.55
-st.Thickness = selected and 1.15 or 1
-end
-end
-end
-function makeNoneButton(index, x)
-local btn = Instance.new("TextButton")
-btn.Name = "None"
-btn.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
-btn.BackgroundTransparency = 0.12
-btn.BorderSizePixel = 0
-btn.Text = "None"
-btn.TextColor3 = COLORS.white
-btn.TextSize = 8
-btn.Font = Enum.Font.GothamSemibold
-btn.AutoButtonColor = false
-btn.Size = UDim2.new(0, 52, 0, 40)
-btn.Position = UDim2.new(0, x, 0.5, -20)
-btn.ZIndex = 6
-btn.ClipsDescendants = true
-btn.Parent = bgRow
-corner(btn, 8)
-stroke(btn, Color3.fromRGB(245, 245, 255), 1.15, 0.12)
-bgButtons[index] = btn
-btn.MouseButton1Click:Connect(function()
-applyBackground(index)
-updateBackgroundButtons()
-end)
-end
-function makeImageButton(index, x)
-local holder = Instance.new("Frame")
-holder.Name = "Image " .. tostring(index)
-holder.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
-holder.BackgroundTransparency = 0.35
-holder.BorderSizePixel = 0
-holder.Size = UDim2.new(0, 58, 0, 40)
-holder.Position = UDim2.new(0, x, 0.5, -20)
-holder.ZIndex = 6
-holder.ClipsDescendants = true
-holder.Parent = bgRow
-corner(holder, 8)
-stroke(holder, COLORS.strokeSoft, 1, 0.45)
-local img = Instance.new("ImageLabel")
-img.Name = "Preview"
-img.BackgroundTransparency = 1
-img.Image = "rbxassetid://" .. BackgroundIDs[index]
-img.ScaleType = Enum.ScaleType.Crop
-img.Size = UDim2.new(1, 0, 1, 0)
-img.Position = UDim2.new(0, 0, 0, 0)
-img.ZIndex = 6
-img.Parent = holder
-corner(img, 8)
-local click = Instance.new("TextButton")
-click.Name = "Click"
-click.BackgroundTransparency = 1
-click.Text = ""
-click.AutoButtonColor = false
-click.Size = UDim2.new(1, 0, 1, 0)
-click.Position = UDim2.new(0, 0, 0, 0)
-click.ZIndex = 7
-click.Parent = holder
-bgButtons[index] = holder
-click.MouseButton1Click:Connect(function()
-applyBackground(index)
-updateBackgroundButtons()
-end)
-end
+-- background image picker removed
 function stepperRow(parent, labelText, defaultValue, order, callback, minValue, maxValue)
 local row = Instance.new("Frame")
 row.Name = labelText
@@ -6318,12 +6230,6 @@ setValue(value + 0.05)
 end)
 return row
 end
-makeNoneButton(0, 8)
-makeImageButton(1, 66)
-makeImageButton(2, 128)
-makeImageButton(3, 190)
-makeImageButton(4, 252)
-updateBackgroundButtons()
 stepperRow(Settings, "GUI Scale", aceGuiScaleValue, 3, function(v)
 aceGuiScaleValue = v
 aceMainScale.Scale = v
@@ -6573,7 +6479,6 @@ _G.AceGuiLocked = false; _G.AceHideMobileButtons = false; _G.AceMobileButtonScal
 aceMainScale.Scale = aceGuiScaleValue
 applyAceProgressBarScale()
 applyBackground(0)
-updateBackgroundButtons()
 applyDefaultAceKeybinds()
 refreshAllSpeedKeybinds()
 refreshTPDownKeybind()
@@ -6766,98 +6671,133 @@ frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startP
 end
 end)
 end
+-- Auto grab bar: rounded blue-bordered card, "AUTO STEAL" header with a
+-- status dot, a wait-range/FPS/percent row, and a full-width blue fill.
+-- Names below are unchanged so setBarState, StealBar.SetProgress and the
+-- FPS loop keep driving it.
+local BAR_EDGE = Color3.fromRGB(56, 138, 255)
+local BAR_GLOW = Color3.fromRGB(126, 186, 255)
+local BAR_DIM = Color3.fromRGB(120, 146, 186)
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
-pbFrame.Size = UDim2.new(0, 372, 0, 42)
-pbFrame.Position = UDim2.new(0.5, -186, 1, -92)
-pbFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+pbFrame.Size = UDim2.new(0, 372, 0, 86)
+pbFrame.Position = UDim2.new(0.5, -186, 1, -128)
+pbFrame.BackgroundColor3 = Color3.fromRGB(6, 11, 22)
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
 pbFrame.ClipsDescendants = true
-Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 12)
 local pbSt = Instance.new("UIStroke", pbFrame)
-pbSt.Color = THEME_ACCENT
-pbSt.Thickness = 1.4
-pbSt.Transparency = 0.2
+pbSt.Color = BAR_EDGE
+pbSt.Thickness = 1.6
+pbSt.Transparency = 0.1
 drag(pbFrame)
 local pbScale = Instance.new("UIScale")
 pbScale.Name = "AceProgressBarScale"
 pbScale.Scale = aceProgressBarScaleValue or 1
 pbScale.Parent = pbFrame
-local fillRegion = Instance.new("Frame", pbFrame)
-fillRegion.Size = UDim2.new(0, 214, 1, -10)
-fillRegion.Position = UDim2.new(0, 6, 0, 5)
-fillRegion.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
-fillRegion.BorderSizePixel = 0
-fillRegion.ClipsDescendants = true
-fillRegion.ZIndex = 2
-Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(1, 0)
-local fillRegGradient = Instance.new("UIGradient", fillRegion)
-fillRegGradient.Color = ColorSequence.new(Color3.fromRGB(30, 30, 30), Color3.fromRGB(14, 14, 14))
-fillRegGradient.Rotation = 90
-local fillRegStroke = Instance.new("UIStroke", fillRegion)
-fillRegStroke.Color = THEME_ACCENT
-fillRegStroke.Thickness = 1
-fillRegStroke.Transparency = 0.6
-local progressFill = Instance.new("Frame", fillRegion)
-progressFill.Name = "Fill"
-progressFill.Size = UDim2.new(0, 0, 1, 0)
-progressFill.Position = UDim2.new(0, 0, 0, 0)
-progressFill.BackgroundColor3 = THEME_ACCENT
-progressFill.BorderSizePixel = 0
-progressFill.ZIndex = 3
-Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
-local fillGradient = Instance.new("UIGradient", progressFill)
-fillGradient.Color = ColorSequence.new(THEME_ACCENT_BRIGHT, THEME_ACCENT_DIM)
-fillGradient.Rotation = 90
-local stealLbl = Instance.new("TextLabel", fillRegion)
-stealLbl.Size = UDim2.new(0, 50, 1, 0)
-stealLbl.Position = UDim2.new(0, 10, 0, 0)
+
+local statusDot = Instance.new("Frame", pbFrame)
+statusDot.Name = "StatusDot"
+statusDot.Size = UDim2.new(0, 8, 0, 8)
+statusDot.Position = UDim2.new(0, 14, 0, 15)
+statusDot.BackgroundColor3 = BAR_GLOW
+statusDot.BorderSizePixel = 0
+statusDot.ZIndex = 5
+Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
+
+local stealLbl = Instance.new("TextLabel", pbFrame)
+stealLbl.Size = UDim2.new(0, 220, 0, 16)
+stealLbl.Position = UDim2.new(0, 30, 0, 11)
 stealLbl.BackgroundTransparency = 1
-stealLbl.Text = "STEAL"
-stealLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-stealLbl.Font = Enum.Font.GothamSemibold
+stealLbl.Text = "AUTO STEAL"
+stealLbl.TextColor3 = BAR_GLOW
+stealLbl.Font = Enum.Font.GothamBold
 stealLbl.TextSize = 13
 stealLbl.TextXAlignment = Enum.TextXAlignment.Left
 stealLbl.ZIndex = 5
-local progressPct = Instance.new("TextLabel", fillRegion)
-progressPct.Size = UDim2.new(0, 50, 1, 0)
-progressPct.Position = UDim2.new(1, -55, 0, 0)
-progressPct.BackgroundTransparency = 1
-progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(230, 230, 230)
-progressPct.Font = Enum.Font.GothamSemibold
-progressPct.TextSize = 12
-progressPct.TextXAlignment = Enum.TextXAlignment.Right
-progressPct.ZIndex = 5
+
+local waitLbl = Instance.new("TextLabel", pbFrame)
+waitLbl.Name = "WaitRange"
+waitLbl.Size = UDim2.new(0, 90, 0, 14)
+waitLbl.Position = UDim2.new(0, 14, 0, 36)
+waitLbl.BackgroundTransparency = 1
+waitLbl.Text = "WAIT RANGE"
+waitLbl.TextColor3 = BAR_DIM
+waitLbl.Font = Enum.Font.GothamBold
+waitLbl.TextSize = 10
+waitLbl.TextXAlignment = Enum.TextXAlignment.Left
+waitLbl.ZIndex = 5
+
 local progressRadLbl = Instance.new("TextLabel", pbFrame)
-progressRadLbl.Size = UDim2.new(0, 144, 1, 0)
-progressRadLbl.Position = UDim2.new(0, 222, 0, 0)
+progressRadLbl.Size = UDim2.new(0, 190, 0, 18)
+progressRadLbl.Position = UDim2.new(0, 106, 0, 34)
 progressRadLbl.BackgroundTransparency = 1
-progressRadLbl.Text = "0 FPS | 0ms"
-progressRadLbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+progressRadLbl.Text = "FPS 0 / 0ms"
+progressRadLbl.TextColor3 = Color3.fromRGB(240, 246, 255)
 progressRadLbl.Font = Enum.Font.GothamSemibold
 progressRadLbl.TextSize = 13
 progressRadLbl.TextScaled = false
 progressRadLbl.TextWrapped = false
-progressRadLbl.TextXAlignment = Enum.TextXAlignment.Center
-progressRadLbl.ZIndex = 4
+progressRadLbl.TextXAlignment = Enum.TextXAlignment.Left
+progressRadLbl.ZIndex = 5
+
+local progressPct = Instance.new("TextLabel", pbFrame)
+progressPct.Size = UDim2.new(0, 56, 0, 18)
+progressPct.Position = UDim2.new(1, -70, 0, 34)
+progressPct.BackgroundTransparency = 1
+progressPct.Text = "0%"
+progressPct.TextColor3 = BAR_GLOW
+progressPct.Font = Enum.Font.GothamBold
+progressPct.TextSize = 13
+progressPct.TextXAlignment = Enum.TextXAlignment.Right
+progressPct.ZIndex = 5
+
+local fillRegion = Instance.new("Frame", pbFrame)
+fillRegion.Name = "Track"
+fillRegion.Size = UDim2.new(1, -24, 0, 22)
+fillRegion.Position = UDim2.new(0, 12, 0, 56)
+fillRegion.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
+fillRegion.BorderSizePixel = 0
+fillRegion.ClipsDescendants = true
+fillRegion.ZIndex = 3
+Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(0, 8)
+local fillRegStroke = Instance.new("UIStroke", fillRegion)
+fillRegStroke.Color = BAR_EDGE
+fillRegStroke.Thickness = 1
+fillRegStroke.Transparency = 0.55
+
+local progressFill = Instance.new("Frame", fillRegion)
+progressFill.Name = "Fill"
+progressFill.Size = UDim2.new(0, 0, 1, 0)
+progressFill.Position = UDim2.new(0, 0, 0, 0)
+progressFill.BackgroundColor3 = BAR_EDGE
+progressFill.BorderSizePixel = 0
+progressFill.ZIndex = 4
+Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 8)
+local fillGradient = Instance.new("UIGradient", progressFill)
+fillGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 64, 150)),
+ColorSequenceKeypoint.new(0.45, Color3.fromRGB(56, 138, 255)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 186, 255)),
+})
+fillGradient.Rotation = 0
 local barState = "IDLE"
 function setBarState(state)
 barState = state
 if state == "STEALING" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 22, 26)}):Play()
+TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_GLOW}):Play()
 elseif state == "READY" then
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(28, 28, 32)}):Play()
+TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 214, 132)}):Play()
 progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(235, 235, 235)
+progressPct.TextColor3 = BAR_GLOW
 else
-TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(150, 150, 150)}):Play()
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 22, 26)}):Play()
+TS:Create(stealLbl, TweenInfo.new(0.2), {TextColor3 = BAR_DIM}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_DIM}):Play()
 progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(150, 150, 150)
+progressPct.TextColor3 = BAR_DIM
 end
 end
 task.spawn(function()
@@ -6882,7 +6822,7 @@ pcall(function()
 local stat = Stats.Network.ServerStatsItem["Data Ping"]
 if stat then ping = tonumber(stat:GetValue()) or 0 end
 end)
-progressRadLbl.Text = string.format("FPS:%d | PING:%dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+progressRadLbl.Text = string.format("FPS %d  /  %dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
 task.wait(0.5)
 end
 end)
@@ -7464,6 +7404,13 @@ end
 end
 end)
 end
+-- blue mobile pad: dark navy when off, hub accent when on
+MB_OFF = Color3.fromRGB(9, 17, 33)
+MB_ON = Color3.fromRGB(56, 138, 255)
+MB_TEXT_OFF = Color3.fromRGB(206, 226, 255)
+MB_TEXT_ON = Color3.fromRGB(255, 255, 255)
+MB_EDGE_OFF = Color3.fromRGB(40, 66, 110)
+MB_EDGE_ON = Color3.fromRGB(126, 186, 255)
 local function setActive(btn, state)
 if not btn then return end
 local pressed = btn:GetAttribute("AceMobilePressed") == true
@@ -7475,15 +7422,15 @@ local holder = btn.Parent
 local glow = holder and holder:FindFirstChild("Glow")
 local st = btn:FindFirstChildOfClass("UIStroke")
 TS:Create(btn, TweenInfo.new(0.18), {
-BackgroundColor3 = state and Color3.fromRGB(238,238,238) or Color3.fromRGB(8,8,8),
-TextColor3 = state and Color3.fromRGB(0,0,0) or Color3.fromRGB(225,225,225),
+BackgroundColor3 = state and MB_ON or MB_OFF,
+TextColor3 = state and MB_TEXT_ON or MB_TEXT_OFF,
 TextTransparency = 0,
 }):Play()
 if st then
 TS:Create(st, TweenInfo.new(0.18), {
-Color = state and Color3.fromRGB(190,190,190) or Color3.fromRGB(85,85,85),
-Thickness = 1,
-Transparency = state and 0 or 0.4,
+Color = state and MB_EDGE_ON or MB_EDGE_OFF,
+Thickness = 1.2,
+Transparency = state and 0 or 0.35,
 }):Play()
 end
 if glow then
@@ -7507,7 +7454,7 @@ end
 local function makeButton(key, label, pos, onPress)
 local holder = Instance.new("Frame")
 holder.Name = "MBH_" .. key
-holder.Size = UDim2.new(0, 78, 0, 58)
+holder.Size = UDim2.new(0, MB_SIZE, 0, MB_SIZE)
 holder.Position = tableToUDim2(_G.AceMobileButtonPositions[key], pos)
 holder.BackgroundTransparency = 1
 holder.BorderSizePixel = 0
@@ -7518,13 +7465,13 @@ local glow = Instance.new("Frame", holder)
 glow.Name = "Glow"
 glow.Size = UDim2.new(1, 4, 1, 4)
 glow.Position = UDim2.new(0, -2, 0, -2)
-glow.BackgroundColor3 = Color3.fromRGB(255,255,255)
+glow.BackgroundColor3 = MB_ON
 glow.BackgroundTransparency = 1
 glow.BorderSizePixel = 0
 glow.ZIndex = 1000
-Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 13)
+Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 15)
 local glowStroke = Instance.new("UIStroke", glow)
-glowStroke.Color = Color3.fromRGB(255,255,255)
+glowStroke.Color = MB_ON
 glowStroke.Thickness = 0.8
 glowStroke.Transparency = 1
 glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -7532,20 +7479,21 @@ local btn = Instance.new("TextButton", holder)
 btn.Name = "MB_" .. key
 btn.Size = UDim2.new(1, 0, 1, 0)
 btn.Position = UDim2.new(0, 0, 0, 0)
-btn.BackgroundColor3 = Color3.fromRGB(8,8,8)
+btn.BackgroundColor3 = MB_OFF
 btn.BackgroundTransparency = 0
 btn.BorderSizePixel = 0
 btn.Text = label
-btn.TextColor3 = Color3.fromRGB(225,225,225)
-btn.Font = Enum.Font.GothamBlack
-btn.TextSize = 10
+btn.TextColor3 = MB_TEXT_OFF
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 11
+btn.LineHeight = 1.2
 btn.TextWrapped = true
 btn.AutoButtonColor = false
 btn.ZIndex = 1002
 btn.Active = true
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
 local stroke = Instance.new("UIStroke", btn)
-stroke.Color = Color3.fromRGB(85,85,85)
+stroke.Color = MB_EDGE_OFF
 stroke.Thickness = 1
 stroke.Transparency = 0.4
 stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
@@ -7608,19 +7556,24 @@ end)
 mobileButtons[key] = {holder = holder, btn = btn, setActive = function(state) setActive(btn, state) end}
 return btn
 end
-local x1, x2, x3 = -218, -154, -90
-local y1, y2, y3, y4 = -150, -102, -54, -6
+-- Envy-style pad: 58px squares, 14px gutters, two columns pinned to the
+-- bottom-right. Ten buttons, so five rows rather than Envy's four.
+MB_SIZE, MB_GAP = 58, 14
+local cA = -(MB_SIZE * 2 + MB_GAP + 20)
+local cB = cA + MB_SIZE + MB_GAP
+local rBase = -(MB_SIZE * 5 + MB_GAP * 4 + 20)
+local function mbRow(r) return rBase + r * (MB_SIZE + MB_GAP) end
 local defaults = {
-insta        = UDim2.new(1, x1, 0.5, y1),
-drop         = UDim2.new(1, x2, 0.5, y1),
-autoLeft     = UDim2.new(1, x3, 0.5, y1),
-antiDesync   = UDim2.new(1, x1, 0.5, y2),
-aimbot       = UDim2.new(1, x2, 0.5, y2),
-autoRight    = UDim2.new(1, x3, 0.5, y2),
-tp           = UDim2.new(1, x2, 0.5, y3),
-carry        = UDim2.new(1, x3, 0.5, y3),
-laggerNormal = UDim2.new(1, x2, 0.5, y4),
-laggerCarry  = UDim2.new(1, x3, 0.5, y4),
+insta        = UDim2.new(1, cA, 1, mbRow(0)),
+drop         = UDim2.new(1, cB, 1, mbRow(0)),
+autoLeft     = UDim2.new(1, cA, 1, mbRow(1)),
+autoRight    = UDim2.new(1, cB, 1, mbRow(1)),
+antiDesync   = UDim2.new(1, cA, 1, mbRow(2)),
+aimbot       = UDim2.new(1, cB, 1, mbRow(2)),
+tp           = UDim2.new(1, cA, 1, mbRow(3)),
+carry        = UDim2.new(1, cB, 1, mbRow(3)),
+laggerNormal = UDim2.new(1, cA, 1, mbRow(4)),
+laggerCarry  = UDim2.new(1, cB, 1, mbRow(4)),
 }
 function _G.AceResetMobileButtons()
 _G.AceMobileButtonScale = 0.75
@@ -7630,7 +7583,7 @@ local entry = mobileButtons[key]
 local holder = entry and entry.holder
 if holder then
 holder.Position = defaultPos
-holder.Size = UDim2.new(0, 78, 0, 58)
+holder.Size = UDim2.new(0, MB_SIZE, 0, MB_SIZE)
 local btn = entry.btn
 if btn then
 btn.Position = UDim2.new(0, 0, 0, 0)
@@ -7660,7 +7613,7 @@ if mobileButtons.autoLeft then mobileButtons.autoLeft.setActive(autoLeftEnabled 
 if mobileButtons.autoRight then mobileButtons.autoRight.setActive(autoRightEnabled == true) end
 end)
 end)
-makeButton("antiDesync", "ANTI\nDESYNC", defaults.antiDesync, function(btn)
+makeButton("antiDesync", "TP\nBAT", defaults.antiDesync, function(btn)
 if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
 if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -7672,7 +7625,7 @@ if _G.AceAntiDesyncAimbotOn then _G.AceStopAntiDesyncAimbot() else _G.AceStartAn
 end
 task.delay(0.03, function() setActive(btn, _G.AceAntiDesyncAimbotOn == true) end)
 end)
-makeButton("aimbot", "BAT\nBOT", defaults.aimbot, function(btn)
+makeButton("aimbot", "BAT\nAIMBOT", defaults.aimbot, function(btn)
 if _G.AceSafeModeIsLocked and _G.AceSafeModeIsLocked() then
 if _G.AceSafeModeForceStop then _G.AceSafeModeForceStop("SAFE MODE LOCK") end
 return
@@ -7694,7 +7647,7 @@ makeButton("tp", "TP\nDOWN", defaults.tp, function(btn)
 if runTPFloor then runTPFloor() end
 pulse(btn)
 end)
-makeButton("carry", "CARRY\nSPEED", defaults.carry, function(btn)
+makeButton("carry", "CARRY\nSPD", defaults.carry, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Carry" and "Normal" or "Carry") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end
@@ -7702,7 +7655,7 @@ if mobileButtons.laggerNormal then mobileButtons.laggerNormal.setActive(currentS
 if mobileButtons.laggerCarry then mobileButtons.laggerCarry.setActive(currentSpeedMode == "Lagger Carry") end
 end)
 end)
-makeButton("laggerNormal", "LAGGER\nNORMAL", defaults.laggerNormal, function(btn)
+makeButton("laggerNormal", "LAGGER\nMODE", defaults.laggerNormal, function(btn)
 if setSpeedMode then setSpeedMode(currentSpeedMode == "Lagger" and "Normal" or "Lagger") end
 task.delay(0.03, function()
 if mobileButtons.carry then mobileButtons.carry.setActive(currentSpeedMode == "Carry") end

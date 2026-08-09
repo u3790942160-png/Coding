@@ -3560,6 +3560,8 @@ local DIE_PIPS = {
 [5] = {{0.27, 0.27}, {0.73, 0.27}, {0.5, 0.5}, {0.27, 0.73}, {0.73, 0.73}},
 [6] = {{0.28, 0.23}, {0.72, 0.23}, {0.28, 0.5}, {0.72, 0.5}, {0.28, 0.77}, {0.72, 0.77}},
 }
+-- unused since the dice theme came out; left in place rather than
+-- risk another bad slice through neighbouring code
 function makeDie(parent, sizePx, value, dark, fade)
 fade = tonumber(fade) or 0
 -- Every layer dims together, so transparencies are quoted at full
@@ -3795,22 +3797,18 @@ MiniFrame.Visible = false
 MiniFrame.Active = true
 MiniFrame.ZIndex = 20
 MiniFrame.Parent = Gui
--- The collapsed handle is a die rather than a labelled tab.
-local MiniDie, setMiniDieFace = makeDie(MiniFrame, 46, 6, false)
-MiniDie.Name = "MiniDie"
-MiniDie.Position = UDim2.new(0, 0, 0, 0)
+-- The collapsed handle carries the wordmark, not a die.
 local MiniButton = Instance.new("TextButton")
 MiniButton.Name = "MiniButton"
 MiniButton.Size = UDim2.new(1, 0, 1, 0)
 MiniButton.BackgroundTransparency = 1
-MiniButton.Text = ""
+MiniButton.Text = "RAINY"
+MiniButton.TextColor3 = COLORS.white
+MiniButton.TextSize = 13
+MiniButton.Font = Enum.Font.GothamBlack
 MiniButton.AutoButtonColor = false
 MiniButton.ZIndex = 25
 MiniButton.Parent = MiniFrame
--- Fresh roll every time it appears.
-MiniFrame:GetPropertyChangedSignal("Visible"):Connect(function()
-if MiniFrame.Visible then setMiniDieFace(math.random(1, 6)) end
-end)
 do
 local miniDragging = false
 local miniDragStart = nil
@@ -4303,21 +4301,32 @@ NumberSequenceKeypoint.new(1, 1),
 })
 fade.Parent = TopGlow
 end
-local TitleDieA, setTitleDieA = makeDie(TopBar, 16, 5, false)
-TitleDieA.Name = "TitleDieA"
-TitleDieA.Position = UDim2.new(0, 14, 0, 18)
-TitleDieA.Rotation = -9
-local TitleDieB, setTitleDieB = makeDie(TopBar, 16, 2, true)
-TitleDieB.Name = "TitleDieB"
-TitleDieB.Position = UDim2.new(0, 35, 0, 18)
-TitleDieB.Rotation = 8
--- Re-rolled whenever you change tab, so the pair is never dead weight.
+-- Three falling drops where the dice pair used to sit.
+local TitleDrops = {}
+for i = 1, 3 do
+local d = Instance.new("Frame")
+d.Name = "TitleDrop" .. i
+d.BorderSizePixel = 0
+d.AnchorPoint = Vector2.new(0.5, 0)
+d.Size = UDim2.new(0, 2.4, 0, 9 + (i % 2) * 4)
+d.Position = UDim2.new(0, 16 + (i - 1) * 9, 0, 17)
+d.BackgroundColor3 = RAIN.drop
+d.BackgroundTransparency = 0.25 + (i - 1) * 0.12
+d.Rotation = 13
+d.ZIndex = 4
+d.Parent = TopBar
+corner(d, 2)
+TitleDrops[i] = d
+end
+-- The drops fall again on a tab change, the way the dice used to re-roll.
 function rollTitleDice()
 task.spawn(function()
-for _ = 1, 7 do
-setTitleDieA(math.random(1, 6))
-setTitleDieB(math.random(1, 6))
-task.wait(0.045)
+for i, d in ipairs(TitleDrops) do
+local home = d.Position
+d.Position = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset - 14)
+d.BackgroundTransparency = 1
+TweenService:Create(d, TweenInfo.new(0.32 + i * 0.06, Enum.EasingStyle.Quad),
+{Position = home, BackgroundTransparency = 0.25 + (i - 1) * 0.12}):Play()
 end
 end)
 end
@@ -4589,12 +4598,29 @@ PageTitle.TextXAlignment = Enum.TextXAlignment.Left
 PageTitle.TextTruncate = Enum.TextTruncate.AtEnd
 PageTitle.ZIndex = 6
 PageTitle.Parent = ContentPane
-local PageDie
-PageDie, setPageDieFace = makeDie(ContentPane, 22, 6, false)
-PageDie.Name = "PageDie"
+-- a small fall of drops in the corner where the page die used to be
+local PageDie = Instance.new("Frame")
+PageDie.Name = "PageMark"
+PageDie.BackgroundTransparency = 1
+PageDie.BorderSizePixel = 0
 PageDie.AnchorPoint = Vector2.new(1, 0)
+PageDie.Size = UDim2.new(0, 24, 0, 22)
 PageDie.Position = UDim2.new(1, -12, 0, 11)
-PageDie.Rotation = 10
+PageDie.ZIndex = 6
+PageDie.Parent = ContentPane
+for i = 1, 3 do
+local d = Instance.new("Frame")
+d.BorderSizePixel = 0
+d.Size = UDim2.new(0, 2.2, 0, 8 + (i % 2) * 4)
+d.Position = UDim2.new(0, 3 + (i - 1) * 8, 0, (i % 2) * 5)
+d.BackgroundColor3 = RAIN.drop
+d.BackgroundTransparency = 0.3 + (i - 1) * 0.1
+d.Rotation = 13
+d.ZIndex = 6
+d.Parent = PageDie
+corner(d, 2)
+end
+setPageDieFace = function() end
 local PageDivider = Instance.new("Frame")
 PageDivider.Name = "PageDivider"
 PageDivider.BackgroundColor3 = COLORS.stroke
@@ -4710,10 +4736,18 @@ badge.ZIndex = 5
 badge.Parent = btn
 corner(badge, 8)
 stroke(badge, COLORS.stroke, 1, 0.5)
-local tabDie = makeDie(badge, 16, i, false)
-tabDie.Name = "TabDie"
-tabDie.Position = UDim2.new(0.5, -8, 0.5, -8)
-tabDie.Rotation = (i % 2 == 0) and 7 or -7
+local tabDie = Instance.new("Frame")
+tabDie.Name = "TabDrop"
+tabDie.BorderSizePixel = 0
+tabDie.AnchorPoint = Vector2.new(0.5, 0.5)
+tabDie.Size = UDim2.new(0, 3, 0, 11)
+tabDie.Position = UDim2.new(0.5, 0, 0.5, 0)
+tabDie.BackgroundColor3 = RAIN.drop
+tabDie.BackgroundTransparency = 0.2
+tabDie.Rotation = 13
+tabDie.ZIndex = 6
+tabDie.Parent = badge
+corner(tabDie, 2)
 local accent = Instance.new("Frame")
 accent.Name = "Accent"
 accent.BackgroundColor3 = COLORS.accent

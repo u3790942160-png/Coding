@@ -538,7 +538,7 @@ ArtLayer.BackgroundTransparency = 1
 ArtLayer.ClipsDescendants = true
 corner(ArtLayer, 13)
 
--- Deep-water wash behind the bones.
+-- Deep-water wash across the sidebar panel.
 do
 	local wash = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), Color3.fromRGB(11, 22, 46), 5)
 	wash.BackgroundTransparency = 0.25
@@ -547,288 +547,52 @@ do
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- SKULL ART — detailed blue skull, drawn from primitives
+-- SKULL ART — uploaded skull image
 -- ═══════════════════════════════════════════════════════════════
 local SkullRoot = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.sidebar, 6)
-SkullRoot.Name = "Skull"
+SkullRoot.Name = "SkullRoot"
 SkullRoot.BackgroundTransparency = 1
 SkullRoot.ClipsDescendants = true
 
-local CX = SIDE_W / 2
-
--- The skull is laid out in the sidebar's own 206-wide space.
+-- The skull is a single uploaded image, sized to the art region above the
+-- tab column. Nothing is drawn behind it — no plate, no bloom, no wash —
+-- so whatever transparency the asset carries is what shows through to the
+-- sidebar. ScaleType.Fit keeps its aspect ratio instead of stretching it.
 --
--- The silhouette is one continuous profile — half-width sampled down the
--- skull and stamped as thin overlapping bars — so the cranium, cheeks and
--- jaw come out as a single smooth outline. Everything that reads as
--- structure sits inside that outline: the cheekbone is shading rather
--- than added geometry, because anything protruding out there just looks
--- like an ear. Orbits, nasal aperture, teeth and sutures go on top.
---
--- Each bar carries the same cross-axis light ramp, so the vault reads as
--- domed. It is all opaque and composited by a CanvasGroup, which is what
--- keeps the overlapping pieces from seaming; the group transparency is
--- what makes the skull glassy.
-
-local SKULL_COLORS = {
-	fill       = Color3.fromRGB(58, 116, 196),
-	light      = Color3.fromRGB(126, 182, 244),
-	lighter    = Color3.fromRGB(186, 222, 255),
-	shade      = Color3.fromRGB(28, 64, 124),
-	deep       = Color3.fromRGB(16, 40, 86),
-	socket     = Color3.fromRGB(6, 15, 36),
-	socketEdge = Color3.fromRGB(10, 26, 58),
-	tooth      = Color3.fromRGB(198, 228, 255),
-	toothShade = Color3.fromRGB(116, 162, 218),
-	crease     = Color3.fromRGB(12, 32, 72),
-	void       = Color3.fromRGB(2, 5, 16),
-}
-
--- dark edge -> lit centre -> darker edge, across the short axis
-local BARREL = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, SKULL_COLORS.deep),
-	ColorSequenceKeypoint.new(0.12, SKULL_COLORS.shade),
-	ColorSequenceKeypoint.new(0.30, SKULL_COLORS.fill),
-	ColorSequenceKeypoint.new(0.46, SKULL_COLORS.light),
-	ColorSequenceKeypoint.new(0.54, SKULL_COLORS.lighter),
-	ColorSequenceKeypoint.new(0.72, SKULL_COLORS.fill),
-	ColorSequenceKeypoint.new(0.90, SKULL_COLORS.shade),
-	ColorSequenceKeypoint.new(1, SKULL_COLORS.deep),
-})
-local HOLLOW = ColorSequence.new({
-	ColorSequenceKeypoint.new(0, SKULL_COLORS.socketEdge),
-	ColorSequenceKeypoint.new(0.5, SKULL_COLORS.socket),
-	ColorSequenceKeypoint.new(1, SKULL_COLORS.socketEdge),
-})
-
--- half-width of the skull at a given y, crown through chin
-local SKULL_PROFILE = {
-	{61, 9}, {64, 18}, {68, 27}, {72, 35}, {77, 43}, {82, 49}, {88, 55},
-	{100, 64}, {112, 69}, {126, 71}, {140, 71}, {152, 69}, {162, 66}, {172, 62},
-	{180, 60}, {188, 60}, {196, 62}, {204, 63}, {212, 61}, {220, 56}, {228, 51},
-	{236, 46}, {244, 45}, {252, 46}, {262, 45}, {272, 42}, {282, 37}, {290, 30},
-	{298, 21}, {304, 11},
-}
-
-local ORBIT = {dx = 34, y = 180, w = 44, h = 42, r = 17, rot = 7}
-
-local function skullHalfWidth(y)
-	local first, last = SKULL_PROFILE[1], SKULL_PROFILE[#SKULL_PROFILE]
-	if y <= first[1] then return first[2] end
-	if y >= last[1] then return last[2] end
-	for i = 1, #SKULL_PROFILE - 1 do
-		local a, b = SKULL_PROFILE[i], SKULL_PROFILE[i + 1]
-		if y >= a[1] and y <= b[1] then
-			return a[2] + (b[2] - a[2]) * (y - a[1]) / (b[1] - a[1])
-		end
-	end
-	return last[2]
-end
-
-local function paint(obj, sequence, rotation)
-	local g = Instance.new("UIGradient")
-	g.Color = sequence
-	g.Rotation = rotation or 0
-	g.Parent = obj
-	return g
-end
-
-local function piece(parent, x, y, w, h, radius, rot, color, transparency, z)
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Size = UDim2.new(0, w, 0, h)
-	f.Position = UDim2.new(0, x, 0, y)
-	f.Rotation = rot or 0
-	f.BackgroundColor3 = color or SKULL_COLORS.fill
-	f.BackgroundTransparency = transparency or 0
-	f.ZIndex = z
-	f.Parent = parent
-	corner(f, radius)
-	return f
-end
-
-local function boneBar(parent, y, w, h, z, alpha)
-	local f = piece(parent, CX, y, w, h, h / 2, 0, SKULL_COLORS.fill, alpha, z)
-	paint(f, BARREL, 0)
-	return f
-end
-
-local function boneBox(parent, x, y, w, h, radius, rot, z, alpha)
-	local f = piece(parent, x, y, w, h, radius, rot, SKULL_COLORS.fill, alpha, z)
-	paint(f, BARREL, 0)
-	return f
-end
-
--- shading blob that fades out along its long axis, so nothing it covers
--- picks up a hard border
-local function softShade(parent, x, y, w, h, rot, color, transparency, z)
-	local f = piece(parent, x, y, w, h, 999, rot, color, transparency, z)
-	local g = Instance.new("UIGradient")
-	g.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.5, 0),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	g.Parent = f
-	return f
-end
-
--- hairline that fades out at both ends: sutures, rims, creases
-local function hairline(parent, x, y, len, thick, rot, color, transparency, z)
-	local f = piece(parent, x, y, len, thick, thick, rot, color, transparency, z)
-	local g = Instance.new("UIGradient")
-	g.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.24, 0),
-		NumberSequenceKeypoint.new(0.76, 0),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	g.Parent = f
-	return f
-end
-
--- CanvasGroup composites the whole skull as one layer, so overlapping
--- opaque pieces never seam. Older clients without it fall back to a plain
--- Frame, where the transparency has to go on each piece instead.
-local function newLayer(parent, name, groupTransparency, z)
-	local ok, layer = pcall(function() return Instance.new("CanvasGroup") end)
-	if not ok or not layer then
-		layer = Instance.new("Frame")
-	end
-	layer.Name = name
-	layer.BackgroundTransparency = 1
-	layer.BorderSizePixel = 0
-	layer.Size = UDim2.new(1, 0, 1, 0)
-	layer.Position = UDim2.new(0, 0, 0, 0)
-	layer.ZIndex = z
-	layer.Parent = parent
-	local grouped = layer:IsA("CanvasGroup")
-	if grouped then
-		layer.GroupTransparency = groupTransparency
-	end
-	return layer, grouped
-end
+-- Swap the art at any time with RH.SetSkullImage("rbxassetid://<id>").
+local SKULL_IMAGE = "rbxassetid://140603483625396"
 
 local function buildSkull()
 	SkullRoot:ClearAllChildren()
 
-	-- halo behind the skull
-	if RH.Flags.skullGlow then
-		local bloom = newFrame(SkullRoot, UDim2.new(0, 182, 0, 300), UDim2.new(0, 12, 0, 44), THEME.accent, 5)
-		bloom.BackgroundTransparency = 0.86
-		corner(bloom, 91)
-		gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.62, 1)
+	local skull = Instance.new("ImageLabel")
+	skull.Name = "Skull"
+	skull.BackgroundTransparency = 1
+	skull.BorderSizePixel = 0
+	skull.Image = SKULL_IMAGE
+	skull.ScaleType = Enum.ScaleType.Fit
+	skull.AnchorPoint = Vector2.new(0.5, 0.5)
+	skull.Size = UDim2.new(0, 190, 0, 262)
+	skull.Position = UDim2.new(0, SIDE_W / 2, 0, 188)
+	skull.ZIndex = 8
+	skull.Parent = SkullRoot
+	RH.Refs.Skull = skull
 
-		local halo, grouped = newLayer(SkullRoot, "SkullHalo", 0.5, 6)
-		RH.Refs.SkullHalo = grouped and halo or nil
-		local haloAlpha = grouped and 0 or 0.6
-		for y = 61, 305, 4 do
-			piece(halo, CX, y, skullHalfWidth(y) * 2 + 7, 10, 5, 0, THEME.accent, haloAlpha, 6)
-		end
-	else
-		RH.Refs.SkullHalo = nil
-	end
-
-	local body, grouped = newLayer(SkullRoot, "SkullBody", 0.26, 8)
-	local a = grouped and 0 or 0.26
-
-	-- ── silhouette ────────────────────────────────────────────────
-	for y = 61, 305, 2 do
-		boneBar(body, y, skullHalfWidth(y) * 2, 6, 8, a)
-	end
-	-- brow ridges standing proud over each orbit, glabella between them
-	for _, s in ipairs({-1, 1}) do
-		boneBox(body, CX + s * 33, 159, 54, 16, 8, s * -6, 9, a)
-	end
-	boneBox(body, CX, 163, 20, 14, 7, 0, 9, a)
-
-	-- ── form shading ──────────────────────────────────────────────
-	softShade(body, CX - 26, 106, 70, 78, 0, SKULL_COLORS.light, 0.66, 10)   -- frontal highlight
-	softShade(body, CX + 46, 128, 44, 100, 0, SKULL_COLORS.shade, 0.6, 10)   -- far side of the vault
-	softShade(body, CX - 58, 172, 32, 46, 0, SKULL_COLORS.shade, 0.5, 10)    -- temporal fossa
-	softShade(body, CX + 58, 172, 32, 46, 0, SKULL_COLORS.shade, 0.42, 10)
-	softShade(body, CX - 62, 204, 20, 34, 0, SKULL_COLORS.shade, 0.5, 10)    -- hollow behind the arch
-	softShade(body, CX + 62, 204, 20, 34, 0, SKULL_COLORS.shade, 0.45, 10)
-	softShade(body, CX, 210, 46, 30, 0, SKULL_COLORS.shade, 0.58, 10)        -- under the nasal root
-	softShade(body, CX, 244, 84, 22, 0, SKULL_COLORS.shade, 0.6, 10)         -- above the tooth row
-	softShade(body, CX, 286, 60, 32, 0, SKULL_COLORS.light, 0.68, 10)        -- chin catch
-	softShade(body, CX, 302, 70, 22, 0, SKULL_COLORS.shade, 0.55, 10)        -- jaw falls away
-	-- cheekbones: read as light and shadow, never as extra geometry
-	softShade(body, CX - 45, 199, 42, 20, -20, SKULL_COLORS.lighter, 0.55, 10)
-	softShade(body, CX + 45, 199, 42, 20, 20, SKULL_COLORS.light, 0.66, 10)
-	for _, s in ipairs({-1, 1}) do
-		softShade(body, CX + s * 44, 214, 40, 16, s * 16, SKULL_COLORS.shade, 0.5, 10)
-		hairline(body, CX + s * 44, 208, 40, 2, s * -16, SKULL_COLORS.lighter, 0.7, 10)
-	end
-
-	-- ── orbits ────────────────────────────────────────────────────
-	for _, s in ipairs({-1, 1}) do
-		local ox = CX + s * ORBIT.dx
-		piece(body, ox, ORBIT.y, ORBIT.w, ORBIT.h, ORBIT.r, s * ORBIT.rot, SKULL_COLORS.socketEdge, 0, 11)
-		local inner = piece(body, ox + s * 1.5, ORBIT.y + 2, ORBIT.w - 8, ORBIT.h - 8,
-			ORBIT.r - 4, s * ORBIT.rot, SKULL_COLORS.socket, 0, 12)
-		paint(inner, HOLLOW, 120)
-		softShade(body, ox - s * 8, ORBIT.y + 8, 14, 12, 0, SKULL_COLORS.void, 0.3, 13) -- optic canal
-		-- lit rims: bright along the top, softer down the outer edge
-		hairline(body, ox, ORBIT.y - ORBIT.h / 2 + 1.5, ORBIT.w - 8, 2.4, s * ORBIT.rot, SKULL_COLORS.lighter, 0.55, 13)
-		hairline(body, ox + s * (ORBIT.w / 2 - 2), ORBIT.y + 3, ORBIT.h - 14, 2.2, 90 + s * ORBIT.rot, SKULL_COLORS.light, 0.7, 13)
-		hairline(body, ox, ORBIT.y + ORBIT.h / 2 - 1, ORBIT.w - 14, 1.8, s * ORBIT.rot, SKULL_COLORS.light, 0.78, 13)
-		softShade(body, ox - s * 7, ORBIT.y - ORBIT.h / 2 + 2, 8, 5, 0, SKULL_COLORS.crease, 0.55, 13) -- supraorbital notch
-		softShade(body, ox + s * 2, ORBIT.y + ORBIT.h / 2 + 9, 6, 5, 0, SKULL_COLORS.crease, 0.5, 13)  -- infraorbital foramen
-	end
-
-	-- ── nasal aperture ────────────────────────────────────────────
-	for y = 198, 236, 2 do
-		local t = (y - 198) / 38
-		local w = 6 + 24 * (t ^ 1.8)
-		local n = piece(body, CX, y, w, 5, 2.5, 0, SKULL_COLORS.socket, 0, 12)
-		paint(n, HOLLOW, 0)
-	end
-	hairline(body, CX, 222, 20, 2.2, 90, SKULL_COLORS.light, 0.74, 13)      -- vomer
-	for _, s in ipairs({-1, 1}) do
-		hairline(body, CX + s * 7, 200, 16, 2, s * 74, SKULL_COLORS.lighter, 0.7, 13) -- nasal bones
-	end
-	piece(body, CX, 240, 10, 7, 3, 0, SKULL_COLORS.lighter, 0.5, 13)        -- nasal spine
-
-	-- ── teeth ─────────────────────────────────────────────────────
-	local UPPER = {-31, -23.5, -16, -8.5, -1.5, 5.5, 13, 20.5, 28, 34.5}
-	local LOWER = {-29, -22, -15, -8, -1.5, 5, 12, 19, 26, 32}
-	local function toothRow(row, yBase, heightAtCentre, upper)
-		for _, dx in ipairs(row) do
-			local k = math.abs(dx) / 32
-			local t = piece(body, CX + dx, yBase - k * k * 3.5,
-				8.6 - k * 3.0, heightAtCentre - k * 4, 3, dx * 0.16,
-				SKULL_COLORS.tooth, k * 0.35, 13)
-			paint(t, ColorSequence.new(
-				upper and SKULL_COLORS.tooth or SKULL_COLORS.toothShade,
-				upper and SKULL_COLORS.toothShade or SKULL_COLORS.tooth
-			), 90)
-		end
-	end
-	toothRow(UPPER, 251, 15, true)
-	toothRow(LOWER, 266, 13, false)
-	hairline(body, CX + 1, 258.5, 70, 2.4, 0, SKULL_COLORS.crease, 0.45, 14) -- bite line
-
-	-- ── sutures and fine detail ───────────────────────────────────
-	for i = 0, 16 do
-		local t = i / 16
-		local x = CX - 60 + t * 120
-		local y = 110 + ((math.abs(t - 0.5) * 2) ^ 2) * 18 + (i % 2 == 1 and 1.4 or -1.4)
-		hairline(body, x, y, 10, 1.7, (t - 0.5) * 52, SKULL_COLORS.crease, 0.6, 13)
-	end
-	hairline(body, CX, 86, 40, 1.7, 90, SKULL_COLORS.crease, 0.7, 13)        -- sagittal
-	for _, s in ipairs({-1, 1}) do
-		hairline(body, CX + s * 55, 148, 44, 1.7, s * 60, SKULL_COLORS.crease, 0.7, 13)  -- temporal line
-		hairline(body, CX + s * 60, 184, 28, 1.6, s * 14, SKULL_COLORS.crease, 0.74, 13) -- squamosal
-		hairline(body, CX + s * 40, 228, 24, 1.6, s * 66, SKULL_COLORS.crease, 0.76, 13) -- zygomaticomaxillary
-		hairline(body, CX + s * 41, 258, 42, 1.8, s * 66, SKULL_COLORS.crease, 0.7, 13)  -- jaw line
-		softShade(body, CX + s * 26, 282, 7, 6, 0, SKULL_COLORS.crease, 0.55, 13)        -- mental foramen
-	end
-	hairline(body, CX, 292, 20, 1.8, 90, SKULL_COLORS.crease, 0.72, 13)      -- mental symphysis
+	return skull
 end
 RH.BuildSkull = buildSkull
 buildSkull()
+
+function RH.SetSkullImage(assetId)
+	if not assetId then return end
+	SKULL_IMAGE = tostring(assetId)
+	if not string.find(SKULL_IMAGE, "://") then
+		SKULL_IMAGE = "rbxassetid://" .. SKULL_IMAGE
+	end
+	if RH.Refs.Skull and RH.Refs.Skull.Parent then
+		RH.Refs.Skull.Image = SKULL_IMAGE
+	end
+end
 
 -- Bloom over the skull that flares with the storm.
 local SkullFlash = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.accentGlow, 14)
@@ -837,13 +601,16 @@ SkullFlash.BackgroundTransparency = 1
 corner(SkullFlash, 13)
 RH.Refs.SkullFlash = SkullFlash
 
--- Slow breathing pulse on the glow behind the skull.
+-- Slow breathing pulse on the skull itself. Nothing sits behind the
+-- image, so the breath rides on its own transparency rather than on a
+-- glow plate.
 task.spawn(function()
 	local up = true
 	while not RH.Dead do
-		local halo = RH.Refs.SkullHalo
-		if halo and halo.Parent then
-			tween(halo, {GroupTransparency = up and 0.4 or 0.62}, 1.9, Enum.EasingStyle.Sine)
+		local skull = RH.Refs.Skull
+		if skull and skull.Parent then
+			local target = RH.Flags.skullGlow and (up and 0 or 0.14) or 0
+			tween(skull, {ImageTransparency = target}, 1.9, Enum.EasingStyle.Sine)
 		end
 		up = not up
 		task.wait(2)
@@ -1751,8 +1518,10 @@ end)
 toggleRow(VisualPage, "Storm Flashes", "stormFlashes", 4, function(on)
 	if not on and RH.Refs.Flash then RH.Refs.Flash.BackgroundTransparency = 1 end
 end)
-toggleRow(VisualPage, "Skull Glow", "skullGlow", 5, function()
-	buildSkull()
+toggleRow(VisualPage, "Skull Pulse", "skullGlow", 5, function(on)
+	if not on and RH.Refs.Skull then
+		tween(RH.Refs.Skull, {ImageTransparency = 0}, 0.3)
+	end
 end)
 cycleRow(VisualPage, "Window Opacity", "windowOpacity", {"Solid", "Glass", "Ghost"}, 6, function(mode)
 	local map = {Solid = 0, Glass = 0.16, Ghost = 0.34}

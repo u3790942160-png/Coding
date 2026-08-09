@@ -3397,13 +3397,7 @@ end
 
 -- ── rainfall ───────────────────────────────────────────────────────────
 _G.RainyRainOn = _G.RainyRainOn ~= false
-_G.RainyIntensity = _G.RainyIntensity or "Heavy"
-RainyIntensities = {
-Light = {count = 26, speed = 380, tilt = 8, alpha = 0.72},
-Medium = {count = 48, speed = 480, tilt = 10, alpha = 0.62},
-Heavy = {count = 78, speed = 620, tilt = 13, alpha = 0.54},
-Storm = {count = 118, speed = 780, tilt = 17, alpha = 0.46},
-}
+RAINY_DROPS, RAINY_SPEED, RAINY_TILT, RAINY_ALPHA = 78, 620, 13, 0.54
 
 function RainyMakeLayer(name, zindex)
 local layer = Instance.new("Frame")
@@ -3424,14 +3418,13 @@ RainyFrontLayer = RainyMakeLayer("RainfallFront", 30)
 RainyDrops = {}
 
 function RainyResetDrop(d, above)
-local cfg = RainyIntensities[_G.RainyIntensity] or RainyIntensities.Heavy
 d.x = RainyRng:NextNumber(-40, RainyW + 20)
 d.y = above and RainyRng:NextNumber(-260, -8) or RainyRng:NextNumber(-RainyH, RainyH)
-d.vy = cfg.speed * RainyRng:NextNumber(0.75, 1.35) * (d.front and 2.1 or 1)
-d.vx = math.tan(math.rad(cfg.tilt)) * d.vy
+d.vy = RAINY_SPEED * RainyRng:NextNumber(0.75, 1.35) * (d.front and 2.1 or 1)
+d.vx = math.tan(math.rad(RAINY_TILT)) * d.vy
 d.frame.Size = UDim2.new(0, d.front and 2.6 or RainyRng:NextNumber(0.9, 2.1), 0, RainyRng:NextInteger(d.front and 34 or 12, d.front and 64 or 30))
-d.frame.Rotation = cfg.tilt + (d.front and 1 or 0)
-d.frame.BackgroundTransparency = (d.front and 0.78 or cfg.alpha) + RainyRng:NextNumber(-0.08, 0.14)
+d.frame.Rotation = RAINY_TILT + (d.front and 1 or 0)
+d.frame.BackgroundTransparency = (d.front and 0.78 or RAINY_ALPHA) + RainyRng:NextNumber(-0.08, 0.14)
 end
 
 function RainyBuildRain()
@@ -3439,9 +3432,8 @@ for _, d in ipairs(RainyDrops) do
 if d.frame then d.frame:Destroy() end
 end
 RainyDrops = {}
-local cfg = RainyIntensities[_G.RainyIntensity] or RainyIntensities.Heavy
-for i = 1, cfg.count + 18 do
-local front = i > cfg.count
+for i = 1, RAINY_DROPS + 18 do
+local front = i > RAINY_DROPS
 local f = Instance.new("Frame")
 f.BorderSizePixel = 0
 f.BackgroundColor3 = RAIN.drop
@@ -3510,38 +3502,6 @@ g.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSeq
 g.Parent = sheen
 end
 
--- ── lightning ──────────────────────────────────────────────────────────
-_G.RainyFlashesOn = _G.RainyFlashesOn ~= false
-RainyFlash = Instance.new("Frame")
-RainyFlash.Name = "StormFlash"
-RainyFlash.BorderSizePixel = 0
-RainyFlash.Size = UDim2.new(1, 0, 1, 0)
-RainyFlash.BackgroundColor3 = Color3.fromRGB(150, 190, 255)
-RainyFlash.BackgroundTransparency = 1
-RainyFlash.ZIndex = 40
-RainyFlash.Parent = Main
-corner(RainyFlash, 16)
-
-function RainyStrike()
-if not _G.RainyFlashesOn then return end
-local peak = RainyRng:NextNumber(0.86, 0.94)
-RainyFlash.BackgroundTransparency = peak
-task.wait(0.05)
-tween(RainyFlash, {BackgroundTransparency = 1}, 0.12)
-if RainyRng:NextNumber() > 0.45 then
-task.wait(0.09)
-RainyFlash.BackgroundTransparency = peak + 0.04
-task.wait(0.04)
-tween(RainyFlash, {BackgroundTransparency = 1}, 0.3)
-end
-end
-task.spawn(function()
-while true do
-task.wait(RainyRng:NextNumber(5, 14))
-pcall(RainyStrike)
-end
-end)
-
 -- ── sidebar ────────────────────────────────────────────────────────────
 RainySidebar = Instance.new("Frame")
 RainySidebar.Name = "Sidebar"
@@ -3579,10 +3539,101 @@ RainySkull.BorderSizePixel = 0
 RainySkull.Image = SKULL_IMAGE
 RainySkull.ScaleType = Enum.ScaleType.Fit
 RainySkull.AnchorPoint = Vector2.new(0.5, 0.5)
-RainySkull.Size = UDim2.new(0, 190, 0, 262)
-RainySkull.Position = UDim2.new(0.5, 0, 0, 190)
+RainySkull.Size = UDim2.new(0, 170, 0, 172)
+RainySkull.Position = UDim2.new(0.5, 0, 0, 168)
 RainySkull.ZIndex = 3
 RainySkull.Parent = RainySidebar
+
+
+-- ── player card, sitting just above the tab column ─────────────────────
+do
+local card = Instance.new("Frame")
+card.Name = "PlayerCard"
+card.BorderSizePixel = 0
+card.Size = UDim2.new(1, -28, 0, 64)
+card.Position = UDim2.new(0, 14, 0, 264)
+card.BackgroundColor3 = COLORS.row
+card.BackgroundTransparency = 0.18
+card.ZIndex = 6
+card.Parent = RainySidebar
+corner(card, 12)
+stroke(card, RAIN.accent, 1.2, 0.45)
+
+local ring = Instance.new("Frame")
+ring.BorderSizePixel = 0
+ring.Size = UDim2.new(0, 46, 0, 46)
+ring.Position = UDim2.new(0, 10, 0.5, -23)
+ring.BackgroundColor3 = Color3.fromRGB(9, 17, 33)
+ring.BackgroundTransparency = 0.1
+ring.ZIndex = 7
+ring.Parent = card
+corner(ring, 999)
+stroke(ring, RAIN.accentGlow, 1.6, 0.2)
+
+local avatar = Instance.new("ImageLabel")
+avatar.Name = "Avatar"
+avatar.BackgroundTransparency = 1
+avatar.BorderSizePixel = 0
+avatar.Size = UDim2.new(1, -6, 1, -6)
+avatar.Position = UDim2.new(0, 3, 0, 3)
+avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LP.UserId) .. "&w=150&h=150"
+avatar.ZIndex = 8
+avatar.Parent = ring
+corner(avatar, 999)
+
+-- online dot on the rim of the avatar
+local dot = Instance.new("Frame")
+dot.BorderSizePixel = 0
+dot.Size = UDim2.new(0, 13, 0, 13)
+dot.Position = UDim2.new(1, -13, 1, -13)
+dot.BackgroundColor3 = RAIN.good
+dot.ZIndex = 9
+dot.Parent = ring
+corner(dot, 999)
+stroke(dot, Color3.fromRGB(6, 12, 26), 2, 0)
+
+local name = Instance.new("TextLabel")
+name.Name = "DisplayName"
+name.BackgroundTransparency = 1
+name.Size = UDim2.new(1, -76, 0, 20)
+name.Position = UDim2.new(0, 68, 0, 12)
+name.Text = LP.DisplayName or LP.Name
+name.TextColor3 = COLORS.white
+name.TextSize = 15
+name.Font = Enum.Font.GothamBold
+name.TextXAlignment = Enum.TextXAlignment.Left
+name.TextTruncate = Enum.TextTruncate.AtEnd
+name.ZIndex = 7
+name.Parent = card
+
+local handle = Instance.new("TextLabel")
+handle.Name = "Handle"
+handle.BackgroundTransparency = 1
+handle.Size = UDim2.new(1, -76, 0, 16)
+handle.Position = UDim2.new(0, 68, 0, 31)
+handle.Text = "@" .. LP.Name
+handle.TextColor3 = RAIN.accentGlow
+handle.TextSize = 12
+handle.Font = Enum.Font.GothamSemibold
+handle.TextXAlignment = Enum.TextXAlignment.Left
+handle.TextTruncate = Enum.TextTruncate.AtEnd
+handle.ZIndex = 7
+handle.Parent = card
+
+local rule = Instance.new("Frame")
+rule.BorderSizePixel = 0
+rule.Size = UDim2.new(1, -80, 0, 2)
+rule.Position = UDim2.new(0, 68, 0, 50)
+rule.BackgroundColor3 = RAIN.accent
+rule.BackgroundTransparency = 0.25
+rule.ZIndex = 7
+rule.Parent = card
+corner(rule, 2)
+local rg = Instance.new("UIGradient")
+rg.Color = ColorSequence.new(RAIN.accentGlow, RAIN.accent)
+rg.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.85)})
+rg.Parent = rule
+end
 
 function _G.RainySetSkull(assetId)
 if not assetId then return end
@@ -3948,7 +3999,7 @@ Content.Parent = Main
 local Tabs = Instance.new("Frame")
 Tabs.Name = "Tabs"
 Tabs.BackgroundTransparency = 1
-Tabs.Position = UDim2.new(0, 26, 0, 342)
+Tabs.Position = UDim2.new(0, 26, 0, 346)
 Tabs.Size = UDim2.new(0, SIDE_W - 28, 0, 170)
 Tabs.ZIndex = 4
 Tabs.Parent = Main

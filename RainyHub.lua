@@ -554,135 +554,280 @@ BoneRoot.Name = "Bones"
 BoneRoot.BackgroundTransparency = 1
 BoneRoot.ClipsDescendants = true
 
-RH.Refs.BoneStrokes = {}
+-- The hand is laid out in the sidebar's own 206-wide space.
+--
+-- Fingers are not capsules-per-bone — that reads as a balloon animal.
+-- Each digit is a centreline that spreads, curls and tapers, stamped
+-- with overlapping circles so the silhouette comes out smooth and
+-- continuous. The palm is a stack of bars whose width follows a profile
+-- curve. Every stamp carries the same cross-axis light ramp, so each
+-- form reads as rounded rather than flat.
+--
+-- All of it is opaque and composited by a CanvasGroup, which is what
+-- keeps overlapping pieces from showing seams; the group's transparency
+-- is what makes the hand glassy.
 
--- The hand is laid out in the sidebar's own 206-wide space. Each digit is
--- two overlapping capsules so it tapers toward the tip and picks up a
--- joint contour where they meet; the palm is a pair of rounded slabs that
--- blend down into the wrist. Everything stays translucent so the storm
--- behind it still reads through the glass.
+local HAND_COLORS = {
+	fill    = Color3.fromRGB(46, 102, 180),
+	light   = Color3.fromRGB(112, 170, 238),
+	lighter = Color3.fromRGB(170, 214, 255),
+	shade   = Color3.fromRGB(24, 58, 116),
+	deep    = Color3.fromRGB(14, 36, 80),
+	crease  = Color3.fromRGB(12, 32, 72),
+}
+
+-- dark edge -> lit centre -> darker edge, across the short axis
+local BARREL = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, HAND_COLORS.deep),
+	ColorSequenceKeypoint.new(0.18, HAND_COLORS.fill),
+	ColorSequenceKeypoint.new(0.40, HAND_COLORS.light),
+	ColorSequenceKeypoint.new(0.52, HAND_COLORS.lighter),
+	ColorSequenceKeypoint.new(0.74, HAND_COLORS.fill),
+	ColorSequenceKeypoint.new(0.92, HAND_COLORS.shade),
+	ColorSequenceKeypoint.new(1, HAND_COLORS.deep),
+})
+
 local DIGITS = {
-	{bx = 79,  by = 192, len = 100, w = 25, rot = -5},  -- index
-	{bx = 104, by = 188, len = 112, w = 26, rot = -1},  -- middle
-	{bx = 128, by = 192, len = 102, w = 25, rot = 5},   -- ring
-	{bx = 150, by = 206, len = 82,  w = 22, rot = 12},  -- little
-	{bx = 68,  by = 276, len = 80,  w = 31, rot = -36}, -- thumb
+	{mcp = {72, 208},  len = 96,  rot = -9,  curl = 7,  w0 = 25, w1 = 18, joints = {0.46, 0.75}}, -- index
+	{mcp = {100, 198}, len = 110, rot = -2,  curl = 5,  w0 = 26, w1 = 19, joints = {0.44, 0.74}}, -- middle
+	{mcp = {128, 204}, len = 100, rot = 5,   curl = 7,  w0 = 25, w1 = 18, joints = {0.45, 0.75}}, -- ring
+	{mcp = {151, 220}, len = 80,  rot = 13,  curl = 9,  w0 = 22, w1 = 16, joints = {0.45, 0.74}}, -- little
+	{mcp = {76, 300},  len = 84,  rot = -37, curl = -9, w0 = 32, w1 = 23, joints = {0.55}},       -- thumb
 }
 
-local SLABS = {
-	{x = 104, y = 226, w = 100, h = 80, r = 36}, -- upper palm
-	{x = 104, y = 276, w = 86,  h = 74, r = 32}, -- lower palm
-	{x = 104, y = 318, w = 62,  h = 46, r = 22}, -- wrist
+-- half-width of the palm at a given y
+local PALM_PROFILE = {
+	{200, 51}, {214, 52}, {236, 52}, {258, 51}, {280, 49},
+	{300, 45}, {318, 40}, {336, 34}, {352, 30}, {368, 27}, {384, 25},
 }
 
-local GLASS_FILL = 0.38
-local GLASS_GLOW = 0.66
-
--- Capsule anchored at the bottom-centre of its base point, which is also
--- what Rotation pivots around.
-local function capsule(parent, d, color, transparency, z, edgeColor, edgeTransparency, grow)
-	local g = grow or 0
-	local f = Instance.new("Frame")
-	f.BorderSizePixel = 0
-	f.AnchorPoint = Vector2.new(0.5, 1)
-	f.Size = UDim2.new(0, d.w + g, 0, d.len + g)
-	f.Position = UDim2.new(0, d.bx, 0, d.by)
-	f.Rotation = d.rot
-	f.BackgroundColor3 = color
-	f.BackgroundTransparency = transparency
-	f.ZIndex = z
-	f.Parent = parent
-	corner(f, (d.w + g) / 2)
-	if edgeColor then
-		gradient(f, THEME.boneCore, THEME.boneDeep, 115)
-		table.insert(RH.Refs.BoneStrokes, stroke(f, edgeColor, 1.6, edgeTransparency or 0.2))
+local function palmHalfWidth(y)
+	if y <= PALM_PROFILE[1][1] then return PALM_PROFILE[1][2] end
+	local last = PALM_PROFILE[#PALM_PROFILE]
+	if y >= last[1] then return last[2] end
+	for i = 1, #PALM_PROFILE - 1 do
+		local a, b = PALM_PROFILE[i], PALM_PROFILE[i + 1]
+		if y >= a[1] and y <= b[1] then
+			local t = (y - a[1]) / (b[1] - a[1])
+			return a[2] + (b[2] - a[2]) * t
+		end
 	end
-	return f
+	return last[2]
 end
 
-local function slab(parent, s, color, transparency, z, edgeColor, edgeTransparency, grow)
-	local g = grow or 0
+-- sample points down a digit, each with its local width and heading
+local function centreline(d, step)
+	local pts = {}
+	local n = math.max(2, math.floor(d.len / (step or 3.5) + 0.5))
+	local x, y = d.mcp[1], d.mcp[2]
+	for i = 0, n do
+		local t = i / n
+		local ang = d.rot + d.curl * (t ^ 1.25)
+		local w = d.w0 + (d.w1 - d.w0) * t
+		if t > 0.80 then
+			w = w * (1 + 0.07 * math.sin(((t - 0.80) / 0.20) * math.pi)) -- finger pad
+		end
+		table.insert(pts, {x = x, y = y, w = w, ang = ang, t = t})
+		local rad = math.rad(ang)
+		x = x + math.sin(rad) * (d.len / n)
+		y = y - math.cos(rad) * (d.len / n)
+	end
+	return pts
+end
+
+local function barrelPaint(obj, rotation)
+	local g = Instance.new("UIGradient")
+	g.Color = BARREL
+	g.Rotation = rotation or 0
+	g.Parent = obj
+	return g
+end
+
+local function stamp(parent, x, y, d, ang, z, alpha)
 	local f = Instance.new("Frame")
 	f.BorderSizePixel = 0
 	f.AnchorPoint = Vector2.new(0.5, 0.5)
-	f.Size = UDim2.new(0, s.w + g, 0, s.h + g)
-	f.Position = UDim2.new(0, s.x, 0, s.y)
+	f.Size = UDim2.new(0, d, 0, d)
+	f.Position = UDim2.new(0, x, 0, y)
+	f.Rotation = ang
+	f.BackgroundColor3 = HAND_COLORS.fill
+	f.BackgroundTransparency = alpha or 0
+	f.ZIndex = z
+	f.Parent = parent
+	corner(f, 999)
+	barrelPaint(f, 0)
+	return f
+end
+
+local function bar(parent, cx, y, w, h, z, alpha)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Size = UDim2.new(0, w, 0, h)
+	f.Position = UDim2.new(0, cx, 0, y)
+	f.BackgroundColor3 = HAND_COLORS.fill
+	f.BackgroundTransparency = alpha or 0
+	f.ZIndex = z
+	f.Parent = parent
+	corner(f, h / 2)
+	barrelPaint(f, 0)
+	return f
+end
+
+-- shading blob: an ellipse that fades out along its long axis so the
+-- shading has no hard border
+local function softShade(parent, x, y, w, h, rot, color, transparency, z)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Size = UDim2.new(0, w, 0, h)
+	f.Position = UDim2.new(0, x, 0, y)
+	f.Rotation = rot
 	f.BackgroundColor3 = color
 	f.BackgroundTransparency = transparency
 	f.ZIndex = z
 	f.Parent = parent
-	corner(f, s.r + g / 2)
-	if edgeColor then
-		gradient(f, THEME.boneCore, THEME.boneDeep, 115)
-		-- palm edges are deliberately left out of the breathing pulse so
-		-- only the digit contours flare
-		stroke(f, edgeColor, 1.6, edgeTransparency or 0.5)
-	end
+	corner(f, 999)
+	local g = Instance.new("UIGradient")
+	g.Rotation = 0
+	g.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	g.Parent = f
 	return f
 end
 
--- lower (knuckle) and upper (tip) halves of one digit
-local function digitParts(d)
-	local rad = math.rad(d.rot)
-	local reach = d.len * 0.46
-	local lower = {bx = d.bx, by = d.by, len = d.len * 0.62, w = d.w, rot = d.rot}
-	local upper = {
-		bx = d.bx + math.sin(rad) * reach,
-		by = d.by - math.cos(rad) * reach,
-		len = d.len * 0.58,
-		w = d.w * 0.84,
-		rot = d.rot,
-	}
-	return lower, upper
+-- skin crease: a hairline that fades out at both ends
+local function crease(parent, x, y, len, thick, rot, transparency, z)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Size = UDim2.new(0, len, 0, thick)
+	f.Position = UDim2.new(0, x, 0, y)
+	f.Rotation = rot
+	f.BackgroundColor3 = HAND_COLORS.crease
+	f.BackgroundTransparency = transparency
+	f.ZIndex = z
+	f.Parent = parent
+	corner(f, thick)
+	local g = Instance.new("UIGradient")
+	g.Rotation = 0
+	g.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.26, 0),
+		NumberSequenceKeypoint.new(0.74, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	g.Parent = f
+	return f
+end
+
+-- CanvasGroup composites the whole hand as one layer, so overlapping
+-- opaque pieces never seam. Older clients without it fall back to a
+-- plain Frame, where the transparency has to go on each piece instead.
+local function newLayer(parent, name, groupTransparency, z)
+	local ok, layer = pcall(function() return Instance.new("CanvasGroup") end)
+	if not ok or not layer then
+		layer = Instance.new("Frame")
+	end
+	layer.Name = name
+	layer.BackgroundTransparency = 1
+	layer.BorderSizePixel = 0
+	layer.Size = UDim2.new(1, 0, 1, 0)
+	layer.Position = UDim2.new(0, 0, 0, 0)
+	layer.ZIndex = z
+	layer.Parent = parent
+	local grouped = layer:IsA("CanvasGroup")
+	if grouped then
+		layer.GroupTransparency = groupTransparency
+	end
+	return layer, grouped
 end
 
 local function buildSkeleton()
 	BoneRoot:ClearAllChildren()
-	RH.Refs.BoneStrokes = {}
 
-	-- bloom behind the whole hand
-	local bloom = newFrame(BoneRoot, UDim2.new(0, 180, 0, 280), UDim2.new(0, 14, 0, 80), THEME.accent, 6)
-	bloom.BackgroundTransparency = 0.86
-	corner(bloom, 90)
-	gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.62, 1)
+	local lines = {}
+	for _, d in ipairs(DIGITS) do
+		table.insert(lines, {def = d, pts = centreline(d)})
+	end
 
-	-- halo pass: fattened copies sitting behind the glass
+	-- halo behind the hand
 	if RH.Flags.boneGlow then
-		for _, d in ipairs(DIGITS) do
-			local lower, upper = digitParts(d)
-			capsule(BoneRoot, lower, THEME.accent, GLASS_GLOW, 7, nil, nil, 10)
-			capsule(BoneRoot, upper, THEME.accent, GLASS_GLOW, 7, nil, nil, 10)
+		local bloom = newFrame(BoneRoot, UDim2.new(0, 190, 0, 310), UDim2.new(0, 8, 0, 66), THEME.accent, 5)
+		bloom.BackgroundTransparency = 0.84
+		corner(bloom, 95)
+		gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.6, 1)
+
+		local halo, grouped = newLayer(BoneRoot, "HandHalo", 0.5, 6)
+		RH.Refs.HandHalo = grouped and halo or nil
+		local haloAlpha = grouped and 0 or 0.6
+		for _, line in ipairs(lines) do
+			for i, p in ipairs(line.pts) do
+				if i % 2 == 1 or i == #line.pts then
+					local s = stamp(halo, p.x, p.y, p.w + 6, p.ang, 6, haloAlpha)
+					s.BackgroundColor3 = THEME.accent
+					local g = s:FindFirstChildOfClass("UIGradient")
+					if g then g:Destroy() end
+				end
+			end
 		end
-		for i, s in ipairs(SLABS) do
-			slab(BoneRoot, s, THEME.accent, i == 3 and 0.74 or GLASS_GLOW, 7, nil, nil, 12)
+		for y = 198, 388, 9 do
+			local b = bar(halo, 104, y, palmHalfWidth(y) * 2 + 8, 24, 6, haloAlpha)
+			b.BackgroundColor3 = THEME.accent
+			local g = b:FindFirstChildOfClass("UIGradient")
+			if g then g:Destroy() end
+		end
+	else
+		RH.Refs.HandHalo = nil
+	end
+
+	-- the hand itself
+	local body, grouped = newLayer(BoneRoot, "HandBody", 0.34, 8)
+	local alpha = grouped and 0 or 0.34
+
+	for y = 198, 388, 4 do
+		bar(body, 104, y, palmHalfWidth(y) * 2, 20, 8, alpha)
+	end
+	-- the thumb mound pushes the left edge of the palm outward
+	for y = 250, 320, 4 do
+		local bulge = 16 * math.sin(((y - 250) / 70) * math.pi)
+		bar(body, 104 - bulge / 2, y, palmHalfWidth(y) * 2 + bulge, 20, 8, alpha)
+	end
+	for _, line in ipairs(lines) do
+		for _, p in ipairs(line.pts) do
+			stamp(body, p.x, p.y, p.w, p.ang, 9, alpha)
 		end
 	end
 
-	-- glass pass, wrist first so the palm overlaps it cleanly
-	for i = #SLABS, 1, -1 do
-		slab(BoneRoot, SLABS[i], THEME.bone, GLASS_FILL, 8, THEME.boneCore, 0.55)
-	end
-	for _, d in ipairs(DIGITS) do
-		local lower, upper = digitParts(d)
-		capsule(BoneRoot, lower, THEME.bone, GLASS_FILL, 9, THEME.boneCore, 0.55)
-		capsule(BoneRoot, upper, THEME.bone, GLASS_FILL - 0.02, 9, THEME.boneCore, 0.18)
-	end
-
-	-- light running up the inside of each digit
-	for _, d in ipairs(DIGITS) do
-		local core = capsule(BoneRoot, {
-			bx = d.bx, by = d.by, len = d.len * 0.7, w = d.w * 0.34, rot = d.rot,
-		}, THEME.boneCore, 0.35, 10)
-		gradient(core, THEME.boneCore, THEME.bone, 90, 0.2, 1)
+	-- form shading
+	softShade(body, 82, 282, 58, 90, -12, HAND_COLORS.light, 0.58, 10)  -- thumb mound catches light
+	softShade(body, 140, 288, 36, 82, 6, HAND_COLORS.shade, 0.5, 10)    -- shaded pinky edge
+	softShade(body, 104, 232, 92, 28, -2, HAND_COLORS.shade, 0.66, 10)  -- occlusion under the knuckles
+	softShade(body, 106, 288, 66, 60, 0, HAND_COLORS.light, 0.78, 10)   -- pool of light in the palm
+	softShade(body, 104, 356, 78, 40, 0, HAND_COLORS.shade, 0.6, 10)    -- wrist falls away
+	for _, line in ipairs(lines) do
+		local first = line.pts[1]
+		softShade(body, first.x, first.y + 4, first.w * 1.3, 16, first.ang, HAND_COLORS.shade, 0.6, 10)
+		local pad = line.pts[math.max(1, math.floor(#line.pts * 0.9))]
+		softShade(body, pad.x, pad.y, pad.w * 0.66, pad.w * 1.1, pad.ang, HAND_COLORS.lighter, 0.68, 11)
 	end
 
-	-- light catch across the palm
-	local catch = newFrame(BoneRoot, UDim2.new(0, 44, 0, 62), UDim2.new(0, 80, 0, 247), THEME.boneCore, 10)
-	catch.AnchorPoint = Vector2.new(0.5, 0.5)
-	catch.BackgroundTransparency = 0.45
-	catch.Rotation = -14
-	corner(catch, 999)
-	gradient(catch, THEME.boneCore, THEME.bone, 120, 0.35, 1)
+	-- creases at the knuckle and each joint
+	for _, line in ipairs(lines) do
+		for _, j in ipairs(line.def.joints) do
+			local p = line.pts[math.max(1, math.floor(j * (#line.pts - 1) + 0.5) + 1)]
+			if p then crease(body, p.x, p.y, p.w * 0.8, 1.8, p.ang, 0.55, 12) end
+		end
+		local k = line.pts[1]
+		crease(body, k.x, k.y + 4, k.w * 0.86, 2, k.ang, 0.66, 12)
+	end
+	-- palm creases
+	crease(body, 100, 246, 72, 2, -8, 0.78, 12)
+	crease(body, 98, 268, 60, 1.8, 6, 0.8, 12)
+	crease(body, 86, 276, 62, 1.8, 78, 0.8, 12)
 end
 RH.BuildSkeleton = buildSkeleton
 buildSkeleton()
@@ -694,14 +839,13 @@ BoneFlash.BackgroundTransparency = 1
 corner(BoneFlash, 13)
 RH.Refs.BoneFlash = BoneFlash
 
--- Slow breathing pulse on the bone outlines.
+-- Slow breathing pulse on the glow behind the hand.
 task.spawn(function()
 	local up = true
 	while not RH.Dead do
-		for _, st in ipairs(RH.Refs.BoneStrokes) do
-			if st and st.Parent then
-				tween(st, {Transparency = up and 0.16 or 0.5}, 1.9, Enum.EasingStyle.Sine)
-			end
+		local halo = RH.Refs.HandHalo
+		if halo and halo.Parent then
+			tween(halo, {GroupTransparency = up and 0.4 or 0.62}, 1.9, Enum.EasingStyle.Sine)
 		end
 		up = not up
 		task.wait(2)
@@ -1609,7 +1753,7 @@ end)
 toggleRow(VisualPage, "Storm Flashes", "stormFlashes", 4, function(on)
 	if not on and RH.Refs.Flash then RH.Refs.Flash.BackgroundTransparency = 1 end
 end)
-toggleRow(VisualPage, "Bone Glow", "boneGlow", 5, function()
+toggleRow(VisualPage, "Hand Glow", "boneGlow", 5, function()
 	buildSkeleton()
 end)
 cycleRow(VisualPage, "Window Opacity", "windowOpacity", {"Solid", "Glass", "Ghost"}, 6, function(mode)

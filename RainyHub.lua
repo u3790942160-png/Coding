@@ -119,6 +119,7 @@ RH.Values = {
 	carryVersion   = "v1",
 	rainIntensity  = "Heavy",
 	windowOpacity  = "Solid",
+	uiScale        = "80%",
 	aimbotSpeed    = 58,
 	stealRadius    = 62,
 	fov            = 70,
@@ -1625,13 +1626,16 @@ end)
 
 divider(VisualPage, 12)
 sectionLabel(VisualPage, "Interface", 13)
-keybindRow(VisualPage, "Toggle UI", "toggleUI", 14)
-buttonRow(VisualPage, "Reset Window Position", 15, function()
+cycleRow(VisualPage, "UI Scale", "uiScale", {"60%", "70%", "80%", "90%", "100%"}, 14, function()
+	if RH.ApplyScale then RH.ApplyScale() end
+end)
+keybindRow(VisualPage, "Toggle UI", "toggleUI", 15)
+buttonRow(VisualPage, "Reset Window Position", 16, function()
 	Main.Position = UDim2.new(0, 26, 0.5, 0)
 	RH.SavedPos = nil
 	saveConfig()
 end)
-buttonRow(VisualPage, "Unload Rainy Hub", 16, function()
+buttonRow(VisualPage, "Unload Rainy Hub", 17, function()
 	saveConfig()
 	if _G.RainyHubCleanup then _G.RainyHubCleanup() end
 	clearMark("RainyESP")
@@ -1940,14 +1944,30 @@ end)
 local UiScale = Instance.new("UIScale")
 UiScale.Parent = Main
 
-local function updateScale()
+-- The viewport term only ever shrinks the window on small screens; on a
+-- normal monitor it lands on 1 and the hub renders at its full 560x580.
+-- RH.Values.uiScale is the user's own multiplier on top of that.
+local function targetScale()
 	local cam = Workspace.CurrentCamera
-	if not cam then return end
-	local vp = cam.ViewportSize
-	if vp.X < 10 then return end
-	UiScale.Scale = math.clamp(math.min(vp.X / 760, vp.Y / 700), 0.6, 1)
+	local fit = 1
+	if cam and cam.ViewportSize.X >= 10 then
+		local vp = cam.ViewportSize
+		fit = math.clamp(math.min(vp.X / 760, vp.Y / 700), 0.6, 1)
+	end
+	local pick = tonumber(string.match(tostring(RH.Values.uiScale or "80%"), "%d+"))
+	return fit * ((pick or 80) / 100)
+end
+RH.TargetScale = targetScale
+
+local function updateScale()
+	UiScale.Scale = targetScale()
 end
 updateScale()
+
+-- called by the UI Scale switch in Visuals
+function RH.ApplyScale()
+	tween(UiScale, {Scale = targetScale()}, 0.2)
+end
 if Workspace.CurrentCamera then
 	track(Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale))
 end
@@ -1969,9 +1989,8 @@ do
 	local startPos = Main.Position
 	Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset - 40, startPos.Y.Scale, startPos.Y.Offset)
 	UiScale.Scale = UiScale.Scale * 0.94
-	local finalScale = math.clamp(math.min((Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize.X or 1280) / 760, 1), 0.6, 1)
 	tween(Main, {Position = startPos}, 0.45, Enum.EasingStyle.Quint)
-	tween(UiScale, {Scale = finalScale}, 0.45, Enum.EasingStyle.Quint)
+	tween(UiScale, {Scale = targetScale()}, 0.45, Enum.EasingStyle.Quint)
 	task.delay(0.18, function() pcall(stormFlash) end)
 end
 

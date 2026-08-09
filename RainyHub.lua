@@ -3971,7 +3971,7 @@ TitleAccent.Parent = Main
 local HeaderBox = Instance.new("Frame")
 HeaderBox.Name = "HeaderBox"
 HeaderBox.BorderSizePixel = 0
-HeaderBox.Size = UDim2.new(0, 178, 0, 54)
+HeaderBox.Size = UDim2.new(0, 146, 0, 54)
 HeaderBox.Position = UDim2.new(0, 22, 0, 18)
 HeaderBox.BackgroundColor3 = COLORS.row
 HeaderBox.BackgroundTransparency = 0.55
@@ -4708,52 +4708,6 @@ _G.AceAimbotSelectorRow = function(parent, order)
 -- Rows that carry a second version (Aimbot: Normal/Anti Bypass, Auto
 -- Steal: Normal/Semi) start collapsed showing only the active mode. The
 -- chevron opens them so the other version can be picked.
-function RainyAddModeArrow(holder, altName)
-local slide = holder:FindFirstChild("SelectedSlide")
-local primary = holder:FindFirstChild("NormalText")
-local alt = holder:FindFirstChild(altName)
-if not (slide and primary and alt) then return end
-
-local arrow = Instance.new("TextButton")
-arrow.Name = "ModeArrow"
-arrow.BackgroundTransparency = 1
-arrow.Text = "\u{25BC}"
-arrow.TextColor3 = RAIN.accentGlow
-arrow.TextSize = 12
-arrow.Font = Enum.Font.GothamBold
-arrow.AutoButtonColor = false
-arrow.Size = UDim2.new(0, 26, 1, 0)
-arrow.Position = UDim2.new(1, -28, 0, 0)
-arrow.ZIndex = 10
-arrow.Parent = holder
-
-local open = false
-local function paint()
-arrow.Text = open and "\u{25B2}" or "\u{25BC}"
-slide.Visible = open
-alt.Visible = open
-if open then
-primary.Size = UDim2.new(0.5, 0, 1, 0)
-primary.Position = UDim2.new(0, 0, 0, 0)
-else
-primary.Size = UDim2.new(1, -30, 1, 0)
-primary.Position = UDim2.new(0, 0, 0, 0)
--- collapsed, the label reports whichever mode is actually live
-primary.Text = (slide.Position.X.Scale > 0.25) and alt.Text or "NORMAL"
-end
-end
-
-arrow.MouseButton1Click:Connect(function()
-open = not open
-paint()
-end)
-slide:GetPropertyChangedSignal("Position"):Connect(function()
-if not open then paint() end
-end)
-paint()
-return arrow
-end
-
 local holder = Instance.new("Frame")
 holder.Name = "Aimbot Mode"
 holder.BackgroundColor3 = COLORS.row
@@ -4871,7 +4825,6 @@ bypassClick.MouseButton1Click:Connect(function()
 setMode("Anti Bypass")
 end)
 setMode(selectedAimbotMode)
-RainyAddModeArrow(holder, "BypassText")
 return holder, setMode
 end
 function autoStealSelectorRow(parent, order)
@@ -4996,7 +4949,6 @@ semiClick.MouseButton1Click:Connect(function()
 setMode("Semi")
 end)
 setMode(selectedStealMode)
-RainyAddModeArrow(holder, "SemiText")
 return holder, setMode
 end
 -- Spread the large one-time UI build over several frames so executing the

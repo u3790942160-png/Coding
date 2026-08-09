@@ -3363,7 +3363,7 @@ discordLbl.Name = "Discord"
 discordLbl.Size = UDim2.new(1, 0, 0, 28)
 discordLbl.Position = UDim2.new(0, 0, 0, 56)
 discordLbl.BackgroundTransparency = 1
-discordLbl.Text = "discord.gg/rainyhub"
+discordLbl.Text = "RAINY HUB"
 discordLbl.TextColor3 = Color3.fromRGB(126, 186, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 -- Lighter than the speed line above it: the handle is there to be read,
@@ -4093,7 +4093,7 @@ corner(Avatar, 999)
 stroke(Avatar, COLORS.accent, 1.2, 0.35)
 local OnlineDot = Instance.new("Frame")
 OnlineDot.Name = "OnlineDot"
-OnlineDot.BackgroundColor3 = COLORS.accent
+OnlineDot.BackgroundColor3 = Color3.fromRGB(64, 214, 132)
 OnlineDot.BorderSizePixel = 0
 OnlineDot.Position = UDim2.new(0, 36, 0.5, 8)
 OnlineDot.Size = UDim2.new(0, 9, 0, 9)
@@ -4331,7 +4331,7 @@ Content.Parent = Main
 end
 local pages = {}
 local tabButtons = {}
-local tabNames = {"MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
+local tabNames = {"SPEED", "MOVEMENT", "COMBAT", "KEYBINDS", "VISUALS", "SETTINGS"}
 local activeTab = "MOVEMENT"
 function addPage(name)
 local page = Instance.new("ScrollingFrame")
@@ -4909,6 +4909,7 @@ btn.Parent = row
 corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
 local clearBtn = Instance.new("TextButton")
+clearBtn.Visible = false -- keybind clear (x) removed
 clearBtn.Name = "ClearKeybindButton"
 clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
@@ -5322,10 +5323,11 @@ end
 -- loadstring does not monopolize the client thread and visibly freeze play.
 task.wait()
 Movement = pages.MOVEMENT
-section(Movement, "AUTO SPEED", -2)
-_, setAutoCarrySpeedVisual = toggleRow(Movement, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
+Speed = pages.SPEED
+section(Speed, "AUTO SPEED", -2)
+_, setAutoCarrySpeedVisual = toggleRow(Speed, "Auto Carry Speed", autoCarrySpeedEnabled, -1)
 do
-local row = Movement:FindFirstChild("Auto Carry Speed")
+local row = Speed:FindFirstChild("Auto Carry Speed")
 _diceBtn = row and row:FindFirstChild("ToggleButton")
 if _diceBtn then
 _diceBtn.Activated:Connect(function()
@@ -5338,8 +5340,8 @@ saveDiceConfig()
 end)
 end
 end
-section(Movement, "NORMAL SPEED", 1)
-_, normalSpeedBox = textboxRow(Movement, "Normal Speed", tostring(NS), 2)
+section(Speed, "NORMAL SPEED", 1)
+_, normalSpeedBox = textboxRow(Speed, "Normal Speed", tostring(NS), 2)
 normalSpeedBox.FocusLost:Connect(function()
 local v = tonumber(normalSpeedBox.Text)
 if v and v > 0 and v <= 250 then
@@ -5347,7 +5349,7 @@ NS = v
 end
 normalSpeedBox.Text = tostring(NS)
 end)
-_, carrySpeedBox = textboxRow(Movement, "Carry Speed", tostring(CS), 3)
+_, carrySpeedBox = textboxRow(Speed, "Carry Speed", tostring(CS), 3)
 carrySpeedBox.FocusLost:Connect(function()
 local v = tonumber(carrySpeedBox.Text)
 if v and v > 0 and v <= 250 then
@@ -5356,8 +5358,8 @@ end
 carrySpeedBox.Text = tostring(CS)
 end)
 modeDisplayRow(Movement, 4, "Normal")
-section(Movement, "LAGGER SPEED", 5)
-_, laggerSpeedBox = textboxRow(Movement, "Lagger Speed", tostring(LAGGER_SPEED), 6)
+section(Speed, "LAGGER SPEED", 5)
+_, laggerSpeedBox = textboxRow(Speed, "Lagger Speed", tostring(LAGGER_SPEED), 6)
 laggerSpeedBox.FocusLost:Connect(function()
 local v = tonumber(laggerSpeedBox.Text)
 if v and v > 0 and v <= 250 then
@@ -5365,7 +5367,7 @@ LAGGER_SPEED = v
 end
 laggerSpeedBox.Text = tostring(LAGGER_SPEED)
 end)
-_, laggerCarrySpeedBox = textboxRow(Movement, "Lagger Carry Speed", tostring(LAGGER_CARRY_SPEED), 7)
+_, laggerCarrySpeedBox = textboxRow(Speed, "Lagger Carry Speed", tostring(LAGGER_CARRY_SPEED), 7)
 laggerCarrySpeedBox.FocusLost:Connect(function()
 local v = tonumber(laggerCarrySpeedBox.Text)
 if v and v > 0 and v <= 250 then
@@ -7074,7 +7076,7 @@ runTPFloor()
 return
 end
 end)
-setTab("MOVEMENT")
+setTab("SPEED")
 _G.__DiceDuelsSetupStealBar = function()
 local RunService   = game:GetService("RunService")
 local UIS = UserInputService

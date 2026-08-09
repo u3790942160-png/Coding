@@ -2,7 +2,7 @@
 	═══════════════════════════════════════════════════════════════
 	  R A I N Y   H U B
 	  Rainy-themed interface — storm backdrop, live rainfall,
-	  and a procedurally drawn blue skeletal hand in the sidebar.
+	  and a procedurally drawn translucent blue hand in the sidebar.
 	═══════════════════════════════════════════════════════════════
 ]]
 
@@ -547,148 +547,142 @@ do
 end
 
 -- ═══════════════════════════════════════════════════════════════
--- SKELETON ART — a blue x-ray hand, drawn from primitives
+-- HAND ART — translucent blue hand, drawn from primitives
 -- ═══════════════════════════════════════════════════════════════
 local BoneRoot = newFrame(ArtLayer, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), THEME.sidebar, 6)
 BoneRoot.Name = "Bones"
 BoneRoot.BackgroundTransparency = 1
 BoneRoot.ClipsDescendants = true
 
-local CX = SIDE_W / 2
 RH.Refs.BoneStrokes = {}
 
-local function boneSegment(parent, x1, y1, x2, y2, thickness, color, transparency, z, glow)
-	local dx, dy = x2 - x1, y2 - y1
-	local length = math.sqrt(dx * dx + dy * dy)
-	local seg = Instance.new("Frame")
-	seg.BorderSizePixel = 0
-	seg.BackgroundColor3 = color or THEME.bone
-	seg.BackgroundTransparency = transparency or 0
-	seg.AnchorPoint = Vector2.new(0, 0.5)
-	seg.Size = UDim2.new(0, math.max(length + thickness * 0.55, 1), 0, thickness)
-	seg.Position = UDim2.new(0, x1, 0, y1)
-	seg.Rotation = math.deg(math.atan2(dy, dx))
-	seg.ZIndex = z or 8
-	seg.Parent = parent
-	corner(seg, math.max(thickness / 2, 1))
-	if glow and RH.Flags.boneGlow then
-		local g = Instance.new("Frame")
-		g.BorderSizePixel = 0
-		g.BackgroundColor3 = THEME.accentGlow
-		g.BackgroundTransparency = 0.72
-		g.AnchorPoint = Vector2.new(0.5, 0.5)
-		g.Size = UDim2.new(1, 6, 0, thickness + 6)
-		g.Position = UDim2.new(0.5, 0, 0.5, 0)
-		g.ZIndex = (z or 8) - 1
-		g.Parent = seg
-		corner(g, (thickness + 6) / 2)
+-- The hand is laid out in the sidebar's own 206-wide space. Each digit is
+-- two overlapping capsules so it tapers toward the tip and picks up a
+-- joint contour where they meet; the palm is a pair of rounded slabs that
+-- blend down into the wrist. Everything stays translucent so the storm
+-- behind it still reads through the glass.
+local DIGITS = {
+	{bx = 79,  by = 192, len = 100, w = 25, rot = -5},  -- index
+	{bx = 104, by = 188, len = 112, w = 26, rot = -1},  -- middle
+	{bx = 128, by = 192, len = 102, w = 25, rot = 5},   -- ring
+	{bx = 150, by = 206, len = 82,  w = 22, rot = 12},  -- little
+	{bx = 68,  by = 276, len = 80,  w = 31, rot = -36}, -- thumb
+}
+
+local SLABS = {
+	{x = 104, y = 226, w = 100, h = 80, r = 36}, -- upper palm
+	{x = 104, y = 276, w = 86,  h = 74, r = 32}, -- lower palm
+	{x = 104, y = 318, w = 62,  h = 46, r = 22}, -- wrist
+}
+
+local GLASS_FILL = 0.38
+local GLASS_GLOW = 0.66
+
+-- Capsule anchored at the bottom-centre of its base point, which is also
+-- what Rotation pivots around.
+local function capsule(parent, d, color, transparency, z, edgeColor, edgeTransparency, grow)
+	local g = grow or 0
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 1)
+	f.Size = UDim2.new(0, d.w + g, 0, d.len + g)
+	f.Position = UDim2.new(0, d.bx, 0, d.by)
+	f.Rotation = d.rot
+	f.BackgroundColor3 = color
+	f.BackgroundTransparency = transparency
+	f.ZIndex = z
+	f.Parent = parent
+	corner(f, (d.w + g) / 2)
+	if edgeColor then
+		gradient(f, THEME.boneCore, THEME.boneDeep, 115)
+		table.insert(RH.Refs.BoneStrokes, stroke(f, edgeColor, 1.6, edgeTransparency or 0.2))
 	end
-	return seg
+	return f
 end
 
--- Bone coordinates are laid out in the sidebar's own 206-wide space.
--- Each finger chain runs knuckle -> tip; metacarpals fan back from the
--- knuckles to the carpal cluster at the wrist.
-local FINGERS = {
-	{{83, 168}, {77, 126}, {74, 100}, {72, 82}},   -- index
-	{{105, 158}, {103, 112}, {102, 84}, {101, 64}}, -- middle
-	{{127, 164}, {131, 120}, {134, 94}, {136, 76}}, -- ring
-	{{147, 178}, {154, 144}, {158, 124}, {161, 110}}, -- little
-}
-local FINGER_THICKNESS = {4.6, 4.0, 3.3}
-
-local THUMB = {{88, 264}, {60, 230}, {46, 198}, {39, 176}}
-local THUMB_THICKNESS = {5.2, 4.6, 3.9}
-
-local METACARPALS = {
-	{{86, 284}, {83, 168}},
-	{{98, 286}, {105, 158}},
-	{{112, 286}, {127, 164}},
-	{{124, 284}, {147, 178}},
-}
-
-local CARPALS = {
-	{84, 282, 12, 9}, {96, 281, 12, 10}, {108, 282, 12, 9}, {120, 280, 11, 9},
-	{86, 298, 13, 10}, {99, 300, 13, 10}, {111, 297, 12, 10}, {122, 293, 11, 9},
-}
-
-local function boneKnob(parent, x, y, d, color, transparency, z)
-	local k = Instance.new("Frame")
-	k.BorderSizePixel = 0
-	k.AnchorPoint = Vector2.new(0.5, 0.5)
-	k.Size = UDim2.new(0, d, 0, d)
-	k.Position = UDim2.new(0, x, 0, y)
-	k.BackgroundColor3 = color
-	k.BackgroundTransparency = transparency or 0.2
-	k.ZIndex = z or 11
-	k.Parent = parent
-	corner(k, 999)
-	table.insert(RH.Refs.BoneStrokes, stroke(k, THEME.boneCore, 1, 0.5))
-	return k
+local function slab(parent, s, color, transparency, z, edgeColor, edgeTransparency, grow)
+	local g = grow or 0
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Size = UDim2.new(0, s.w + g, 0, s.h + g)
+	f.Position = UDim2.new(0, s.x, 0, s.y)
+	f.BackgroundColor3 = color
+	f.BackgroundTransparency = transparency
+	f.ZIndex = z
+	f.Parent = parent
+	corner(f, s.r + g / 2)
+	if edgeColor then
+		gradient(f, THEME.boneCore, THEME.boneDeep, 115)
+		-- palm edges are deliberately left out of the breathing pulse so
+		-- only the digit contours flare
+		stroke(f, edgeColor, 1.6, edgeTransparency or 0.5)
+	end
+	return f
 end
 
-local function carpalBone(parent, x, y, w, h, z)
-	local c = Instance.new("Frame")
-	c.BorderSizePixel = 0
-	c.AnchorPoint = Vector2.new(0.5, 0.5)
-	c.Size = UDim2.new(0, w, 0, h)
-	c.Position = UDim2.new(0, x, 0, y)
-	c.Rotation = (x - CX) * 0.4
-	c.BackgroundColor3 = THEME.bone
-	c.BackgroundTransparency = 0.06
-	c.ZIndex = z or 10
-	c.Parent = parent
-	corner(c, math.floor(math.min(w, h) / 2))
-	gradient(c, THEME.bone, THEME.boneDeep, 90)
-	table.insert(RH.Refs.BoneStrokes, stroke(c, THEME.boneCore, 1.1, 0.5))
-	return c
+-- lower (knuckle) and upper (tip) halves of one digit
+local function digitParts(d)
+	local rad = math.rad(d.rot)
+	local reach = d.len * 0.46
+	local lower = {bx = d.bx, by = d.by, len = d.len * 0.62, w = d.w, rot = d.rot}
+	local upper = {
+		bx = d.bx + math.sin(rad) * reach,
+		by = d.by - math.cos(rad) * reach,
+		len = d.len * 0.58,
+		w = d.w * 0.84,
+		rot = d.rot,
+	}
+	return lower, upper
 end
 
 local function buildSkeleton()
 	BoneRoot:ClearAllChildren()
 	RH.Refs.BoneStrokes = {}
 
-	-- backlight behind the palm
-	local palmGlow = newFrame(BoneRoot, UDim2.new(0, 128, 0, 210), UDim2.new(0, CX - 64, 0, 118), THEME.accent, 6)
-	palmGlow.BackgroundTransparency = 0.86
-	corner(palmGlow, 60)
-	gradient(palmGlow, THEME.accentGlow, THEME.accent, 90, 0.7, 1)
+	-- bloom behind the whole hand
+	local bloom = newFrame(BoneRoot, UDim2.new(0, 180, 0, 280), UDim2.new(0, 14, 0, 80), THEME.accent, 6)
+	bloom.BackgroundTransparency = 0.86
+	corner(bloom, 90)
+	gradient(bloom, THEME.accentGlow, THEME.accent, 90, 0.62, 1)
 
-	-- forearm, fading out as it runs down behind the tab column
-	boneSegment(BoneRoot, 99, 306, 95, 348, 7, THEME.boneDeep, 0.6, 7, false)
-	boneSegment(BoneRoot, 117, 304, 121, 348, 6, THEME.boneDeep, 0.68, 7, false)
-
-	-- metacarpals
-	for _, bone in ipairs(METACARPALS) do
-		local base, knuckle = bone[1], bone[2]
-		boneSegment(BoneRoot, base[1], base[2], knuckle[1], knuckle[2], 5, THEME.bone, 0.06, 9, true)
-		boneKnob(BoneRoot, base[1], base[2], 7, THEME.boneDeep, 0.1, 10)
-		boneKnob(BoneRoot, knuckle[1], knuckle[2], 8.5, THEME.boneCore, 0.22, 11)
-	end
-
-	-- thumb: metacarpal plus two phalanges
-	for i = 1, #THUMB - 1 do
-		local thickness = THUMB_THICKNESS[i]
-		boneSegment(BoneRoot, THUMB[i][1], THUMB[i][2], THUMB[i + 1][1], THUMB[i + 1][2], thickness, THEME.bone, 0.06, 9, true)
-		boneKnob(BoneRoot, THUMB[i][1], THUMB[i][2], thickness + 3, THEME.boneCore, 0.25, 11)
-	end
-	boneKnob(BoneRoot, THUMB[#THUMB][1], THUMB[#THUMB][2], 5.5, THEME.boneCore, 0.25, 11)
-
-	-- fingers
-	for _, finger in ipairs(FINGERS) do
-		for i = 1, #finger - 1 do
-			local thickness = FINGER_THICKNESS[i]
-			boneSegment(BoneRoot, finger[i][1], finger[i][2], finger[i + 1][1], finger[i + 1][2], thickness, THEME.bone, 0.05 + (i - 1) * 0.03, 9, true)
-			boneKnob(BoneRoot, finger[i][1], finger[i][2], thickness + 3.2, THEME.boneCore, 0.22, 11)
+	-- halo pass: fattened copies sitting behind the glass
+	if RH.Flags.boneGlow then
+		for _, d in ipairs(DIGITS) do
+			local lower, upper = digitParts(d)
+			capsule(BoneRoot, lower, THEME.accent, GLASS_GLOW, 7, nil, nil, 10)
+			capsule(BoneRoot, upper, THEME.accent, GLASS_GLOW, 7, nil, nil, 10)
 		end
-		local tip = finger[#finger]
-		boneKnob(BoneRoot, tip[1], tip[2], 5, THEME.boneCore, 0.25, 11)
+		for i, s in ipairs(SLABS) do
+			slab(BoneRoot, s, THEME.accent, i == 3 and 0.74 or GLASS_GLOW, 7, nil, nil, 12)
+		end
 	end
 
-	-- carpals
-	for _, c in ipairs(CARPALS) do
-		carpalBone(BoneRoot, c[1], c[2], c[3], c[4], 10)
+	-- glass pass, wrist first so the palm overlaps it cleanly
+	for i = #SLABS, 1, -1 do
+		slab(BoneRoot, SLABS[i], THEME.bone, GLASS_FILL, 8, THEME.boneCore, 0.55)
 	end
+	for _, d in ipairs(DIGITS) do
+		local lower, upper = digitParts(d)
+		capsule(BoneRoot, lower, THEME.bone, GLASS_FILL, 9, THEME.boneCore, 0.55)
+		capsule(BoneRoot, upper, THEME.bone, GLASS_FILL - 0.02, 9, THEME.boneCore, 0.18)
+	end
+
+	-- light running up the inside of each digit
+	for _, d in ipairs(DIGITS) do
+		local core = capsule(BoneRoot, {
+			bx = d.bx, by = d.by, len = d.len * 0.7, w = d.w * 0.34, rot = d.rot,
+		}, THEME.boneCore, 0.35, 10)
+		gradient(core, THEME.boneCore, THEME.bone, 90, 0.2, 1)
+	end
+
+	-- light catch across the palm
+	local catch = newFrame(BoneRoot, UDim2.new(0, 44, 0, 62), UDim2.new(0, 80, 0, 247), THEME.boneCore, 10)
+	catch.AnchorPoint = Vector2.new(0.5, 0.5)
+	catch.BackgroundTransparency = 0.45
+	catch.Rotation = -14
+	corner(catch, 999)
+	gradient(catch, THEME.boneCore, THEME.bone, 120, 0.35, 1)
 end
 RH.BuildSkeleton = buildSkeleton
 buildSkeleton()

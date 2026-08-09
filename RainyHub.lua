@@ -3364,7 +3364,7 @@ discordLbl.Size = UDim2.new(1, 0, 0, 28)
 discordLbl.Position = UDim2.new(0, 0, 0, 56)
 discordLbl.BackgroundTransparency = 1
 discordLbl.Text = "discord.gg/rainyhub"
-discordLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+discordLbl.TextColor3 = Color3.fromRGB(126, 186, 255)
 discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 -- Lighter than the speed line above it: the handle is there to be read,
 -- not to compete with the number.
@@ -4023,7 +4023,7 @@ end
 local Title = Instance.new("TextLabel")
 Title.Name = "Title"
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(0, 48, 0, 24)
+Title.Size = UDim2.new(0, 66, 0, 24)
 Title.Position = UDim2.new(0, 56, 0, 15)
 Title.Text = "RAINY"
 Title.TextColor3 = COLORS.white
@@ -4038,9 +4038,9 @@ local TitleSub = Instance.new("TextLabel")
 TitleSub.Name = "TitleSub"
 TitleSub.BackgroundTransparency = 1
 TitleSub.Size = UDim2.new(0, 90, 0, 24)
-TitleSub.Position = UDim2.new(0, 104, 0, 15)
+TitleSub.Position = UDim2.new(0, 126, 0, 15)
 TitleSub.Text = "HUB"
-TitleSub.TextColor3 = COLORS.accentDim
+TitleSub.TextColor3 = Color3.fromRGB(30, 96, 205)
 TitleSub.TextStrokeTransparency = 0.7
 TitleSub.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 TitleSub.Font = Enum.Font.GothamBlack
@@ -4314,7 +4314,7 @@ end
 setPageDieFace = function() end
 local PageDivider = Instance.new("Frame")
 PageDivider.Name = "PageDivider"
-PageDivider.BackgroundColor3 = COLORS.stroke
+PageDivider.BackgroundColor3 = COLORS.accent
 PageDivider.BackgroundTransparency = 0.5
 PageDivider.BorderSizePixel = 0
 PageDivider.Position = UDim2.new(0, 12, 0, 40)
@@ -4541,7 +4541,7 @@ box.Name = "ValueBox"
 box.BackgroundColor3 = COLORS.accentSoft
 box.BackgroundTransparency = 0.18
 box.Text = tostring(value or "")
-box.TextColor3 = COLORS.white
+box.TextColor3 = COLORS.accentDim
 box.TextSize = 12
 box.Font = Enum.Font.GothamSemibold
 box.ClearTextOnFocus = false
@@ -4853,7 +4853,9 @@ btn.AutoButtonColor = false
 btn.Parent = row
 corner(btn, 7)
 stroke(btn, COLORS.strokeSoft, 1, 0.45)
+-- keybind clear (x) button removed
 local clearBtn = Instance.new("TextButton")
+clearBtn.Visible = false
 clearBtn.Name = "ClearKeybindButton"
 clearBtn.BackgroundColor3 = COLORS.accentSoft
 clearBtn.BackgroundTransparency = 0.18
@@ -5651,8 +5653,9 @@ speedKeybindRow(Keybinds, "Auto Left", "AutoLeft", 9)
 speedKeybindRow(Keybinds, "Auto Right", "AutoRight", 10)
 speedKeybindRow(Keybinds, "Instant Reset", "InstantReset", 12)
 do
-THEME_ACCENT = THEME_ACCENT or Color3.fromRGB(230, 230, 230)
-THEME_ACCENT_DIM = THEME_ACCENT_DIM or Color3.fromRGB(145, 145, 145)
+-- drives the boxed ESP and the tracers through _diceEspColor
+THEME_ACCENT = Color3.fromRGB(56, 138, 255)
+THEME_ACCENT_DIM = Color3.fromRGB(126, 186, 255)
 PlayerESP = PlayerESP or {enabled=false, playerData={}, conns={}, discordText="discord.gg/rainyhub"}
 BoxedESPOptions = BoxedESPOptions or {box=false, tracer=false}
 BoxedESPData = BoxedESPData or {}
@@ -7080,7 +7083,7 @@ local Stats        = game:GetService("Stats")
 local existingStealBar = LP:FindFirstChild("PlayerGui") and LP.PlayerGui:FindFirstChild("StealBarGui")
 if existingStealBar then existingStealBar:Destroy() end
 local THEME_ACCENT        = Color3.fromRGB(235, 235, 245)
-local THEME_ACCENT_BRIGHT = Color3.fromRGB(255, 255, 255)
+local THEME_ACCENT_BRIGHT = Color3.fromRGB(126, 186, 255)
 local THEME_ACCENT_DIM    = Color3.fromRGB(120, 120, 130)
 local gui = Instance.new("ScreenGui")
 gui.Name = "StealBarGui"
@@ -7255,7 +7258,7 @@ elseif state == "READY" then
 TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 214, 132)}):Play()
 TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
 else
-TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_DIM}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(38, 150, 92)}):Play()
 TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = BAR_DIM}):Play()
 end
 end

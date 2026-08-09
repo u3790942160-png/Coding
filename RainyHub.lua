@@ -3563,6 +3563,22 @@ RainyArt.Position = UDim2.new(0.5, 0, 0, 178)
 RainyArt.ZIndex = 4
 RainyArt.Parent = RainySidebar
 
+-- Say so in the console when the asset does not resolve, rather than just
+-- showing an empty slot. A Decal id used where an Image id is needed is
+-- the usual cause, and the two look identical in a URL.
+task.spawn(function()
+local ok = pcall(function()
+game:GetService("ContentProvider"):PreloadAsync({RainyArt})
+end)
+if (not ok) or (RainyArt.IsLoaded == false) then
+warn("[Rainy Hub] artwork " .. tostring(RainyArt.Image) .. " did not load. "
+.. "If that number is a Decal id, use the Image id instead: "
+.. "_G.RainySetArt(\"rbxassetid://<image id>\")")
+else
+print("[Rainy Hub] artwork loaded: " .. tostring(RainyArt.Image))
+end
+end)
+
 
 -- ── player card, sitting just above the tab column ─────────────────────
 do

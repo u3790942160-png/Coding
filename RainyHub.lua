@@ -643,7 +643,7 @@ _G.DiceStopNormalInfJumpHoldState()
 end
 end
 local diceGuiScaleValue = 0.52
-local diceProgressBarScaleValue = 0.83
+local diceProgressBarScaleValue = 0.70 -- pinned; the stepper is gone
 CONFIG_FILE = "DiceDuels_MainGUI_Config_DefaultsV2.json"
 KEYBINDS_CONFIG_FILE = "DiceDuels_Keybinds_DefaultsV2.json"
 -- The hub used to save under the old name. Settings are read back from
@@ -661,7 +661,7 @@ canSaveConfig = (type(_dice_readfile) == "function" and type(_dice_writefile) ==
 
 --// Dice Duels Intro + Songs (ported from old source only)
 selectedIntroMusic = selectedIntroMusic or 1
-_introEnabled = (_introEnabled ~= false)
+_introEnabled = false -- intro removed
 setIntroVisual = nil
 setIntroSongVisual = nil
 INTRO_MUSIC_OPTIONS = INTRO_MUSIC_OPTIONS or {
@@ -824,6 +824,9 @@ function collectDiceMobileButtonPositions()
 local out = {}
 if _G.DiceMobilePanel then
 out.panel = udim2ToTable(_G.DiceMobilePanel.Position)
+for key, entry in pairs(_G.DiceMobileButtonRefs or {}) do
+if entry and entry.btn then out[key] = udim2ToTable(entry.btn.Position) end
+end
 end
 if next(out) == nil and type(_G.DiceMobileButtonPositions) == "table" then
 return _G.DiceMobileButtonPositions
@@ -3511,7 +3514,7 @@ stroke = Color3.fromRGB(40, 66, 110),
 strokeSoft = Color3.fromRGB(23, 39, 70),
 white = Color3.fromRGB(240, 246, 255),
 textDim = Color3.fromRGB(136, 156, 188),
-toggleBg = Color3.fromRGB(60, 68, 84),
+toggleBg = Color3.fromRGB(22, 30, 46),
 knob = Color3.fromRGB(236, 243, 255),
 accent = Color3.fromRGB(56, 138, 255),
 accentDim = Color3.fromRGB(126, 186, 255),
@@ -4051,7 +4054,7 @@ Discord.BackgroundTransparency = 1
 Discord.Position = UDim2.new(0, 15, 0, 42)
 Discord.Size = UDim2.new(0, 170, 0, 14)
 Discord.Text = "discord.gg/rainyhub"
-Discord.TextColor3 = COLORS.textDim
+Discord.TextColor3 = COLORS.accentDim
 Discord.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 Discord.TextStrokeTransparency = 0.45
 Discord.Font = Enum.Font.GothamSemibold
@@ -4139,10 +4142,10 @@ CardUnderline.ZIndex = 7
 CardUnderline.Parent = PlayerCard
 Close = Instance.new("TextButton")
 Close.Name = "Close"
-Close.BackgroundColor3 = Color3.fromRGB(246, 246, 250)
-Close.BackgroundTransparency = 0.04
+Close.BackgroundColor3 = Color3.fromRGB(10, 18, 34)
+Close.BackgroundTransparency = 0.25
 Close.Text = "–"
-Close.TextColor3 = Color3.fromRGB(12, 12, 14)
+Close.TextColor3 = COLORS.white
 Close.TextSize = 18
 Close.Font = Enum.Font.GothamBold
 Close.Size = UDim2.new(0, 30, 0, 24)
@@ -5159,6 +5162,36 @@ end)
 setMode(selectedAimbotMode)
 return holder, setMode
 end
+-- A selector row (NORMAL / SEMI, NORMAL / ANTI BYPASS) starts folded
+-- away. The chevron on its owning row opens it. Hiding the row is enough
+-- on its own: UIListLayout skips invisible children, so the rest of the
+-- page closes up behind it.
+function RainyFoldSelector(selector, ownerRow)
+if not (selector and ownerRow) then return end
+selector.Visible = false
+local arrow = Instance.new("TextButton")
+arrow.Name = "SelectorArrow"
+arrow.BackgroundColor3 = COLORS.row2
+arrow.BackgroundTransparency = 0.25
+arrow.BorderSizePixel = 0
+arrow.Text = "\u{25B2}"
+arrow.TextColor3 = COLORS.accentDim
+arrow.TextSize = 10
+arrow.Font = Enum.Font.GothamBold
+arrow.AutoButtonColor = false
+arrow.Size = UDim2.new(0, 26, 0, 20)
+arrow.Position = UDim2.new(1, -92, 0.5, -10)
+arrow.ZIndex = 8
+arrow.Parent = ownerRow
+corner(arrow, 6)
+stroke(arrow, COLORS.stroke, 1, 0.5)
+arrow.MouseButton1Click:Connect(function()
+selector.Visible = not selector.Visible
+arrow.Text = selector.Visible and "\u{25BC}" or "\u{25B2}"
+end)
+return arrow
+end
+
 function autoStealSelectorRow(parent, order)
 local holder = Instance.new("Frame")
 holder.Name = "Auto Steal Mode"
@@ -5421,8 +5454,9 @@ refreshSpeedModeRows()
 task.wait()
 Combat = pages.COMBAT
 section(Combat, "AUTO STEAL", 1)
-autoStealSelectorRow(Combat, 2)
+local _autoStealSelector = autoStealSelectorRow(Combat, 2)
 _diceRow, setAutoStealVisual = toggleRow(Combat, "Auto Steal", autoStealEnabled, 3)
+RainyFoldSelector(_autoStealSelector, _diceRow)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5452,10 +5486,11 @@ if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
 saveDiceConfig()
 end)
 section(Combat, "NORMAL/BYPASS AIMBOT", 5)
-_G.DiceAimbotSelectorRow(Combat, 6)
+local _aimbotSelector = _G.DiceAimbotSelectorRow(Combat, 6)
 _G.DiceAimbotSetVisual = nil
 if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 _G.DiceNormalAutoSwingRow, _G.DiceNormalAutoSwingSetVisual, _G.DiceNormalAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", autoSwingEnabled, 7)
+RainyFoldSelector(_aimbotSelector, _G.DiceNormalAutoSwingRow)
 do
 if _G.DiceNormalAutoSwingBtn then
 _G.DiceNormalAutoSwingBtn.MouseButton1Click:Connect(function()
@@ -5468,7 +5503,7 @@ task.delay(0.12, function() _G.DiceAutoSwingClickBusy = false end)
 end)
 end
 end
-_G.DiceMirrorTPDownRow, _G.DiceMirrorTPDownSetVisual, _G.DiceMirrorTPDownBtn = _G.DiceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 7.1)
+_G.DiceMirrorTPDownRow, _G.DiceMirrorTPDownSetVisual, _G.DiceMirrorTPDownBtn = _G.DiceActionToggleRow(Combat, "Mirror TP Down", mirrorTPDownEnabled, 7.1)
 local mirrorTPDownLabel = _G.DiceMirrorTPDownRow and _G.DiceMirrorTPDownRow:FindFirstChild("Label")
 if mirrorTPDownLabel then mirrorTPDownLabel.TextSize = 10 end
 if _G.DiceMirrorTPDownBtn then
@@ -5648,8 +5683,8 @@ local hrp=char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild
 local head=char and (char:FindFirstChild("Head") or char:WaitForChild("Head",5))
 if not hrp or not head then return end
 local hl=Instance.new("Highlight")
-hl.Name="DiceDuelsESP"; hl.Adornee=char; hl.FillColor=Color3.fromRGB(35,35,35); hl.FillTransparency=0.72
-hl.OutlineColor=Color3.fromRGB(245,245,245); hl.OutlineTransparency=0; hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
+hl.Name="DiceDuelsESP"; hl.Adornee=char; hl.FillColor=Color3.fromRGB(28,70,148); hl.FillTransparency=0.66
+hl.OutlineColor=Color3.fromRGB(126,186,255); hl.OutlineTransparency=0; hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
 local bb=Instance.new("BillboardGui")
 bb.Name="DiceDuelsESPTag"; bb.Adornee=head; bb.Size=UDim2.new(0,124,0,34); bb.StudsOffset=Vector3.new(0,2.7,0); bb.AlwaysOnTop=true; bb.LightInfluence=0; bb.Parent=head
 local box=Instance.new("Frame",bb); box.Size=UDim2.new(1,0,1,0); box.BackgroundTransparency=1; box.BorderSizePixel=0
@@ -6520,7 +6555,7 @@ __DiceDuelsSetupVisualsUI()
 Settings = pages.SETTINGS
 diceGuiScaleValue = tonumber(savedConfig.diceGuiScaleValue) or diceGuiScaleValue
 diceGuiScaleValue = math.clamp(tonumber(diceGuiScaleValue) or 0.52, 0.50, 1.50)
-diceProgressBarScaleValue = tonumber(savedConfig.diceProgressBarScaleValue) or diceProgressBarScaleValue
+diceProgressBarScaleValue = 0.70
 diceMainScale = Main:FindFirstChild("DiceMainScale") or Instance.new("UIScale")
 diceMainScale.Name = "DiceMainScale"
 diceMainScale.Scale = diceGuiScaleValue
@@ -6643,13 +6678,7 @@ diceGuiScaleValue = v
 diceMainScale.Scale = v
 saveDiceConfig()
 end)
-stepperRow(Settings, "Progress Bar Size", diceProgressBarScaleValue, 4, function(v)
-diceProgressBarScaleValue = v
-applyDiceProgressBarScale()
-saveDiceConfig()
-end)
-speedKeybindRow(Settings, "Toggle UI", "ToggleUI", 5)
-section(Settings, "MOBILE BUTTONS", 6)
+-- Progress Bar Size stepper removed; the scale is pinned at 0.70
 stepperRow(Settings, "Mobile Buttons Size", tonumber(_G.DiceMobileButtonScale) or 0.75, 9, function(v)
 _G.DiceMobileButtonScale = math.clamp(tonumber(v) or 0.35, 0.30, 1.35)
 if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end
@@ -6766,6 +6795,7 @@ resetHolder.ZIndex = 5
 resetHolder.Parent = Settings
 local resetBtn = Instance.new("TextButton")
 resetBtn.Name = "Reset All Settings"
+resetBtn.Visible = false -- reset settings removed
 resetBtn.BackgroundColor3 = Color3.fromRGB(232, 232, 238)
 resetBtn.BackgroundTransparency = 0
 resetBtn.BorderSizePixel = 0
@@ -7117,7 +7147,7 @@ local statusDot = Instance.new("Frame", pbFrame)
 statusDot.Name = "StatusDot"
 statusDot.Size = UDim2.new(0, 8, 0, 8)
 statusDot.Position = UDim2.new(0, 14, 0, 15)
-statusDot.BackgroundColor3 = BAR_GLOW
+statusDot.BackgroundColor3 = Color3.fromRGB(64, 214, 132)
 statusDot.BorderSizePixel = 0
 statusDot.ZIndex = 5
 Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
@@ -7219,7 +7249,7 @@ local barState = "IDLE"
 function setBarState(state)
 barState = state
 if state == "STEALING" then
-TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_GLOW}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 214, 132)}):Play()
 TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
 elseif state == "READY" then
 TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 214, 132)}):Play()
@@ -7279,15 +7309,52 @@ _G.__DiceDuelsSetupStealBar()
 if _G.DiceAutoStealSync then task.defer(_G.DiceAutoStealSync) end
 _G.__DiceDuelsSetupMinimizeToggle = function()
 _G.__DiceDuelsMinimized = false
+-- Closing drops and shrinks away, reopening rises back. The scaler is
+-- looked up live because diceMainScale is built further down the file.
+local function windowScale()
+return Main:FindFirstChild("DiceMainScale")
+end
+local function animateClose()
+local sc = windowScale()
+local home = Main.Position
+local target = sc and sc.Scale or 1
+Main:SetAttribute("RainyHome", home.Y.Offset)
+if sc then
+TweenService:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+{Scale = target * 0.9}):Play()
+end
+TweenService:Create(Main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+{Position = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset + 22)}):Play()
+task.delay(0.19, function()
+Main.Visible = false
+Main.Position = home
+if sc then sc.Scale = target end
+MiniFrame.Visible = true
+end)
+end
+local function animateOpen()
+local sc = windowScale()
+local home = Main.Position
+local target = sc and sc.Scale or 1
+MiniFrame.Visible = false
+Main.Size = FULL_MAIN_SIZE
+Main.Position = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset + 22)
+if sc then sc.Scale = target * 0.9 end
+Main.Visible = true
+TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+{Position = home}):Play()
+if sc then
+TweenService:Create(sc, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+{Scale = target}):Play()
+end
+end
+_G.RainyOpenWindow = animateOpen
 Close.MouseButton1Click:Connect(function()
 _G.__DiceDuelsMinimized = not _G.__DiceDuelsMinimized
 if _G.__DiceDuelsMinimized then
-Main.Visible = false
-MiniFrame.Visible = true
+animateClose()
 else
-Main.Visible = true
-MiniFrame.Visible = false
-Main.Size = FULL_MAIN_SIZE
+animateOpen()
 end
 saveDiceConfig()
 end)
@@ -8061,14 +8128,42 @@ st.Thickness = 1
 st.Transparency = 0.45
 st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 -- no pips: the pad is not dice themed any more
+-- Each button carries its own drag, so the pad can be taken apart and
+-- laid out to taste rather than moving as one block. A press only fires
+-- the action if the finger did not travel.
+btn:SetAttribute("DiceHomePos", string.format("%d,%d",
+PADDING + col * (BTN_SIZE + BTN_GAP), PADDING + row * (BTN_SIZE + BTN_GAP)))
+btn.Position = tableToUDim2(_G.DiceMobileButtonPositions and _G.DiceMobileButtonPositions[key], btn.Position)
+local btnDrag = {active = false, moved = false, start = nil, origin = nil, input = nil}
 btn.InputBegan:Connect(function(input)
-if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-beginPanelDrag(input)
+if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+if _G.DiceGuiLocked == true then return end
+btnDrag.active = true
+btnDrag.moved = false
+btnDrag.start = input.Position
+btnDrag.origin = btn.Position
+btnDrag.input = input
+end)
+UserInputService.InputChanged:Connect(function(input)
+if not btnDrag.active or not btnDrag.start then return end
+if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+local delta = input.Position - btnDrag.start
+if math.abs(delta.X) > 6 or math.abs(delta.Y) > 6 then btnDrag.moved = true end
+if btnDrag.moved then
+btn.Position = UDim2.new(btnDrag.origin.X.Scale, btnDrag.origin.X.Offset + delta.X,
+btnDrag.origin.Y.Scale, btnDrag.origin.Y.Offset + delta.Y)
 end
 end)
 btn.InputEnded:Connect(function(input)
 if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-if not endPanelDrag() then pcall(onPress, btn) end
+local moved = btnDrag.moved
+btnDrag.active = false
+btnDrag.moved = false
+if moved then
+task.defer(saveDiceConfig)
+else
+pcall(onPress, btn)
+end
 end)
 mobileButtons[key] = {holder = MobilePanel, btn = btn, setActive = function(state) setActive(btn, state) end}
 return btn
@@ -8082,6 +8177,11 @@ local btn = entry and entry.btn
 if btn then
 btn:SetAttribute("DiceMobilePressed", false)
 btn:SetAttribute("DiceMobileVisualState", nil)
+local home = btn:GetAttribute("DiceHomePos")
+if home then
+local hx, hy = string.match(home, "([%-%d%.]+),([%-%d%.]+)")
+if hx and hy then btn.Position = UDim2.new(0, tonumber(hx), 0, tonumber(hy)) end
+end
 end
 end
 if _G.DiceApplyMobileButtonSize then _G.DiceApplyMobileButtonSize() end

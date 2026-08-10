@@ -4847,6 +4847,44 @@ NumberSequenceKeypoint.new(1, 1),
 fade.Parent = underline
 return holder
 end
+-- A collapse arrow on a row, in the style of the reference: tapping it
+-- folds the rows that belong to that feature away and back, and the
+-- glyph flips to show which way the next tap will go. Hidden rows drop
+-- out of the list layout, so nothing leaves a gap behind.
+function addRowExpander(row, children, startExpanded, xOffset)
+if not row then return nil end
+local expanded = startExpanded ~= false
+local arrow = Instance.new("TextButton")
+arrow.Name = "Expander"
+arrow.Size = UDim2.new(0, 26, 0, 26)
+arrow.Position = UDim2.new(1, -(xOffset or 92), 0.5, -13)
+arrow.BackgroundColor3 = COLORS.accentSoft
+arrow.BackgroundTransparency = 0.18
+arrow.BorderSizePixel = 0
+arrow.Text = "▲"
+arrow.TextColor3 = COLORS.white
+arrow.TextSize = 10
+arrow.Font = Enum.Font.GothamBold
+arrow.AutoButtonColor = false
+-- Above the segmented selectors' own click areas, so tapping the arrow
+-- never doubles as a mode change.
+arrow.ZIndex = 12
+arrow.Parent = row
+corner(arrow, 8)
+stroke(arrow, COLORS.strokeSoft, 1, 0.45)
+local function apply()
+arrow.Text = expanded and "▲" or "▼"
+for _, child in ipairs(children) do
+if child then child.Visible = expanded end
+end
+end
+arrow.MouseButton1Click:Connect(function()
+expanded = not expanded
+apply()
+end)
+apply()
+return arrow
+end
 function baseRow(parent, labelText, order)
 local row = Instance.new("Frame")
 row.Name = labelText
@@ -4872,7 +4910,7 @@ label.TextXAlignment = Enum.TextXAlignment.Left
 label.TextTruncate = Enum.TextTruncate.AtEnd
 label.Position = UDim2.new(0, 12, 0, 0)
 -- Leaves room for the widest right-hand control (the value pill).
-label.Size = UDim2.new(1, -90, 1, 0)
+label.Size = UDim2.new(1, -100, 1, 0)
 label.ZIndex = 5
 label.Parent = row
 row.MouseEnter:Connect(function()
@@ -5404,11 +5442,14 @@ holder.ClipsDescendants = true
 holder.Parent = parent
 corner(holder, 9)
 stroke(holder, COLORS.strokeSoft, 1.15, 0.38)
+-- The expander lives at the right end of this row, so the segmented
+-- control gives up that much width rather than sitting under it.
+local RESERVE = 34
 local slide = Instance.new("Frame")
 slide.Name = "SelectedSlide"
 slide.BackgroundColor3 = Color3.fromRGB(58, 58, 64)
 slide.BackgroundTransparency = 0.08
-slide.Size = UDim2.new(0.5, -3, 1, -8)
+slide.Size = UDim2.new(0.5, -3 - RESERVE / 2, 1, -8)
 slide.Position = UDim2.new(0, 4, 0, 4)
 slide.BorderSizePixel = 0
 slide.ZIndex = 5
@@ -5442,7 +5483,7 @@ normalText.TextStrokeTransparency = 0.2
 normalText.TextSize = 11
 normalText.Font = Enum.Font.GothamSemibold
 normalText.TextXAlignment = Enum.TextXAlignment.Center
-normalText.Size = UDim2.new(0.5, 0, 1, 0)
+normalText.Size = UDim2.new(0.5, -RESERVE / 2, 1, 0)
 normalText.Position = UDim2.new(0, 0, 0, 0)
 normalText.ZIndex = 8
 normalText.Parent = holder
@@ -5456,8 +5497,8 @@ bypassText.TextStrokeTransparency = 0.2
 bypassText.TextSize = 10
 bypassText.Font = Enum.Font.GothamSemibold
 bypassText.TextXAlignment = Enum.TextXAlignment.Center
-bypassText.Size = UDim2.new(0.5, 0, 1, 0)
-bypassText.Position = UDim2.new(0.5, 0, 0, 0)
+bypassText.Size = UDim2.new(0.5, -RESERVE / 2, 1, 0)
+bypassText.Position = UDim2.new(0.5, -RESERVE / 2, 0, 0)
 bypassText.ZIndex = 8
 bypassText.Parent = holder
 local normalClick = Instance.new("TextButton")
@@ -5465,7 +5506,7 @@ normalClick.Name = "NormalClick"
 normalClick.BackgroundTransparency = 1
 normalClick.Text = ""
 normalClick.AutoButtonColor = false
-normalClick.Size = UDim2.new(0.5, 0, 1, 0)
+normalClick.Size = UDim2.new(0.5, -RESERVE / 2, 1, 0)
 normalClick.Position = UDim2.new(0, 0, 0, 0)
 normalClick.ZIndex = 10
 normalClick.Parent = holder
@@ -5474,8 +5515,8 @@ bypassClick.Name = "BypassClick"
 bypassClick.BackgroundTransparency = 1
 bypassClick.Text = ""
 bypassClick.AutoButtonColor = false
-bypassClick.Size = UDim2.new(0.5, 0, 1, 0)
-bypassClick.Position = UDim2.new(0.5, 0, 0, 0)
+bypassClick.Size = UDim2.new(0.5, -RESERVE / 2, 1, 0)
+bypassClick.Position = UDim2.new(0.5, -RESERVE / 2, 0, 0)
 bypassClick.ZIndex = 10
 bypassClick.Parent = holder
 local function setMode(mode)
@@ -5491,7 +5532,7 @@ if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
 saveDiceConfig()
 local onBypass = selectedAimbotMode == "Anti Bypass"
 tween(slide, {
-Position = onBypass and UDim2.new(0.5, -1, 0, 4) or UDim2.new(0, 4, 0, 4)
+Position = onBypass and UDim2.new(0.5, -1 - RESERVE / 2, 0, 4) or UDim2.new(0, 4, 0, 4)
 }, 0.18)
 tween(normalText, {
 TextTransparency = onBypass and 0.18 or 0,
@@ -5773,8 +5814,8 @@ refreshSpeedModeRows()
 task.wait()
 Combat = pages.COMBAT
 section(Combat, "AUTO STEAL", 1)
-autoStealSelectorRow(Combat, 2)
-_diceRow, setAutoStealVisual = toggleRow(Combat, "Auto Steal", autoStealEnabled, 3)
+stealModeSelectorRow = autoStealSelectorRow(Combat, 3)
+_diceRow, setAutoStealVisual = toggleRow(Combat, "Auto Steal", autoStealEnabled, 2)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5803,11 +5844,18 @@ if _G.DiceSemiAutoStealSetRadius then _G.DiceSemiAutoStealSetRadius(_G.DiceSteal
 if _G.DiceAutoStealSync then _G.DiceAutoStealSync() end
 saveDiceConfig()
 end)
+-- One arrow over the whole steal group: the NORMAL/SEMI choice and the
+-- radius that goes with whichever of the two is selected.
+do
+local stealRow = Combat:FindFirstChild("Auto Steal")
+local radiusRow = Combat:FindFirstChild("Radius")
+addRowExpander(stealRow, {stealModeSelectorRow, radiusRow}, true, 92)
+end
 section(Combat, "NORMAL/BYPASS AIMBOT", 5)
-_G.DiceAimbotSelectorRow(Combat, 6)
+aimbotModeSelectorRow = _G.DiceAimbotSelectorRow(Combat, 6)
 _G.DiceAimbotSetVisual = nil
 if _G.DiceRefreshAimbotVisual then _G.DiceRefreshAimbotVisual() end
-_G.DiceNormalAutoSwingRow, _G.DiceNormalAutoSwingSetVisual, _G.DiceNormalAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", autoSwingEnabled, 7)
+_G.DiceNormalAutoSwingRow, _G.DiceNormalAutoSwingSetVisual, _G.DiceNormalAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", autoSwingEnabled, 9)
 do
 if _G.DiceNormalAutoSwingBtn then
 _G.DiceNormalAutoSwingBtn.MouseButton1Click:Connect(function()
@@ -5820,7 +5868,7 @@ task.delay(0.12, function() _G.DiceAutoSwingClickBusy = false end)
 end)
 end
 end
-_G.DiceMirrorTPDownRow, _G.DiceMirrorTPDownSetVisual, _G.DiceMirrorTPDownBtn = _G.DiceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 7.1)
+_G.DiceMirrorTPDownRow, _G.DiceMirrorTPDownSetVisual, _G.DiceMirrorTPDownBtn = _G.DiceActionToggleRow(Combat, "Mirror TP Down (Recommended)", mirrorTPDownEnabled, 10)
 local mirrorTPDownLabel = _G.DiceMirrorTPDownRow and _G.DiceMirrorTPDownRow:FindFirstChild("Label")
 if mirrorTPDownLabel then mirrorTPDownLabel.TextSize = 10 end
 if _G.DiceMirrorTPDownBtn then
@@ -5832,7 +5880,7 @@ saveDiceConfig()
 task.delay(0.12, function() _G.DiceMirrorTPDownClickBusy = false end)
 end)
 end
-aimbotSpeedRow, aimbotSpeedBox = textboxRow(Combat, "Normal Aimbot Speed", tostring(AIMBOT_SPEED), 8)
+aimbotSpeedRow, aimbotSpeedBox = textboxRow(Combat, "Normal Aimbot Speed", tostring(AIMBOT_SPEED), 7)
 _G.DiceAimbotSpeedBox = aimbotSpeedBox
 aimbotSpeedLabel = aimbotSpeedRow and aimbotSpeedRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
@@ -5844,7 +5892,7 @@ end
 if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() else aimbotSpeedBox.Text = tostring(AIMBOT_SPEED) end
 saveDiceConfig()
 end)
-laggerAimbotSpeedRow, laggerAimbotSpeedBox = textboxRow(Combat, "Normal Lagger Aimbot Speed", tostring(LAGGER_AIMBOT_SPEED), 9)
+laggerAimbotSpeedRow, laggerAimbotSpeedBox = textboxRow(Combat, "Normal Lagger Aimbot Speed", tostring(LAGGER_AIMBOT_SPEED), 8)
 _G.DiceLaggerAimbotSpeedBox = laggerAimbotSpeedBox
 laggerAimbotSpeedLabel = laggerAimbotSpeedRow and laggerAimbotSpeedRow:FindFirstChild("Label")
 refreshAimbotModeLabels()
@@ -5857,8 +5905,12 @@ end
 if _G.DiceRefreshAimbotSpeedBoxes then _G.DiceRefreshAimbotSpeedBoxes() else laggerAimbotSpeedBox.Text = tostring(LAGGER_AIMBOT_SPEED) end
 saveDiceConfig()
 end)
-section(Combat, "ANTI DESYNC BAT", 10)
-_G.DiceAntiDesyncAutoSwingRow, _G.DiceAntiDesyncAutoSwingSetVisual, _G.DiceAntiDesyncAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", antiDesyncAutoSwingEnabled, 11)
+-- And one over the aimbot pair: whichever of NORMAL and ANTI BYPASS is
+-- selected, these two speeds are the settings behind it. The arrow sits
+-- past the right-hand label, clear of the text.
+addRowExpander(aimbotModeSelectorRow, {aimbotSpeedRow, laggerAimbotSpeedRow}, true, 32)
+section(Combat, "ANTI DESYNC BAT", 20)
+_G.DiceAntiDesyncAutoSwingRow, _G.DiceAntiDesyncAutoSwingSetVisual, _G.DiceAntiDesyncAutoSwingBtn = _G.DiceActionToggleRow(Combat, "Auto Swing", antiDesyncAutoSwingEnabled, 21)
 do
 if _G.DiceAntiDesyncAutoSwingBtn then
 _G.DiceAntiDesyncAutoSwingBtn.MouseButton1Click:Connect(function()
@@ -5872,8 +5924,8 @@ end)
 end
 end
 _G.DiceAntiDesyncSetVisual = function(_) end
-section(Combat, "COUNTERS", 13)
-_diceRow, setBatCounterVisual = _G.DiceActionToggleRow(Combat, "Bat Counter", batCounterEnabled, 14)
+section(Combat, "COUNTERS", 30)
+_diceRow, setBatCounterVisual = _G.DiceActionToggleRow(Combat, "Bat Counter", batCounterEnabled, 31)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5891,7 +5943,7 @@ saveDiceConfig()
 end)
 end
 end
-_diceRow, setMedCounterVisual = _G.DiceActionToggleRow(Combat, "Med Counter", medCounterEnabled, 15)
+_diceRow, setMedCounterVisual = _G.DiceActionToggleRow(Combat, "Med Counter", medCounterEnabled, 32)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5909,7 +5961,7 @@ saveDiceConfig()
 end)
 end
 end
-_diceRow, _G.DiceSetNoPlayerCollisionVisual = _G.DiceActionToggleRow(Combat, "No Player Collision", _G.DiceNoPlayerCollisionEnabled, 16)
+_diceRow, _G.DiceSetNoPlayerCollisionVisual = _G.DiceActionToggleRow(Combat, "No Player Collision", _G.DiceNoPlayerCollisionEnabled, 33)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5925,7 +5977,7 @@ saveDiceConfig()
 end)
 end
 end
-_diceRow, setSafeModeVisual = _G.DiceActionToggleRow(Combat, "Safe Mode", antiKickEnabled, 17)
+_diceRow, setSafeModeVisual = _G.DiceActionToggleRow(Combat, "Safe Mode", antiKickEnabled, 34)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then
@@ -5937,7 +5989,7 @@ saveDiceConfig()
 end)
 end
 end
-_diceRow, setAutoResetOnMedVisual = toggleRow(Combat, "Auto Reset On Med Fling", autoResetOnMedEnabled, 18)
+_diceRow, setAutoResetOnMedVisual = toggleRow(Combat, "Auto Reset On Med Fling", autoResetOnMedEnabled, 35)
 do
 _diceBtn = _diceRow and _diceRow:FindFirstChild("ToggleButton")
 if _diceBtn then

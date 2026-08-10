@@ -3349,7 +3349,7 @@ overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 overheadSpeedLabel.TextStrokeTransparency = 0
 overheadSpeedLabel.Font = Enum.Font.GothamBold
-overheadSpeedLabel.TextSize = 26
+overheadSpeedLabel.TextSize = 20
 overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
 overheadSpeedLabel.ZIndex = 10
 overheadSpeedLabel.Parent = overheadGui
@@ -3363,7 +3363,7 @@ end
 local discordLbl = Instance.new("TextLabel")
 discordLbl.Name = "Discord"
 discordLbl.Size = UDim2.new(1, 0, 0, 28)
-discordLbl.Position = UDim2.new(0, 0, 0, 56)
+discordLbl.Position = UDim2.new(0, 0, 0, 48)
 discordLbl.BackgroundTransparency = 1
 discordLbl.Text = "RAINY HUB"
 discordLbl.TextColor3 = Color3.fromRGB(126, 186, 255)
@@ -3372,7 +3372,7 @@ discordLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 -- not to compete with the number.
 discordLbl.TextStrokeTransparency = 0.35
 discordLbl.Font = Enum.Font.GothamBold
-discordLbl.TextSize = 19
+discordLbl.TextSize = 15
 discordLbl.TextXAlignment = Enum.TextXAlignment.Center
 discordLbl.ZIndex = 10
 discordLbl.Parent = overheadGui

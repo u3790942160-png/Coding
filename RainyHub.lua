@@ -1045,7 +1045,7 @@ noCamCollisionEnabled = data.noCamCollisionEnabled == true
 _G.DiceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
 _G.DiceAntiBodylockEnabled = data.antiBodylockEnabled == true
 customFontVisualEnabled = false
-skyTheme = (type(data.skyTheme) == "string" and data.skyTheme) or skyTheme
+skyTheme = "Off" -- sky theme removed
 if data.lightningEnabled ~= nil then _G.DiceLightningEnabled = data.lightningEnabled ~= false else _G.DiceLightningEnabled = true end
 autoLeftEnabled = data.autoLeftEnabled == true
 autoRightEnabled = data.autoRightEnabled == true
@@ -5843,7 +5843,11 @@ for _,v in ipairs(Lighting:GetChildren()) do if v:GetAttribute("_DiceDuelsSky") 
 local terrain=workspace:FindFirstChildOfClass("Terrain"); if terrain then for _,v in ipairs(terrain:GetChildren()) do if v:GetAttribute("_DiceDuelsSky") then pcall(function() v:Destroy() end) end end end
 end
 function applyCustomSky(mode)
-_v4mpClearSky(); local p=SKY_PRESETS[mode]
+-- sky theme removed: clear anything a previous run left in Lighting and
+-- return, rather than resetting the game's own lighting to preset values
+_v4mpClearSky(); skyTheme = "Off"
+do return end
+local p=SKY_PRESETS[mode]
 if not p or p.kind=="off" then Lighting.Brightness=2; Lighting.ClockTime=14; Lighting.GlobalShadows=true; skyTheme="Off"; return end
 Lighting.ClockTime=p.clock or 14; Lighting.Brightness=p.brightness or 2; if p.ambient then Lighting.Ambient=_vC3(p.ambient) end; if p.outAmb then Lighting.OutdoorAmbient=_vC3(p.outAmb) end
 local atm=Instance.new("Atmosphere"); atm:SetAttribute("_DiceDuelsSky",true); atm.Density=0.35; atm.Color=Lighting.Ambient; atm.Decay=Lighting.OutdoorAmbient; atm.Parent=Lighting
@@ -6009,7 +6013,9 @@ end
 end
 end
 function applyCustomSky(mode)
-_v4mpClearSky()
+-- sky theme removed; see the note on the first definition
+_v4mpClearSky(); skyTheme = "Off"
+do return end
 local preset = SKY_PRESETS[mode]
 if not preset or preset.kind == "off" then
 Lighting.FogEnd = 100000; Lighting.FogStart = 0
@@ -6477,7 +6483,7 @@ end)
 end
 end
 section(Utility, "SKY THEME", 5)
-skyThemeSelectorRow(Utility, 6)
+-- Sky Theme row removed; the sky is left alone
 section(Utility, "PERFORMANCE", 7)
 do
 local row, setVisual = toggleRow(Utility, "Stretch Rez", fpsBoostEnabled, 8)

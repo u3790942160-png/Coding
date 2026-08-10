@@ -1049,7 +1049,7 @@ skyTheme = (type(data.skyTheme) == "string" and data.skyTheme) or skyTheme
 if data.lightningEnabled ~= nil then _G.DiceLightningEnabled = data.lightningEnabled ~= false else _G.DiceLightningEnabled = true end
 autoLeftEnabled = data.autoLeftEnabled == true
 autoRightEnabled = data.autoRightEnabled == true
-if data.introEnabled ~= nil then _introEnabled = data.introEnabled == true end
+_introEnabled = false -- intro removed; a saved config cannot switch it back on
 if data.selectedIntroMusic and INTRO_MUSIC_OPTIONS[data.selectedIntroMusic] then selectedIntroMusic = data.selectedIntroMusic end
 if autoLeftEnabled and autoRightEnabled then autoRightEnabled = false end
 end
@@ -6720,24 +6720,11 @@ end
 end)
 end
 
-section(Settings, "INTRO", 50)
-do
-local row, setVisual = toggleRow(Settings, "Intro", _introEnabled, 51)
-setIntroVisual = setVisual
-local btn = row and row:FindFirstChild("ToggleButton")
-if btn then
-btn.Activated:Connect(function()
-_introEnabled = not _introEnabled
-if not _introEnabled then stopIntroPlayback(); stopIntroPreview() end
-if setIntroVisual then setIntroVisual(_introEnabled) end
-saveDiceConfig()
-end)
-end
-if setIntroVisual then setIntroVisual(_introEnabled) end
-end
+-- INTRO section removed along with the intro itself
 do
 local row = Instance.new("Frame")
 row.Name = "Intro Song"
+row.Visible = false -- intro removed, nothing to pick a song for
 row.BackgroundColor3 = COLORS.row
 row.BackgroundTransparency = 0.22
 row.Size = UDim2.new(1, -4, 0, 42)
@@ -6913,7 +6900,7 @@ espEnabled = false; showTracerEnabled = false; ragdollCountdownEnabled = false
 fpsBoostEnabled = false; antiLagVisualEnabled = false; nukeOptimiserEnabled = false
 fovEnabled = false; fovValue = 70; noCamCollisionEnabled = false; _G.DiceNoPlayerCollisionEnabled = false
 skyTheme = "Off"
-selectedIntroMusic = 1; _introEnabled = true
+selectedIntroMusic = 1; _introEnabled = false
 if setIntroVisual then setIntroVisual(_introEnabled) end
 if setIntroSongVisual then setIntroSongVisual() end
 stopIntroPlayback(); stopIntroPreview()

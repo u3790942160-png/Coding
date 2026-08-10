@@ -3348,7 +3348,7 @@ overheadSpeedLabel.Text = '<font color="#3C8CFF">0.0 SPEED</font>  <font color="
 overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 overheadSpeedLabel.TextStrokeTransparency = 0
-overheadSpeedLabel.Font = Enum.Font.GothamBlack
+overheadSpeedLabel.Font = Enum.Font.GothamBold
 overheadSpeedLabel.TextSize = 26
 overheadSpeedLabel.TextXAlignment = Enum.TextXAlignment.Center
 overheadSpeedLabel.ZIndex = 10
@@ -3356,7 +3356,7 @@ overheadSpeedLabel.Parent = overheadGui
 do
 local outline = Instance.new("UIStroke")
 outline.Color = Color3.fromRGB(0, 0, 0)
-outline.Thickness = 2.5
+outline.Thickness = 1.8
 outline.Transparency = 0
 outline.Parent = overheadSpeedLabel
 end
@@ -3494,12 +3494,7 @@ if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
 local speedMag = Vector3.new(v.X, 0, v.Z).Magnitude
 local rounded = math.floor(speedMag * 10 + 0.5) / 10
-local shown
-if math.abs(rounded - math.floor(rounded)) < 0.05 then
-shown = string.format("%d", math.floor(rounded + 0.5))
-else
-shown = string.format("%.1f", rounded)
-end
+local shown = string.format("%.1f", rounded)
 overheadSpeedLabel.Text = string.format(
 '<font color="#3C8CFF">%s SPEED</font>  <font color="#FFFFFF">%s SPEED</font>',
 shown, string.upper(tostring(currentSpeedMode or "Normal")))

@@ -3335,14 +3335,16 @@ ragdollCountdownLabel.TextSize = 22
 ragdollCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 ragdollCountdownLabel.ZIndex = 10
 ragdollCountdownLabel.Parent = overheadGui
--- Speed on top, discord under it, both heavy white on a thick black
--- outline so they hold up against whatever is behind the character.
+-- Speed on top, the wordmark under it, on a thick black outline so both
+-- hold up against whatever is behind the character. The speed line is one
+-- RichText label: the reading in blue, the mode in white beside it.
 overheadSpeedLabel = Instance.new("TextLabel")
 overheadSpeedLabel.Name = "Speed"
 overheadSpeedLabel.Size = UDim2.new(1, 0, 0, 32)
 overheadSpeedLabel.Position = UDim2.new(0, 0, 0, 24)
 overheadSpeedLabel.BackgroundTransparency = 1
-overheadSpeedLabel.Text = "Speed: 0 | Normal"
+overheadSpeedLabel.RichText = true
+overheadSpeedLabel.Text = '<font color="#3C8CFF">0.0 SPEED</font>  <font color="#FFFFFF">NORMAL SPEED</font>'
 overheadSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 overheadSpeedLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 overheadSpeedLabel.TextStrokeTransparency = 0
@@ -3498,7 +3500,9 @@ shown = string.format("%d", math.floor(rounded + 0.5))
 else
 shown = string.format("%.1f", rounded)
 end
-overheadSpeedLabel.Text = string.format("Speed: %s | %s", shown, tostring(currentSpeedMode or "Normal"))
+overheadSpeedLabel.Text = string.format(
+'<font color="#3C8CFF">%s SPEED</font>  <font color="#FFFFFF">%s SPEED</font>',
+shown, string.upper(tostring(currentSpeedMode or "Normal")))
 end
 end)
 -- Monochrome dice table: near-black panels, white pips, white accent.

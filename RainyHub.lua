@@ -6693,11 +6693,11 @@ do
 local row = baseRow(Settings, "Reset Mobile Buttons", 10)
 local button = Instance.new("TextButton")
 button.Name = "ResetMobileButtons"
-button.BackgroundColor3 = Color3.fromRGB(232, 232, 238)
+button.BackgroundColor3 = COLORS.accent
 button.BackgroundTransparency = 0
 button.BorderSizePixel = 0
 button.Text = "RESET"
-button.TextColor3 = Color3.fromRGB(0, 0, 0)
+button.TextColor3 = COLORS.white
 button.TextSize = 11
 button.Font = Enum.Font.GothamBlack
 button.AutoButtonColor = false
@@ -6706,7 +6706,7 @@ button.Position = UDim2.new(1, -88, 0.5, -13)
 button.ZIndex = 7
 button.Parent = row
 corner(button, 8)
-stroke(button, Color3.fromRGB(255, 255, 255), 1, 0.18)
+stroke(button, COLORS.accentDim, 1, 0.18)
 button.Activated:Connect(function()
 if _G.DiceResetMobileButtons then
 _G.DiceResetMobileButtons()

@@ -4852,12 +4852,12 @@ local row = Instance.new("Frame")
 row.Name = labelText
 row.BackgroundColor3 = COLORS.row
 row.BackgroundTransparency = 0.3
-row.Size = UDim2.new(1, -4, 0, 36)
+row.Size = UDim2.new(1, -4, 0, 44)
 row.BorderSizePixel = 0
 row.LayoutOrder = order
 row.ZIndex = 4
 row.Parent = parent
-corner(row, 10)
+corner(row, 11)
 stroke(row, COLORS.strokeSoft, 1.15, 0.38)
 local label = Instance.new("TextLabel")
 label.Name = "Label"
@@ -4866,7 +4866,7 @@ label.Text = labelText
 label.TextColor3 = Color3.fromRGB(245, 245, 255)
 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 label.TextStrokeTransparency = 0.25
-label.TextSize = 12
+label.TextSize = 13
 label.Font = Enum.Font.GothamSemibold
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.TextTruncate = Enum.TextTruncate.AtEnd
@@ -4891,11 +4891,11 @@ box.BackgroundColor3 = COLORS.accentSoft
 box.BackgroundTransparency = 0.18
 box.Text = tostring(value or "")
 box.TextColor3 = COLORS.white
-box.TextSize = 12
+box.TextSize = 13
 box.Font = Enum.Font.GothamSemibold
 box.ClearTextOnFocus = false
-box.Size = UDim2.new(0, 62, 0, 26)
-box.Position = UDim2.new(1, -72, 0.5, -13)
+box.Size = UDim2.new(0, 70, 0, 32)
+box.Position = UDim2.new(1, -80, 0.5, -16)
 box.BorderSizePixel = 0
 box.ZIndex = 6
 box.Parent = row
@@ -4918,18 +4918,18 @@ local track = Instance.new("Frame")
 track.Name = "Track"
 track.BackgroundColor3 = COLORS.toggleBg
 track.BackgroundTransparency = 0.2
-track.Size = UDim2.new(0, 34, 0, 18)
-track.Position = UDim2.new(1, -44, 0.5, -9)
+track.Size = UDim2.new(0, 46, 0, 25)
+track.Position = UDim2.new(1, -58, 0.5, -12)
 track.BorderSizePixel = 0
 track.ZIndex = 5
 track.Parent = button
-corner(track, 9)
+corner(track, 13)
 stroke(track, COLORS.strokeSoft, 1, 0.45)
 local knob = Instance.new("Frame")
 knob.Name = "Knob"
-knob.BackgroundColor3 = COLORS.knob
-knob.Size = UDim2.new(0, 13, 0, 13)
-knob.Position = default and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+knob.BackgroundColor3 = Color3.fromRGB(96, 96, 102)
+knob.Size = UDim2.new(0, 19, 0, 19)
+knob.Position = default and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
 knob.BorderSizePixel = 0
 knob.ZIndex = 6
 knob.Parent = track
@@ -4938,8 +4938,8 @@ local shine = Instance.new("Frame")
 shine.Name = "Shine"
 shine.BackgroundColor3 = COLORS.white
 shine.BackgroundTransparency = 0.72
-shine.Size = UDim2.new(1, -4, 0, 4)
-shine.Position = UDim2.new(0, 2, 0, 2)
+shine.Size = UDim2.new(1, -6, 0, 5)
+shine.Position = UDim2.new(0, 3, 0, 3)
 shine.BorderSizePixel = 0
 shine.ZIndex = 7
 shine.Parent = knob
@@ -4950,26 +4950,26 @@ local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 state = on and true or false
 tween(knob, {
-Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
--- White track, dark knob when on: the only contrast a monochrome
--- switch has left once the accent stopped being a colour.
-BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+Position = state and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+-- Both states sit low: the knob carries the read, bright when on and
+-- a dim grey when off, over a track that never goes white.
+BackgroundColor3 = state and Color3.fromRGB(236, 236, 240) or Color3.fromRGB(96, 96, 102)
 })
 tween(track, {
-BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
+BackgroundTransparency = state and 0.02 or 0.05,
+BackgroundColor3 = state and Color3.fromRGB(54, 54, 60) or Color3.fromRGB(19, 19, 22)
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and COLORS.accent or COLORS.strokeSoft,
-Transparency = state and 0.05 or 0.45,
+Color = state and Color3.fromRGB(206, 206, 212) or Color3.fromRGB(64, 64, 70),
+Transparency = state and 0.15 or 0.5,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and COLORS.accent or COLORS.strokeSoft,
-Transparency = state and 0.12 or 0.38,
+Color = state and Color3.fromRGB(198, 198, 204) or COLORS.strokeSoft,
+Transparency = state and 0.28 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
 end
@@ -5003,18 +5003,18 @@ local track = Instance.new("Frame")
 track.Name = "Track"
 track.BackgroundColor3 = COLORS.toggleBg
 track.BackgroundTransparency = 0.2
-track.Size = UDim2.new(0, 34, 0, 18)
-track.Position = UDim2.new(1, -44, 0.5, -9)
+track.Size = UDim2.new(0, 46, 0, 25)
+track.Position = UDim2.new(1, -58, 0.5, -12)
 track.BorderSizePixel = 0
 track.ZIndex = 5
 track.Parent = button
-corner(track, 9)
+corner(track, 13)
 stroke(track, COLORS.strokeSoft, 1, 0.45)
 local knob = Instance.new("Frame")
 knob.Name = "Knob"
-knob.BackgroundColor3 = COLORS.knob
-knob.Size = UDim2.new(0, 13, 0, 13)
-knob.Position = default and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+knob.BackgroundColor3 = Color3.fromRGB(96, 96, 102)
+knob.Size = UDim2.new(0, 19, 0, 19)
+knob.Position = default and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
 knob.BorderSizePixel = 0
 knob.ZIndex = 6
 knob.Parent = track
@@ -5023,8 +5023,8 @@ local shine = Instance.new("Frame")
 shine.Name = "Shine"
 shine.BackgroundColor3 = COLORS.white
 shine.BackgroundTransparency = 0.72
-shine.Size = UDim2.new(1, -4, 0, 4)
-shine.Position = UDim2.new(0, 2, 0, 2)
+shine.Size = UDim2.new(1, -6, 0, 5)
+shine.Position = UDim2.new(0, 3, 0, 3)
 shine.BorderSizePixel = 0
 shine.ZIndex = 7
 shine.Parent = knob
@@ -5034,26 +5034,26 @@ local rowStroke = row:FindFirstChildOfClass("UIStroke")
 local function setVisual(on)
 local state = on and true or false
 tween(knob, {
-Position = state and UDim2.new(1, -16, 0.5, -6) or UDim2.new(0, 3, 0.5, -6),
--- White track, dark knob when on: the only contrast a monochrome
--- switch has left once the accent stopped being a colour.
-BackgroundColor3 = state and Color3.fromRGB(16, 16, 18) or COLORS.knob
+Position = state and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+-- Both states sit low: the knob carries the read, bright when on and
+-- a dim grey when off, over a track that never goes white.
+BackgroundColor3 = state and Color3.fromRGB(236, 236, 240) or Color3.fromRGB(96, 96, 102)
 })
 tween(track, {
-BackgroundTransparency = state and 0.03 or 0.2,
-BackgroundColor3 = state and COLORS.accent or COLORS.toggleBg
+BackgroundTransparency = state and 0.02 or 0.05,
+BackgroundColor3 = state and Color3.fromRGB(54, 54, 60) or Color3.fromRGB(19, 19, 22)
 })
 if trackStroke then
 tween(trackStroke, {
-Color = state and COLORS.accent or COLORS.strokeSoft,
-Transparency = state and 0.05 or 0.45,
+Color = state and Color3.fromRGB(206, 206, 212) or Color3.fromRGB(64, 64, 70),
+Transparency = state and 0.15 or 0.5,
 Thickness = state and 1.25 or 1
 })
 end
 if rowStroke then
 tween(rowStroke, {
-Color = state and COLORS.accent or COLORS.strokeSoft,
-Transparency = state and 0.12 or 0.38,
+Color = state and Color3.fromRGB(198, 198, 204) or COLORS.strokeSoft,
+Transparency = state and 0.28 or 0.38,
 Thickness = state and 1.25 or 1.15
 })
 end
@@ -7458,122 +7458,137 @@ end)
 end
 -- ═══════════════════════════════════════════════════════════════
 -- STEAL BAR
--- A rounded pill: percentage on the left, a track with a round knob
--- riding the fill, radius on the right, and a stat line underneath.
+-- The Rainy Hub card, in greys: a status dot and AUTO STEAL header on
+-- the top line, radius / stats / percentage on the second, and a
+-- full-width track with a gradient fill and a knob riding it below.
 -- ═══════════════════════════════════════════════════════════════
+local BAR_EDGE = Color3.fromRGB(226, 226, 232)
+local BAR_GLOW = Color3.fromRGB(248, 248, 252)
+local BAR_DIM = Color3.fromRGB(140, 140, 148)
+local TRACK_WIDTH = 348
+local TRACK_KNOB_R = 9
 local pbFrame = Instance.new("Frame", gui)
 pbFrame.Name = "StealBar"
--- Tall enough for the stat line to sit inside the pill rather than
--- hanging off the bottom of it.
-pbFrame.Size = UDim2.new(0, 372, 0, 60)
-pbFrame.Position = UDim2.new(0.5, -186, 1, -100)
-pbFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+pbFrame.Size = UDim2.new(0, 372, 0, 86)
+pbFrame.Position = UDim2.new(0.5, -186, 1, -128)
+pbFrame.BackgroundColor3 = Color3.fromRGB(9, 9, 11)
 pbFrame.BackgroundTransparency = 0.05
 pbFrame.BorderSizePixel = 0
 pbFrame.Active = true
 pbFrame.ClipsDescendants = true
-Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(1, 0)
+Instance.new("UICorner", pbFrame).CornerRadius = UDim.new(0, 12)
 local pbSt = Instance.new("UIStroke", pbFrame)
-pbSt.Color = THEME_ACCENT_BRIGHT
+pbSt.Color = BAR_EDGE
 pbSt.Thickness = 1.6
-pbSt.Transparency = 0.12
+pbSt.Transparency = 0.25
 drag(pbFrame)
 local pbScale = Instance.new("UIScale")
 pbScale.Name = "DiceProgressBarScale"
 pbScale.Scale = diceProgressBarScaleValue or 1
 pbScale.Parent = pbFrame
-local progressPct = Instance.new("TextLabel", pbFrame)
-progressPct.Name = "Percent"
-progressPct.Size = UDim2.new(0, 46, 0, 26)
-progressPct.Position = UDim2.new(0, 14, 0, 8)
-progressPct.BackgroundTransparency = 1
-progressPct.Text = "0%"
-progressPct.TextColor3 = Color3.fromRGB(255, 255, 255)
-progressPct.Font = Enum.Font.GothamBold
-progressPct.TextSize = 14
-progressPct.TextXAlignment = Enum.TextXAlignment.Left
-progressPct.ZIndex = 5
+local statusDot = Instance.new("Frame", pbFrame)
+statusDot.Name = "StatusDot"
+statusDot.Size = UDim2.new(0, 8, 0, 8)
+statusDot.Position = UDim2.new(0, 14, 0, 15)
+statusDot.BackgroundColor3 = BAR_GLOW
+statusDot.BorderSizePixel = 0
+statusDot.ZIndex = 5
+Instance.new("UICorner", statusDot).CornerRadius = UDim.new(1, 0)
+local stealLbl = Instance.new("TextLabel", pbFrame)
+stealLbl.Name = "Header"
+stealLbl.Size = UDim2.new(0, 220, 0, 16)
+stealLbl.Position = UDim2.new(0, 30, 0, 11)
+stealLbl.BackgroundTransparency = 1
+stealLbl.Text = "AUTO STEAL"
+stealLbl.TextColor3 = BAR_GLOW
+stealLbl.Font = Enum.Font.GothamBold
+stealLbl.TextSize = 13
+stealLbl.TextXAlignment = Enum.TextXAlignment.Left
+stealLbl.ZIndex = 5
 local progressRadLbl = Instance.new("TextLabel", pbFrame)
 progressRadLbl.Name = "Radius"
-progressRadLbl.Size = UDim2.new(0, 86, 0, 26)
-progressRadLbl.Position = UDim2.new(1, -100, 0, 8)
+progressRadLbl.Size = UDim2.new(0, 96, 0, 14)
+progressRadLbl.Position = UDim2.new(0, 14, 0, 36)
 progressRadLbl.BackgroundTransparency = 1
 progressRadLbl.Text = "Radius: 0"
-progressRadLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+progressRadLbl.TextColor3 = BAR_DIM
 progressRadLbl.Font = Enum.Font.GothamBold
-progressRadLbl.TextSize = 14
-progressRadLbl.TextXAlignment = Enum.TextXAlignment.Right
+progressRadLbl.TextSize = 10
+progressRadLbl.TextXAlignment = Enum.TextXAlignment.Left
 progressRadLbl.ZIndex = 5
-local TRACK_WIDTH = 190
-local TRACK_KNOB_R = 11
+local statLbl = Instance.new("TextLabel", pbFrame)
+statLbl.Name = "Stats"
+statLbl.Size = UDim2.new(0, 190, 0, 18)
+statLbl.Position = UDim2.new(0, 112, 0, 34)
+statLbl.BackgroundTransparency = 1
+statLbl.Text = "FPS 0 / 0ms"
+statLbl.TextColor3 = Color3.fromRGB(240, 240, 246)
+statLbl.Font = Enum.Font.GothamSemibold
+statLbl.TextSize = 12
+statLbl.TextXAlignment = Enum.TextXAlignment.Left
+statLbl.ZIndex = 5
+local progressPct = Instance.new("TextLabel", pbFrame)
+progressPct.Name = "Percent"
+progressPct.Size = UDim2.new(0, 56, 0, 18)
+progressPct.Position = UDim2.new(1, -70, 0, 34)
+progressPct.BackgroundTransparency = 1
+progressPct.Text = "0%"
+progressPct.TextColor3 = BAR_GLOW
+progressPct.Font = Enum.Font.GothamBold
+progressPct.TextSize = 13
+progressPct.TextXAlignment = Enum.TextXAlignment.Right
+progressPct.ZIndex = 5
 local fillRegion = Instance.new("Frame", pbFrame)
 fillRegion.Name = "Track"
-fillRegion.Size = UDim2.new(0, TRACK_WIDTH, 0, 18)
-fillRegion.Position = UDim2.new(0, 66, 0, 12)
-fillRegion.BackgroundColor3 = Color3.fromRGB(6, 6, 7)
+fillRegion.Size = UDim2.new(0, TRACK_WIDTH, 0, 22)
+fillRegion.Position = UDim2.new(0, 12, 0, 56)
+fillRegion.BackgroundColor3 = Color3.fromRGB(16, 16, 19)
 fillRegion.BorderSizePixel = 0
-fillRegion.ZIndex = 2
-Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(1, 0)
+fillRegion.ClipsDescendants = true
+fillRegion.ZIndex = 3
+Instance.new("UICorner", fillRegion).CornerRadius = UDim.new(0, 8)
 local fillRegStroke = Instance.new("UIStroke", fillRegion)
-fillRegStroke.Color = THEME_ACCENT_BRIGHT
-fillRegStroke.Thickness = 1.2
-fillRegStroke.Transparency = 0.35
+fillRegStroke.Color = BAR_EDGE
+fillRegStroke.Thickness = 1
+fillRegStroke.Transparency = 0.6
 local progressFill = Instance.new("Frame", fillRegion)
 progressFill.Name = "Fill"
 progressFill.Size = UDim2.new(0, 0, 1, 0)
 progressFill.Position = UDim2.new(0, 0, 0, 0)
-progressFill.BackgroundColor3 = THEME_ACCENT_BRIGHT
+progressFill.BackgroundColor3 = BAR_EDGE
 progressFill.BorderSizePixel = 0
-progressFill.ZIndex = 3
-Instance.new("UICorner", progressFill).CornerRadius = UDim.new(1, 0)
+progressFill.ZIndex = 4
+Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 8)
+local fillGradient = Instance.new("UIGradient", progressFill)
+fillGradient.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, Color3.fromRGB(104, 104, 112)),
+ColorSequenceKeypoint.new(0.45, Color3.fromRGB(196, 196, 204)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(252, 252, 255)),
+})
+fillGradient.Rotation = 0
 -- The knob rides the leading edge of the fill.
 local progressKnob = Instance.new("Frame", fillRegion)
 progressKnob.Name = "Knob"
 progressKnob.AnchorPoint = Vector2.new(0.5, 0.5)
 progressKnob.Size = UDim2.new(0, TRACK_KNOB_R * 2, 0, TRACK_KNOB_R * 2)
 progressKnob.Position = UDim2.new(0, TRACK_KNOB_R, 0.5, 0)
-progressKnob.BackgroundColor3 = Color3.fromRGB(238, 238, 242)
+progressKnob.BackgroundColor3 = Color3.fromRGB(240, 240, 246)
 progressKnob.BorderSizePixel = 0
-progressKnob.ZIndex = 6
+progressKnob.ZIndex = 5
 Instance.new("UICorner", progressKnob).CornerRadius = UDim.new(1, 0)
 local knobStroke = Instance.new("UIStroke", progressKnob)
-knobStroke.Color = Color3.fromRGB(255, 255, 255)
-knobStroke.Thickness = 1
-knobStroke.Transparency = 0.4
-local statLbl = Instance.new("TextLabel", pbFrame)
-statLbl.Name = "Stats"
-statLbl.Size = UDim2.new(1, -28, 0, 15)
-statLbl.Position = UDim2.new(0, 14, 0, 38)
-statLbl.BackgroundTransparency = 1
-statLbl.Text = "FPS: 0  discord.gg/qgwhrFZXd  PING: 0ms"
-statLbl.TextColor3 = Color3.fromRGB(232, 232, 238)
-statLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-statLbl.TextStrokeTransparency = 0.55
-statLbl.Font = Enum.Font.GothamSemibold
--- Scaled rather than fixed: the discord handle and a three-digit FPS
--- together are wider than the pill at a fixed size.
-statLbl.TextScaled = true
-statLbl.TextSize = 11
-statLbl.TextXAlignment = Enum.TextXAlignment.Center
-statLbl.ZIndex = 5
-do
-local limit = Instance.new("UITextSizeConstraint")
-limit.MaxTextSize = 11
-limit.MinTextSize = 7
-limit.Parent = statLbl
-end
+knobStroke.Color = BAR_GLOW
+knobStroke.Thickness = 1.2
+knobStroke.Transparency = 0.25
 local barState = "IDLE"
 function setBarState(state)
 barState = state
-if state == "STEALING" then
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(16, 16, 18)}):Play()
-TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-elseif state == "READY" then
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 23)}):Play()
-TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+if state == "STEALING" or state == "READY" then
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = BAR_GLOW}):Play()
+TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = BAR_GLOW}):Play()
 else
-TS:Create(fillRegion, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(6, 6, 7)}):Play()
-TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = Color3.fromRGB(168, 168, 174)}):Play()
+TS:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(92, 92, 98)}):Play()
+TS:Create(progressPct, TweenInfo.new(0.2), {TextColor3 = BAR_DIM}):Play()
 end
 end
 task.spawn(function()
@@ -7598,7 +7613,7 @@ pcall(function()
 local stat = Stats.Network.ServerStatsItem["Data Ping"]
 if stat then ping = tonumber(stat:GetValue()) or 0 end
 end)
-statLbl.Text = string.format("FPS: %d  discord.gg/qgwhrFZXd  PING: %dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
+statLbl.Text = string.format("FPS %d / %dms", math.floor(fpsAvg + 0.5), math.floor(ping + 0.5))
 progressRadLbl.Text = "Radius: " .. tostring(math.floor(tonumber(autoStealRadius) or 0))
 task.wait(0.5)
 end

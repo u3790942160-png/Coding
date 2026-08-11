@@ -351,6 +351,7 @@ end
 --==============================================================================
 
 local featureWatchers, valueWatchers, modeWatchers, profileWatchers = {}, {}, {}, {}
+local methodWatchers = {}
 
 local function watchFeature(id, fn)
 	featureWatchers[id] = featureWatchers[id] or {}
@@ -375,6 +376,11 @@ local function watchProfile(fn)
 	fn(cfg.speedProfile)
 end
 
+local function watchMethod(fn)
+	table.insert(methodWatchers, fn)
+	fn(cfg.speedMethod)
+end
+
 local function refreshAll()
 	for id, watchers in pairs(featureWatchers) do
 		for _, fn in ipairs(watchers) do pcall(fn, Core.isOn(id)) end
@@ -386,6 +392,7 @@ local function refreshAll()
 		for _, fn in ipairs(watchers) do pcall(fn, cfg[key]) end
 	end
 	for _, fn in ipairs(profileWatchers) do pcall(fn, cfg.speedProfile) end
+	for _, fn in ipairs(methodWatchers) do pcall(fn, cfg.speedMethod) end
 end
 
 Core.on("sync", refreshAll)
@@ -400,6 +407,9 @@ Core.on("mode", function(key, value)
 end)
 Core.on("speedProfile", function(name)
 	for _, fn in ipairs(profileWatchers) do pcall(fn, name) end
+end)
+Core.on("speedMethod", function(name)
+	for _, fn in ipairs(methodWatchers) do pcall(fn, name) end
 end)
 Core.on("notify", function(message, kind) UI.toast(message, kind) end)
 
@@ -1054,6 +1064,80 @@ local function makeMeter(section, opts)
 	return row
 end
 
+-- A stepper for lists too long to lay out as cells: arrows, a name plate and
+-- a position counter.
+local function makeCycler(section, opts)
+	local row = addRow(section, opts.label, opts.hint)
+
+	local NAME_W, ARROW_W = 124, 16
+	local total = NAME_W + ARROW_W * 2 + 4
+
+	local counter = text({
+		Text           = "",
+		TextSize       = 9,
+		TextColor3     = Theme.dim,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Position       = UDim2.new(1, -(total + 42), 0.5, -9),
+		Size           = UDim2.new(0, 38, 0, 18),
+		Parent         = row,
+	})
+
+	local plate = new("Frame", {
+		Size                   = UDim2.new(0, NAME_W, 0, 18),
+		Position               = UDim2.new(1, -(NAME_W + ARROW_W + 2), 0.5, -9),
+		BackgroundTransparency = 1,
+		Parent                 = row,
+	})
+	stroke(plate, Theme.rule, 0)
+
+	local name = text({
+		Text           = "",
+		TextSize       = 10,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size           = UDim2.new(1, 0, 1, 0),
+		Parent         = plate,
+	})
+	accented(name, "TextColor3")
+
+	local function arrow(glyph, position, step)
+		local button = new("TextButton", {
+			Size                   = UDim2.new(0, ARROW_W, 0, 18),
+			Position               = position,
+			BackgroundColor3       = Theme.accent,
+			BackgroundTransparency = 1,
+			BorderSizePixel        = 0,
+			AutoButtonColor        = false,
+			Text                   = glyph,
+			TextColor3             = Theme.sub,
+			Font                   = FONT,
+			TextSize               = 11,
+			Parent                 = row,
+		})
+		stroke(button, Theme.rule, 0)
+		accented(button, "BackgroundColor3")
+
+		track(button.MouseEnter:Connect(function() button.TextColor3 = Theme.ink end))
+		track(button.MouseLeave:Connect(function() button.TextColor3 = Theme.sub end))
+		track(button.MouseButton1Click:Connect(function()
+			button.BackgroundTransparency = 0.8
+			task.delay(0.1, function() button.BackgroundTransparency = 1 end)
+			opts.step(step)
+		end))
+		return button
+	end
+
+	arrow("<", UDim2.new(1, -total, 0.5, -9), -1)
+	arrow(">", UDim2.new(1, -ARROW_W, 0.5, -9), 1)
+
+	local function render(value)
+		name.Text = string.upper(value)
+		local index, count = opts.position()
+		counter.Text = string.format("%02d/%02d", index, count)
+	end
+
+	return row, render
+end
+
 local function makeKeybind(section, bind)
 	local row = addRow(section, bind.label)
 
@@ -1278,6 +1362,20 @@ do
 		hint    = "Detect carrying and pick the speed for you",
 		feature = "autoSwitchSpeed",
 	})
+end
+
+do
+	local section = addSection(tabSpeed, "Method")
+
+	local _, renderMethod = makeCycler(section, {
+		label    = "Movement Method",
+		hint     = "Which physics trick actually moves you",
+		step     = function(step) Core.cycleSpeedMethod(step) end,
+		position = function() return Core.speedMethodIndex() end,
+	})
+	watchMethod(renderMethod)
+
+	makeMeter(section, { label = "Hyper Multiplier", key = "hyperMult", hint = "Hyper CFrame only" })
 end
 
 do

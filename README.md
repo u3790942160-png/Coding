@@ -25,8 +25,8 @@ throughout, amber phosphor on warm black.
 
 - **STATUS** — a four-column telemetry block (fps, ping, speed, profile), four
   command buttons, and the five channels you reach for most.
-- **SPEED** — profile cells (Norm / Carry / Lag / LagC), auto switch, and a
-  meter for each rate.
+- **SPEED** — the movement method picker, profile cells (Norm / Carry / Lag /
+  LagC), auto switch, and a meter for each rate.
 - **COMBAT** — Auto Bat, Auto Swing, Bat V2, Anti-Desync, the two counters, and
   meters for chase speed, hover height, turn rate, hit range and swing delay.
   Those five were hard-coded constants before.
@@ -67,6 +67,37 @@ Also new:
 Defaults: `LeftCtrl` toggles the console, `Q` carry speed, `R` lagger, `X` drop,
 `F` TP down, `T` instant reset, `Z`/`C` auto paths, `E` auto bat, `V` bat V2,
 `B` anti-desync.
+
+## Movement methods
+
+How the hub actually moves you is a setting, not a decision baked into the
+engine. The method list and dispatch come from the Vynx build:
+
+```
+Velocity              AssemblyLinearVelocity   Velocity Lerp
+AssemblyLinearVelocity Lerp                    CFrame
+CFrame Lerp           Hyper CFrame             Anchored CFrame
+PivotTo               Model PivotTo            Tween CFrame
+WalkSpeed             Humanoid Move            Humanoid MoveTo
+BodyVelocity          BodyPosition             BodyForce
+BodyThrust            LinearVelocity           VectorForce
+AlignPosition         ApplyImpulse             RocketPropulsion
+```
+
+Speed → Method steps through them with `<` and `>`. Games and anti-cheats
+disagree about which of these actually shifts a character, so the one that
+works is worth being able to change without editing the script. The default is
+`Velocity`, which cancels the current horizontal velocity and applies a
+mass-scaled impulse in the direction you are holding.
+
+Switching method tears down whatever the previous one created — body movers,
+constraints, attachments, the rocket target part — and hands `WalkSpeed` back to
+the game. The same cleanup runs when you stop moving, get ragdolled, respawn or
+unload, so nothing is left attached to your character. `Hyper CFrame` has its
+own multiplier on the same tab.
+
+The engine around the method is unchanged: profiles and auto-switch still decide
+*how fast*, the method only decides *how*.
 
 ## How the two halves talk
 

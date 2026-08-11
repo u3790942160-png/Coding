@@ -35,6 +35,7 @@ local RunService       = game:GetService("RunService")
 local UIS              = game:GetService("UserInputService")
 local HttpService      = game:GetService("HttpService")
 local Stats            = game:GetService("Stats")
+local TS               = game:GetService("TweenService")
 
 local LP        = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
@@ -147,7 +148,9 @@ local CONFIG_FILE = "VeltrexHub.json"
 local LEGACY_FILE = "VeltrexHubConfig.json"
 
 Core.cfg = {
-	-- movement speeds
+	-- movement
+	speedMethod      = "Velocity",  -- see Core.speedMethods
+	hyperMult        = 4,           -- multiplier for the Hyper CFrame method
 	normalSpeed      = 60,
 	carrySpeed       = 30,
 	laggerSpeed      = 15,
@@ -424,7 +427,31 @@ end
 -- Speed engine
 --==============================================================================
 
-local speedLV, speedAttachment
+-- Movement methods, ported from the Vynx build. Games and executors disagree
+-- about which of these actually shifts the character, so the method is a
+-- setting rather than a decision baked into the engine.
+local SPEED_METHODS = {
+	"Velocity", "AssemblyLinearVelocity", "Velocity Lerp", "AssemblyLinearVelocity Lerp",
+	"CFrame", "CFrame Lerp", "Hyper CFrame", "Anchored CFrame", "PivotTo",
+	"Model PivotTo", "Tween CFrame",
+	"WalkSpeed", "Humanoid Move", "Humanoid MoveTo",
+	"BodyVelocity", "BodyPosition", "BodyForce", "BodyThrust",
+	"LinearVelocity", "VectorForce", "AlignPosition",
+	"ApplyImpulse", "RocketPropulsion",
+}
+Core.speedMethods = SPEED_METHODS
+
+local methodIndex = {}
+for index, name in ipairs(SPEED_METHODS) do methodIndex[name] = index end
+
+-- A config naming a method this build does not have must not wedge the engine.
+if not methodIndex[cfg.speedMethod] then cfg.speedMethod = "Velocity" end
+
+-- Everything a method may have created. Cleared whenever movement stops, the
+-- method changes, the character is ragdolled or the hub unloads.
+local mover = {}
+local lastMethod = nil
+
 local lastMoveDir = Vector3.zero
 local autoSwitchWasCarrying = false
 
@@ -456,33 +483,237 @@ local function pathSpeed()
 	return lagging and cfg.laggerSpeed or cfg.normalSpeed
 end
 
-local function buildSpeedMover(c)
-	if speedLV then pcall(function() speedLV:Destroy() end) end
-	if speedAttachment then pcall(function() speedAttachment:Destroy() end) end
-	speedLV, speedAttachment = nil, nil
+local function clearMover()
+	if mover.anchored then
+		pcall(function() mover.anchored.Anchored = false end)
+		mover.anchored = nil
+	end
+	if mover.tween then
+		pcall(function() mover.tween:Cancel() end)
+		mover.tween = nil
+	end
 
-	local hrp = c and c:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-
-	speedAttachment = Instance.new("Attachment")
-	speedAttachment.Name = "VeltrexSpeedAttachment"
-	speedAttachment.Parent = hrp
-
-	speedLV = Instance.new("LinearVelocity")
-	speedLV.Name           = "VeltrexSpeedVelocity"
-	speedLV.Attachment0    = speedAttachment
-	speedLV.RelativeTo     = Enum.ActuatorRelativeTo.World
-	speedLV.VectorVelocity = Vector3.zero
-	speedLV.ForceLimitMode = Enum.ForceLimitMode.PerAxis
-	speedLV.MaxAxesForce   = Vector3.new(100000, 0, 100000)
-	speedLV.Enabled        = false
-	speedLV.Parent         = hrp
+	for key, object in pairs(mover) do
+		if typeof(object) == "Instance" then
+			pcall(function() object:Destroy() end)
+			mover[key] = nil
+		end
+	end
 end
 
-local function stopSpeedMover()
-	if speedLV then
-		speedLV.VectorVelocity = Vector3.zero
-		speedLV.Enabled = false
+local function ensureAttachment(hrp, key, name)
+	local attachment = mover[key]
+	if not attachment or attachment.Parent ~= hrp then
+		if attachment then pcall(function() attachment:Destroy() end) end
+		attachment = Instance.new("Attachment")
+		attachment.Name = name
+		attachment.Parent = hrp
+		mover[key] = attachment
+	end
+	return attachment
+end
+
+-- Cancel out the current horizontal velocity and impulse in the one we want.
+local function massImpulse(hrp, direction, speed)
+	local mass    = hrp.AssemblyMass or 1
+	local current = hrp.AssemblyLinearVelocity
+	local desired = Vector3.new(direction.X * speed, current.Y, direction.Z * speed)
+	local delta   = desired - current
+	pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+end
+
+local function lerpImpulse(hrp, direction, speed)
+	local current = hrp.AssemblyLinearVelocity
+	local desired = Vector3.new(direction.X * speed, current.Y, direction.Z * speed)
+	local blended = current:Lerp(desired, 0.6)
+	local mass    = hrp.AssemblyMass or 1
+	pcall(function()
+		hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass)
+	end)
+end
+
+local function applyMethod(hrp, hum, direction, speed, dt)
+	local step   = dt or 1 / 60
+	local method = cfg.speedMethod
+	local c      = hrp.Parent
+
+	-- Switching method leaves the previous one's instances behind, so tear
+	-- them down and hand WalkSpeed back to the game.
+	if lastMethod ~= method then
+		clearMover()
+		if method ~= "WalkSpeed" and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
+		lastMethod = method
+	end
+
+	local target = hrp.Position + (direction * speed * step)
+
+	if method == "Velocity" or method == "AssemblyLinearVelocity" or method == "ApplyImpulse" then
+		massImpulse(hrp, direction, speed)
+
+	elseif method == "Velocity Lerp" or method == "AssemblyLinearVelocity Lerp" then
+		lerpImpulse(hrp, direction, speed)
+
+	elseif method == "CFrame" then
+		hrp.CFrame = hrp.CFrame + (direction * speed * step)
+
+	elseif method == "CFrame Lerp" then
+		hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + (direction * speed * step), 0.5)
+
+	elseif method == "Hyper CFrame" then
+		hrp.CFrame = hrp.CFrame + (direction * speed * cfg.hyperMult * step)
+
+	elseif method == "Anchored CFrame" then
+		if not hrp.Anchored then
+			hrp.Anchored = true
+			mover.anchored = hrp
+		end
+		hrp.CFrame = hrp.CFrame + (direction * speed * step)
+
+	elseif method == "PivotTo" then
+		hrp:PivotTo(hrp.CFrame + (direction * speed * step))
+
+	elseif method == "Model PivotTo" then
+		if c and c:IsA("Model") then
+			c:PivotTo(c:GetPivot() + (direction * speed * step))
+		else
+			hrp:PivotTo(hrp.CFrame + (direction * speed * step))
+		end
+
+	elseif method == "Tween CFrame" then
+		if mover.tween then pcall(function() mover.tween:Cancel() end) end
+		mover.tween = TS:Create(hrp, TweenInfo.new(step, Enum.EasingStyle.Linear), {
+			CFrame = hrp.CFrame + (direction * speed * step),
+		})
+		mover.tween:Play()
+
+	elseif method == "WalkSpeed" then
+		hum.WalkSpeed = speed
+
+	elseif method == "Humanoid Move" then
+		hum.WalkSpeed = speed
+		hum:Move(direction)
+
+	elseif method == "Humanoid MoveTo" then
+		hum:MoveTo(target, hrp)
+
+	elseif method == "BodyVelocity" then
+		if not mover.bodyVelocity or mover.bodyVelocity.Parent ~= hrp then
+			if mover.bodyVelocity then pcall(function() mover.bodyVelocity:Destroy() end) end
+			local body = Instance.new("BodyVelocity")
+			body.Name     = "VeltrexBodyVelocity"
+			body.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+			body.Parent   = hrp
+			mover.bodyVelocity = body
+		end
+		mover.bodyVelocity.Velocity =
+			Vector3.new(direction.X * speed, mover.bodyVelocity.Velocity.Y, direction.Z * speed)
+
+	elseif method == "BodyPosition" then
+		if not mover.bodyPosition or mover.bodyPosition.Parent ~= hrp then
+			if mover.bodyPosition then pcall(function() mover.bodyPosition:Destroy() end) end
+			local body = Instance.new("BodyPosition")
+			body.Name     = "VeltrexBodyPosition"
+			body.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+			body.P        = 500
+			body.D        = 50
+			body.Parent   = hrp
+			mover.bodyPosition = body
+		end
+		mover.bodyPosition.Position = target
+
+	elseif method == "BodyForce" then
+		if not mover.bodyForce or mover.bodyForce.Parent ~= hrp then
+			if mover.bodyForce then pcall(function() mover.bodyForce:Destroy() end) end
+			local body = Instance.new("BodyForce")
+			body.Name   = "VeltrexBodyForce"
+			body.Parent = hrp
+			mover.bodyForce = body
+		end
+		mover.bodyForce.Force = Vector3.new(direction.X * speed, 0, direction.Z * speed) * 100
+
+	elseif method == "BodyThrust" then
+		if not mover.bodyThrust or mover.bodyThrust.Parent ~= hrp then
+			if mover.bodyThrust then pcall(function() mover.bodyThrust:Destroy() end) end
+			local body = Instance.new("BodyThrust")
+			body.Name   = "VeltrexBodyThrust"
+			body.Force  = Vector3.new(math.huge, math.huge, math.huge)
+			body.Parent = hrp
+			mover.bodyThrust = body
+		end
+		mover.bodyThrust.Force = Vector3.new(direction.X * speed, 0, direction.Z * speed) * 100
+
+	elseif method == "LinearVelocity" then
+		if not mover.linearVelocity or mover.linearVelocity.Parent ~= hrp then
+			if mover.linearVelocity then pcall(function() mover.linearVelocity:Destroy() end) end
+			local attachment = ensureAttachment(hrp, "attLinear", "VeltrexLinearAtt")
+			local velocity = Instance.new("LinearVelocity")
+			velocity.Name        = "VeltrexLinearVelocity"
+			velocity.Attachment0 = attachment
+			velocity.MaxForce    = 1e8
+			velocity.RelativeTo  = Enum.ActuatorRelativeTo.World
+			velocity.Parent      = hrp
+			mover.linearVelocity = velocity
+		end
+		mover.linearVelocity.VectorVelocity =
+			Vector3.new(direction.X * speed, mover.linearVelocity.VectorVelocity.Y, direction.Z * speed)
+
+	elseif method == "VectorForce" then
+		if not mover.vectorForce or mover.vectorForce.Parent ~= hrp then
+			if mover.vectorForce then pcall(function() mover.vectorForce:Destroy() end) end
+			local attachment = ensureAttachment(hrp, "attVector", "VeltrexVectorAtt")
+			local force = Instance.new("VectorForce")
+			force.Name        = "VeltrexVectorForce"
+			force.Attachment0 = attachment
+			force.RelativeTo  = Enum.ActuatorRelativeTo.World
+			force.Parent      = hrp
+			mover.vectorForce = force
+		end
+		mover.vectorForce.Force = Vector3.new(direction.X * speed, 0, direction.Z * speed) * 100
+
+	elseif method == "AlignPosition" then
+		if not mover.alignPosition or mover.alignPosition.Parent ~= hrp then
+			if mover.alignPosition then pcall(function() mover.alignPosition:Destroy() end) end
+			local attachment = ensureAttachment(hrp, "attAlign", "VeltrexAlignAtt")
+			local align = Instance.new("AlignPosition")
+			align.Name           = "VeltrexAlignPosition"
+			align.Attachment0    = attachment
+			align.Mode           = Enum.PositionAlignmentMode.OneAttachment
+			align.MaxForce       = math.huge
+			align.Responsiveness = 15
+			align.RigidityEnabled = false
+			align.Parent         = hrp
+			mover.alignPosition = align
+		end
+		mover.alignPosition.Position = target
+
+	elseif method == "RocketPropulsion" then
+		if not mover.rocket or mover.rocket.Parent ~= hrp or not mover.rocketTarget then
+			if mover.rocket then pcall(function() mover.rocket:Destroy() end) end
+			if mover.rocketTarget then pcall(function() mover.rocketTarget:Destroy() end) end
+
+			local anchor = Instance.new("Part")
+			anchor.Name        = "VeltrexRocketTarget"
+			anchor.Anchored    = true
+			anchor.CanCollide  = false
+			anchor.Transparency = 1
+			anchor.Size        = Vector3.new(1, 1, 1)
+			anchor.Parent      = workspace
+			mover.rocketTarget = anchor
+
+			local rocket = Instance.new("RocketPropulsion")
+			rocket.Name      = "VeltrexRocket"
+			rocket.MaxThrust = 3000
+			rocket.MaxTorque = 1000
+			rocket.ThrustP   = 100
+			rocket.ThrustD   = 20
+			rocket.TurnP     = 100
+			rocket.TurnD     = 10
+			rocket.Target    = anchor
+			rocket.Parent    = hrp
+			mover.rocket = rocket
+		end
+		mover.rocketTarget.Position = target
+		pcall(function() mover.rocket:Fire() end)
 	end
 end
 
@@ -491,26 +722,23 @@ local function speedSuppressed()
 	return flags.autoBat or flags.batV2 or flags.autoLeft or flags.autoRight or flags.antiDesync
 end
 
-bind(RunService.RenderStepped, function()
+bind(RunService.RenderStepped, function(dt)
 	local c = char()
 	if not c then return end
 	local hum = c:FindFirstChildOfClass("Humanoid")
 	local hrp = c:FindFirstChild("HumanoidRootPart")
 	if not hum or not hrp then return end
 
-	if not speedLV or not speedLV.Parent then buildSpeedMover(c) end
-	if not speedLV then return end
-
 	state.speed = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z).Magnitude
 
 	if isRagdolled(hum) then
 		lastMoveDir = Vector3.zero
-		stopSpeedMover()
+		clearMover()
 		return
 	end
 
 	if speedSuppressed() then
-		stopSpeedMover()
+		clearMover()
 		return
 	end
 
@@ -521,30 +749,52 @@ bind(RunService.RenderStepped, function()
 		speed = profileSpeed()
 	end
 
-	local moveDir = hum.MoveDirection
+	local direction = Vector3.zero
+	local moveDir   = hum.MoveDirection
+
 	if moveDir.Magnitude > 0.05 then
 		lastMoveDir = moveDir
-		speedLV.VectorVelocity = Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed
-		speedLV.Enabled = true
-		return
-	end
-
-	-- With anti-ragdoll on, keep gliding while a movement key is still held —
-	-- MoveDirection drops to zero for a frame whenever the humanoid is reset.
-	local held = false
-	if flags.antiRagdoll and lastMoveDir.Magnitude > 0.05 then
+		direction = moveDir
+	elseif flags.antiRagdoll and lastMoveDir.Magnitude > 0.05 then
+		-- MoveDirection drops to zero for a frame whenever the humanoid is
+		-- reset, so keep gliding while a movement key is still held.
 		for key in pairs(MOVE_KEYS) do
-			if UIS:IsKeyDown(key) then held = true break end
+			if UIS:IsKeyDown(key) then
+				direction = lastMoveDir
+				break
+			end
 		end
 	end
 
-	if held then
-		speedLV.VectorVelocity = Vector3.new(lastMoveDir.X, 0, lastMoveDir.Z).Unit * speed
-		speedLV.Enabled = true
+	if direction.Magnitude > 0 then
+		applyMethod(hrp, hum, Vector3.new(direction.X, 0, direction.Z).Unit, speed, dt)
 	else
-		stopSpeedMover()
+		clearMover()
 	end
 end)
+
+function Core.setSpeedMethod(name)
+	if not methodIndex[name] then return end
+	cfg.speedMethod = name
+	clearMover()
+	lastMethod = nil
+
+	local hum = humanoid()
+	if hum and name ~= "WalkSpeed" and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
+
+	Core.emit("speedMethod", name)
+	Core.save()
+end
+
+function Core.cycleSpeedMethod(step)
+	local index = (methodIndex[cfg.speedMethod] or 1) + (step or 1)
+	index = ((index - 1) % #SPEED_METHODS) + 1
+	Core.setSpeedMethod(SPEED_METHODS[index])
+end
+
+function Core.speedMethodIndex()
+	return methodIndex[cfg.speedMethod] or 1, #SPEED_METHODS
+end
 
 -- Auto-switch nudges the current velocity the moment the carry state flips.
 task.spawn(function()
@@ -1865,6 +2115,7 @@ local LIMITS = {
 	aimbotTurn       = { 5, 150 },
 	batHitDistance   = { 1, 60 },
 	swingCooldown    = { 0.05, 2 },
+	hyperMult        = { 1, 20 },
 }
 Core.limits = LIMITS
 
@@ -1991,7 +2242,8 @@ end)
 
 bind(LP.CharacterAdded, function(c)
 	task.wait(0.5)
-	buildSpeedMover(c)
+	clearMover()
+	lastMethod = nil
 
 	if flags.medusaCounter then startMedusaCounter() end
 	if flags.batCounter    then startBatCounter() end
@@ -2046,7 +2298,6 @@ function Core.start()
 		if not resetRemote then findResetRemote() end
 	end)
 
-	if LP.Character then buildSpeedMover(LP.Character) end
 
 	-- Restore saved feature states (defaults apply on a fresh install).
 	for _, def in ipairs(FEATURES) do
@@ -2059,6 +2310,7 @@ function Core.start()
 	-- re-read the whole state instead of firing an event per feature.
 	Core.emit("sync")
 	Core.emit("speedProfile", cfg.speedProfile)
+	Core.emit("speedMethod", cfg.speedMethod)
 	Core.emit("mode", "stealMode", cfg.stealMode)
 	Core.emit("mode", "dropMode", cfg.dropMode)
 end
@@ -2074,9 +2326,7 @@ function Core.unload()
 	for _, conn in ipairs(coreConns) do drop(conn) end
 	coreConns = {}
 
-	stopSpeedMover()
-	if speedLV then pcall(function() speedLV:Destroy() end) end
-	if speedAttachment then pcall(function() speedAttachment:Destroy() end) end
+	clearMover()
 
 	writeJSON(CONFIG_FILE, cfg)
 	Core.emit("unload")

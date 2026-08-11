@@ -208,6 +208,52 @@ check("speed engine runs against a real character", function()
 	Core.setFeature("autoSwitchSpeed", false)
 end)
 
+check("every movement method drives a frame", function()
+	local methods = Core.speedMethods
+	assert(#methods == 23, "expected 23 movement methods, found " .. #methods)
+
+	local humanoid = mock.localPlayer.Character:FindFirstChildOfClass("Humanoid")
+
+	for _, method in ipairs(methods) do
+		Core.setSpeedMethod(method)
+		assert(Core.cfg.speedMethod == method, method .. " did not stick")
+
+		humanoid.MoveDirection = env.Vector3.new(1, 0, 0)
+		for _ = 1, 3 do mock.services.RunService.RenderStepped:Fire(0.016) end
+
+		-- and again with no input, which tears the method's objects back down
+		humanoid.MoveDirection = env.Vector3.new(0, 0, 0)
+		mock.services.RunService.RenderStepped:Fire(0.016)
+		humanoid.MoveDirection = env.Vector3.new(1, 0, 0)
+	end
+
+	-- Anchored CFrame must hand the root part back when it stops
+	local hrp = mock.localPlayer.Character:FindFirstChild("HumanoidRootPart")
+	assert(hrp.Anchored == false, "Anchored CFrame left the root part anchored")
+	assert(hrp.Parent ~= nil, "the cleanup pass destroyed the root part")
+
+	Core.setSpeedMethod("Velocity")
+end)
+
+check("the method cycler wraps in both directions", function()
+	local _, count = Core.speedMethodIndex()
+
+	Core.setSpeedMethod(Core.speedMethods[1])
+	Core.cycleSpeedMethod(-1)
+	local index = Core.speedMethodIndex()
+	assert(index == count, "cycling back from the first method should wrap to the last")
+
+	Core.cycleSpeedMethod(1)
+	index = Core.speedMethodIndex()
+	assert(index == 1, "cycling forward from the last method should wrap to the first")
+end)
+
+check("a bad saved method falls back instead of wedging", function()
+	local before = Core.cfg.speedMethod
+	Core.setSpeedMethod("NotAMethod")
+	assert(Core.cfg.speedMethod == before, "an unknown method should be refused")
+end)
+
 check("aimbots chase a real opponent", function()
 	mock.addOpponent("Rival", env.Vector3.new(20, 5, 0))
 	mock.step(1)

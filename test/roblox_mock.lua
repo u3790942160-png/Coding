@@ -143,6 +143,11 @@ CFrameMT.__index = function(self, key)
 	return rawget(CFrameMT, key)
 end
 CFrameMT.__mul = function(a) return a end
+CFrameMT.__add = function(a, v)
+	local pos = rawget(a, "_position")
+	return setmetatable({ _position = vec3(pos.X + v.X, pos.Y + v.Y, pos.Z + v.Z) }, CFrameMT)
+end
+function CFrameMT:Lerp(goal) return goal end
 
 function CFrameMT:ToEulerAnglesYXZ() return 0, 0, 0 end
 function CFrameMT:ToEulerAnglesXYZ() return 0, 0, 0 end
@@ -246,6 +251,9 @@ local DEFAULTS = {
 	Scale = 1,
 	Enabled = true,
 	AutoRotate = true,
+	-- Roblox gives these zero defaults; the movement methods read them back.
+	Velocity = nil,
+	VectorVelocity = nil,
 	WalkSpeed = 16,
 	Anchored = false,
 }
@@ -258,6 +266,9 @@ function Instance.new(className, parent)
 	rawset(self, "_class", className)
 
 	for key, value in pairs(DEFAULTS) do rawget(self, "_props")[key] = value end
+	rawget(self, "_props").Velocity = vec3(0, 0, 0)
+	rawget(self, "_props").VectorVelocity = vec3(0, 0, 0)
+	rawget(self, "_props").AssemblyLinearVelocity = vec3(0, 0, 0)
 	rawget(self, "_props").Name = className
 	rawget(self, "_props").Position = UDim2.new(0, 0, 0, 0)
 	rawget(self, "_props").Size = UDim2.new(0, 100, 0, 100)
@@ -342,11 +353,13 @@ function instanceMethods:IsFocused() return false end
 function instanceMethods:GetPlayingAnimationTracks() return {} end
 function instanceMethods:ChangeState() end
 function instanceMethods:Move() end
+function instanceMethods:MoveTo() end
+function instanceMethods:Fire() end
 function instanceMethods:EquipTool() end
 function instanceMethods:Activate() end
 function instanceMethods:FireServer() end
 function instanceMethods:GetState() return Enum.HumanoidStateType.Running end
-function instanceMethods:GetPivot() return { Position = Vector3.new(0, 0, 0) } end
+function instanceMethods:GetPivot() return cframe(vec3(0, 0, 0)) end
 function instanceMethods:SetAttribute() end
 function instanceMethods:GetAttribute() return nil end
 
@@ -435,6 +448,10 @@ local function makePart(name, parent, position)
 	part.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 	part.CFrame                  = CFrame.new(position or Vector3.new(0, 0, 0))
 	part.CanCollide              = true
+	part.Anchored                = false
+	part.AssemblyMass            = 12
+	part.ApplyImpulse            = function() end
+	part.PivotTo                 = function() end
 	part.IsA = function(_, className)
 		return className == "BasePart" or className == "Part"
 	end
@@ -444,6 +461,8 @@ end
 function mock.spawnCharacter(player, position)
 	local character = Instance.new("Model")
 	character.Name = player.Name
+	character.IsA = function(_, className) return className == "Model" end
+	character.PivotTo = function() end
 
 	makePart("HumanoidRootPart", character, position)
 	makePart("Head", character, position)

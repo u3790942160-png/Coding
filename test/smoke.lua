@@ -373,18 +373,18 @@ check("clicking every control in the interface is safe", function()
 	assert(unloadCalls > 0, "the close and unload buttons never fired")
 end)
 
-check("search filters rows across tabs", function()
+check("filter narrows rows across tabs", function()
 	local box
 	local function findSearch(instance)
 		for _, child in ipairs(instance:GetChildren()) do
-			if rawget(child, "_class") == "TextBox" and child.PlaceholderText == "Search settings" then
+			if rawget(child, "_class") == "TextBox" and child.PlaceholderText == "filter" then
 				box = child
 			end
 			findSearch(child)
 		end
 	end
 	findSearch(UI.window)
-	assert(box, "search box not found")
+	assert(box, "filter box not found")
 
 	box.Text = "lagger"
 	box:GetPropertyChangedSignal("Text"):Fire()

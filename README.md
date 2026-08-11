@@ -19,39 +19,52 @@ anything in `src/`.
 
 ## The interface
 
-A tabbed panel rather than one long scrolling column.
+A console, not a settings panel: tabs across the top, content across the full
+width, flush rows on hairlines, no rounded corners anywhere, monospace
+throughout, amber phosphor on warm black.
 
-- **Dashboard** — live FPS / ping / speed / profile cards, one-tap Drop, TP Down,
-  Instant Reset and Rescan, plus the five most-used toggles.
-- **Speed** — profile selector (Normal / Carry / Lagger / Lagger Carry), auto
-  switch, and a slider for each speed.
-- **Combat** — Auto Bat, Auto Swing, Bat Aimbot V2, Anti-Desync, the two
-  counters, and sliders for chase speed, hover height, turn rate, hit distance
-  and swing cooldown. Those five were hard-coded constants before.
-- **Steal** — auto steal, normal/semi mode, every range, a live podium count and
+- **STATUS** — a four-column telemetry block (fps, ping, speed, profile), four
+  command buttons, and the five channels you reach for most.
+- **SPEED** — profile cells (Norm / Carry / Lag / LagC), auto switch, and a
+  meter for each rate.
+- **COMBAT** — Auto Bat, Auto Swing, Bat V2, Anti-Desync, the two counters, and
+  meters for chase speed, hover height, turn rate, hit range and swing delay.
+  Those five were hard-coded constants before.
+- **STEAL** — the engine, normal/semi mode, every range, a live podium count and
   a manual rescan.
-- **Movement** — the two auto paths, drop and drop mode, TP Down, Auto TP, the TP
-  height, and the character toggles.
-- **Keybinds** — every binding, rebindable, keyboard or gamepad.
-- **Settings** — six accent colours, three independent scale sliders, position
-  lock, HUD and touch-pad visibility, layout reset and a clean unload.
+- **MOVE** — the two auto paths, drop and drop mode, TP down, auto TP, the TP
+  height, and the character channels.
+- **KEYS** — every binding, rebindable, keyboard or gamepad.
+- **CONFIG** — six console phosphors, three independent scale meters, position
+  lock, strip and keypad visibility, layout reset and a clean unload.
+
+The controls carry the same idea:
+
+- **Toggles are ON/OFF cells** with a lamp in the left gutter, so scanning the
+  gutter tells you what is live without reading any labels.
+- **Numbers are twenty-cell meters**, dragged or clicked across the cells, with
+  the value as a monospace readout you can also type into.
+- **Sections are a label and a rule** out to the right edge, not a boxed card.
+- **Modes and keybinds are bracketed cells**; a listening keybind blinks.
 
 Also new:
 
-- **Search** filters every control across all tabs as you type, and jumps to a
-  tab that has matches.
-- **HUD** is a compact status bar: steal progress with a percentage, current
-  target or profile, FPS, ping and live speed. Draggable, scalable, hideable.
-- **Touch pad** is one draggable panel instead of twelve independently dragged
-  buttons, and its buttons light up from the same state the panel reads, so the
-  two can no longer disagree.
-- **Toasts** replace silent failures — you get told when a feature turns on, when
-  a steal lands, or when your executor is missing something the script needs.
+- **Filter** — the `>` line at the top narrows every row across all tabs as you
+  type, collapses empty sections, dims tabs with no matches and jumps to a tab
+  that has some.
+- **Status strip** — one 420x26 line: what the hub is doing, a segmented
+  progress meter, a percentage and fps/ping/speed. Draggable, scalable, hideable.
+- **Keypad** — a 3x4 touch grid, one draggable panel rather than twelve
+  independently dragged buttons, each key lit from the same state the console
+  reads, so the two cannot disagree.
+- **Log lines** replace silent failures — bottom-left terminal output when a
+  channel changes, a steal lands, or your executor is missing something.
 - **Unload** stops every loop, disconnects every connection, destroys the GUIs
   and writes the config. Re-running the script unloads the previous copy first,
-  so it no longer stacks duplicate interfaces.
+  so it no longer stacks duplicate interfaces. The header `X` asks once first;
+  `_` collapses to a small bracket stub.
 
-Defaults: `LeftCtrl` toggles the menu, `Q` carry speed, `R` lagger, `X` drop,
+Defaults: `LeftCtrl` toggles the console, `Q` carry speed, `R` lagger, `X` drop,
 `F` TP down, `T` instant reset, `Z`/`C` auto paths, `E` auto bat, `V` bat V2,
 `B` anti-desync.
 
@@ -86,9 +99,9 @@ Everything from the original is here, with these deliberate differences:
 - **TP height is wired up.** The original had a "TP Height" box that was saved,
   loaded and never read — TP Down always used `-7`. The slider now sets the Y
   level it teleports to, defaulting to `-7`.
-- **Speed is shown in the HUD** instead of a `BillboardGui` floating over your
-  head, which was interface code living inside the character.
-- **Aimbot constants are sliders.** Chase speed, hover height, turn rate, hit
+- **Speed is shown on the status strip** instead of a `BillboardGui` floating
+  over your head, which was interface code living inside the character.
+- **Aimbot constants are meters.** Chase speed, hover height, turn rate, hit
   distance and swing cooldown were literals in the middle of the aimbot loops.
 - **No-collide is a toggle and runs five times a second** instead of walking
   every player's descendants on every physics step.

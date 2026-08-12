@@ -926,6 +926,7 @@ autoLeftEnabled = autoLeftEnabled,
 autoRightEnabled = autoRightEnabled,
 diceGuiScaleValue = diceGuiScaleValue,
 diceProgressBarScaleValue = diceProgressBarScaleValue,
+speedMethod = VS and VS.speedMethod or "Velocity",
 introEnabled = _introEnabled == true,
 selectedIntroMusic = selectedIntroMusic,
 guiLocked = _G.DiceGuiLocked == true,
@@ -1046,6 +1047,9 @@ _G.DiceNoPlayerCollisionEnabled = data.noPlayerCollisionEnabled == true
 _G.DiceAntiBodylockEnabled = data.antiBodylockEnabled == true
 customFontVisualEnabled = false
 skyTheme = "Off" -- sky theme removed
+-- VS is built much later in the file, so hold the saved choice and let
+-- the mover pick it up once the table exists
+if type(data.speedMethod) == "string" then _diceSavedSpeedMethod = data.speedMethod end
 if data.lightningEnabled ~= nil then _G.DiceLightningEnabled = data.lightningEnabled ~= false else _G.DiceLightningEnabled = true end
 autoLeftEnabled = data.autoLeftEnabled == true
 autoRightEnabled = data.autoRightEnabled == true
@@ -2823,6 +2827,225 @@ end)
 -- accelerates like an empty character. Vertical velocity is left alone
 -- so jumps and falls behave.
 -- ═══════════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════
+-- SPEED MOVEMENT METHOD — ported from the Vynx source.
+-- Instead of one hardcoded push, the mover dispatches on VS.speedMethod,
+-- so the same call site can drive velocity, CFrame, a BodyMover, a
+-- constraint or an impulse. Switching method tears down whatever the
+-- previous one built before the next frame runs.
+-- ═══════════════════════════════════════════════════════════════
+VS = {
+speedMethod = "Velocity",
+speedMethodList = {
+"Velocity", "AssemblyLinearVelocity", "Velocity Lerp", "AssemblyLinearVelocity Lerp",
+"CFrame", "CFrame Lerp", "Hyper CFrame", "Anchored CFrame", "PivotTo", "Model PivotTo", "Tween CFrame",
+"WalkSpeed", "Humanoid Move", "Humanoid MoveTo",
+"BodyVelocity", "BodyPosition", "BodyForce", "BodyThrust",
+"LinearVelocity", "VectorForce", "AlignPosition",
+"ApplyImpulse", "RocketPropulsion",
+},
+hyperMult = 4,
+}
+if type(_diceSavedSpeedMethod) == "string" then
+for _, name in ipairs(VS.speedMethodList) do
+if name == _diceSavedSpeedMethod then VS.speedMethod = name break end
+end
+end
+
+local function destroySpeedObjects()
+    if VS._anchoredBySpeed then pcall(function() VS._anchoredBySpeed.Anchored = false end); VS._anchoredBySpeed = nil end
+    if VS._bodyVel then pcall(function() VS._bodyVel:Destroy() end); VS._bodyVel = nil end
+    if VS._bodyPosition then pcall(function() VS._bodyPosition:Destroy() end); VS._bodyPosition = nil end
+    if VS._bodyForce then pcall(function() VS._bodyForce:Destroy() end); VS._bodyForce = nil end
+    if VS._bodyThrust then pcall(function() VS._bodyThrust:Destroy() end); VS._bodyThrust = nil end
+    if VS._linearVel then pcall(function() VS._linearVel:Destroy() end); VS._linearVel = nil end
+    if VS._vectorForce then pcall(function() VS._vectorForce:Destroy() end); VS._vectorForce = nil end
+    if VS._alignPos then pcall(function() VS._alignPos:Destroy() end); VS._alignPos = nil end
+    if VS._rocket then pcall(function() VS._rocket:Destroy() end); VS._rocket = nil end
+    if VS._rocketTarget then pcall(function() VS._rocketTarget:Destroy() end); VS._rocketTarget = nil end
+    if VS._attLinVel then pcall(function() VS._attLinVel:Destroy() end); VS._attLinVel = nil end
+    if VS._attVecForce then pcall(function() VS._attVecForce:Destroy() end); VS._attVecForce = nil end
+    if VS._attAlign then pcall(function() VS._attAlign:Destroy() end); VS._attAlign = nil end
+    if VS._speedTween then pcall(function() VS._speedTween:Cancel() end); VS._speedTween = nil end
+end
+
+local function ensureSpeedAttachment(hrp, key, name)
+    local att = M[key]
+    if not att or att.Parent ~= hrp then
+        if att then pcall(function() att:Destroy() end) end
+        att = Instance.new("Attachment")
+        att.Name = name or "MoveeSpeedAtt"
+        att.Parent = hrp
+        M[key] = att
+    end
+    return att
+end
+
+local function applySpeedMethod(hrp, hum, dir, spd, dt)
+    local step = dt or 1/60
+    local m = VS.speedMethod
+    if VS._lastSpeedMethod ~= m then
+        destroySpeedObjects()
+        if m ~= "WalkSpeed" and hum.WalkSpeed ~= 16 then hum.WalkSpeed = 16 end
+        VS._lastSpeedMethod = m
+    end
+    local char = hrp.Parent
+    local targetPos = hrp.Position + (dir * spd * step)
+
+    local function massImpulse(direction, targetSpeed)
+        local mass = hrp.AssemblyMass or 1
+        local current = hrp.AssemblyLinearVelocity
+        local desired = Vector3.new(direction.X * targetSpeed, current.Y, direction.Z * targetSpeed)
+        local delta = desired - current
+        pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+    end
+
+    if m == "Velocity" then
+        massImpulse(dir, spd)
+    elseif m == "AssemblyLinearVelocity" then
+        massImpulse(dir, spd)
+    elseif m == "Velocity Lerp" then
+        local current = hrp.AssemblyLinearVelocity
+        local desired = Vector3.new(dir.X*spd, current.Y, dir.Z*spd)
+        local blended = current:Lerp(desired, 0.6)
+        local mass = hrp.AssemblyMass or 1
+        pcall(function() hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass) end)
+    elseif m == "AssemblyLinearVelocity Lerp" then
+        local current = hrp.AssemblyLinearVelocity
+        local desired = Vector3.new(dir.X*spd, current.Y, dir.Z*spd)
+        local blended = current:Lerp(desired, 0.6)
+        local mass = hrp.AssemblyMass or 1
+        pcall(function() hrp:ApplyImpulse(Vector3.new(blended.X - current.X, 0, blended.Z - current.Z) * mass) end)
+    elseif m == "CFrame" then
+        hrp.CFrame = hrp.CFrame + (dir * spd * step)
+    elseif m == "CFrame Lerp" then
+        hrp.CFrame = hrp.CFrame:Lerp(hrp.CFrame + (dir * spd * step), 0.5)
+    elseif m == "Hyper CFrame" then
+        hrp.CFrame = hrp.CFrame + (dir * spd * (VS.hyperMult or 4) * step)
+    elseif m == "Anchored CFrame" then
+        if not hrp.Anchored then
+            hrp.Anchored = true
+            VS._anchoredBySpeed = hrp
+        end
+        hrp.CFrame = hrp.CFrame + (dir * spd * step)
+    elseif m == "PivotTo" then
+        hrp:PivotTo(hrp.CFrame + (dir * spd * step))
+    elseif m == "Model PivotTo" then
+        if char and char:IsA("Model") then
+            char:PivotTo(char:GetPivot() + (dir * spd * step))
+        else
+            hrp:PivotTo(hrp.CFrame + (dir * spd * step))
+        end
+    elseif m == "Tween CFrame" then
+        if VS._speedTween then pcall(function() VS._speedTween:Cancel() end) end
+        VS._speedTween = TweenService:Create(hrp, TweenInfo.new(step, Enum.EasingStyle.Linear), {CFrame = hrp.CFrame + (dir * spd * step)})
+        VS._speedTween:Play()
+    elseif m == "WalkSpeed" then
+        hum.WalkSpeed = spd
+    elseif m == "Humanoid Move" then
+        hum.WalkSpeed = spd
+        hum:Move(dir)
+    elseif m == "Humanoid MoveTo" then
+        hum:MoveTo(targetPos, hrp)
+    elseif m == "BodyVelocity" then
+        if not VS._bodyVel or VS._bodyVel.Parent ~= hrp then
+            if VS._bodyVel then pcall(function() VS._bodyVel:Destroy() end) end
+            VS._bodyVel = Instance.new("BodyVelocity")
+            VS._bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            VS._bodyVel.Parent = hrp
+        end
+        VS._bodyVel.Velocity = Vector3.new(dir.X*spd, VS._bodyVel.Velocity.Y, dir.Z*spd)
+    elseif m == "BodyPosition" then
+        if not VS._bodyPosition or VS._bodyPosition.Parent ~= hrp then
+            if VS._bodyPosition then pcall(function() VS._bodyPosition:Destroy() end) end
+            VS._bodyPosition = Instance.new("BodyPosition")
+            VS._bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            VS._bodyPosition.P = 500
+            VS._bodyPosition.D = 50
+            VS._bodyPosition.Parent = hrp
+        end
+        VS._bodyPosition.Position = targetPos
+    elseif m == "BodyForce" then
+        if not VS._bodyForce or VS._bodyForce.Parent ~= hrp then
+            if VS._bodyForce then pcall(function() VS._bodyForce:Destroy() end) end
+            VS._bodyForce = Instance.new("BodyForce")
+            VS._bodyForce.Parent = hrp
+        end
+        VS._bodyForce.Force = Vector3.new(dir.X*spd, 0, dir.Z*spd) * 100
+    elseif m == "BodyThrust" then
+        if not VS._bodyThrust or VS._bodyThrust.Parent ~= hrp then
+            if VS._bodyThrust then pcall(function() VS._bodyThrust:Destroy() end) end
+            VS._bodyThrust = Instance.new("BodyThrust")
+            VS._bodyThrust.Force = Vector3.new(math.huge, math.huge, math.huge)
+            VS._bodyThrust.Parent = hrp
+        end
+        VS._bodyThrust.Force = Vector3.new(dir.X*spd, 0, dir.Z*spd) * 100
+    elseif m == "LinearVelocity" then
+        if not VS._linearVel or VS._linearVel.Parent ~= hrp then
+            if VS._linearVel then pcall(function() VS._linearVel:Destroy() end) end
+            local att = ensureSpeedAttachment(hrp, "_attLinVel", "MoveeLinVelAtt")
+            VS._linearVel = Instance.new("LinearVelocity")
+            VS._linearVel.Attachment0 = att
+            VS._linearVel.MaxForce = 1e8
+            VS._linearVel.RelativeTo = Enum.ActuatorRelativeTo.World
+            VS._linearVel.Parent = hrp
+        end
+        VS._linearVel.VectorVelocity = Vector3.new(dir.X*spd, VS._linearVel.VectorVelocity.Y, dir.Z*spd)
+    elseif m == "VectorForce" then
+        if not VS._vectorForce or VS._vectorForce.Parent ~= hrp then
+            if VS._vectorForce then pcall(function() VS._vectorForce:Destroy() end) end
+            local att = ensureSpeedAttachment(hrp, "_attVecForce", "MoveeVecForceAtt")
+            VS._vectorForce = Instance.new("VectorForce")
+            VS._vectorForce.Attachment0 = att
+            VS._vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+            VS._vectorForce.Parent = hrp
+        end
+        VS._vectorForce.Force = Vector3.new(dir.X*spd, 0, dir.Z*spd) * 100
+    elseif m == "AlignPosition" then
+        if not VS._alignPos or VS._alignPos.Parent ~= hrp then
+            if VS._alignPos then pcall(function() VS._alignPos:Destroy() end) end
+            local att = ensureSpeedAttachment(hrp, "_attAlign", "MoveeAlignAtt")
+            VS._alignPos = Instance.new("AlignPosition")
+            VS._alignPos.Attachment0 = att
+            VS._alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment
+            VS._alignPos.MaxForce = math.huge
+            VS._alignPos.Responsiveness = 15
+            VS._alignPos.RigidityEnabled = false
+            VS._alignPos.Parent = hrp
+        end
+        VS._alignPos.Position = targetPos
+    elseif m == "ApplyImpulse" then
+        local mass = hrp.AssemblyMass or 1
+        local current = hrp.AssemblyLinearVelocity
+        local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
+        local delta = desired - current
+        pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+    elseif m == "RocketPropulsion" then
+        if not VS._rocket or VS._rocket.Parent ~= hrp or not VS._rocketTarget then
+            if VS._rocket then pcall(function() VS._rocket:Destroy() end) end
+            if VS._rocketTarget then pcall(function() VS._rocketTarget:Destroy() end) end
+            VS._rocketTarget = Instance.new("Part")
+            VS._rocketTarget.Name = "MoveeRocketTarget"
+            VS._rocketTarget.Anchored = true
+            VS._rocketTarget.CanCollide = false
+            VS._rocketTarget.Transparency = 1
+            VS._rocketTarget.Size = Vector3.new(1,1,1)
+            VS._rocketTarget.Parent = workspace
+            VS._rocket = Instance.new("RocketPropulsion")
+            VS._rocket.MaxThrust = 3000
+            VS._rocket.MaxTorque = 1000
+            VS._rocket.ThrustP = 100
+            VS._rocket.ThrustD = 20
+            VS._rocket.TurnP = 100
+            VS._rocket.TurnD = 10
+            VS._rocket.Target = VS._rocketTarget
+            VS._rocket.Parent = hrp
+        end
+        VS._rocketTarget.Position = targetPos
+        pcall(function() VS._rocket:Fire() end)
+    end
+end
+
 do
 local walkSpeedHeld = false
 -- Only ever touches the humanoid if we are the ones holding it off
@@ -2836,18 +3059,21 @@ hum = char and char:FindFirstChildOfClass("Humanoid")
 end
 if hum and hum.WalkSpeed ~= 16 then pcall(function() hum.WalkSpeed = 16 end) end
 end
-function DiceApplyMoveSpeed(hrp, hum, dir, spd)
--- Match before the push lands, so the humanoid is already walking at
--- the target rather than hauling the character back toward 16.
-if diceMatchWalkSpeed and hum then
+-- Standing still: drop any BodyMover, constraint or tween the method
+-- left behind, or it keeps driving the character.
+function DiceClearSpeedObjects()
+if destroySpeedObjects then pcall(destroySpeedObjects) end
+end
+function DiceApplyMoveSpeed(hrp, hum, dir, spd, dt)
+-- Match before the push lands, so the humanoid is already walking at the
+-- target rather than hauling the character back toward 16. The Vynx
+-- mover handles WalkSpeed itself when that is the chosen method, so this
+-- steps aside for it.
+if diceMatchWalkSpeed and hum and VS.speedMethod ~= "WalkSpeed" then
 if hum.WalkSpeed ~= spd then hum.WalkSpeed = spd end
 walkSpeedHeld = true
 end
-local mass = hrp.AssemblyMass or 1
-local current = hrp.AssemblyLinearVelocity
-local desired = Vector3.new(dir.X * spd, current.Y, dir.Z * spd)
-local delta = desired - current
-pcall(function() hrp:ApplyImpulse(Vector3.new(delta.X, 0, delta.Z) * mass) end)
+applySpeedMethod(hrp, hum, dir, spd, dt)
 end
 end
 local lastMoveDir = Vector3.new(0, 0, 0)
@@ -3447,7 +3673,7 @@ task.wait(0.5)
 setupOverheadInfo(char)
 if ragdollCountdownEnabled then hookRagdollCountdown(char) end
 end)
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
 local char = LP.Character
 if not char then return end
 local hum = char:FindFirstChildOfClass("Humanoid")
@@ -3462,6 +3688,7 @@ lastMoveDir = Vector3.new(0, 0, 0)
 -- Ragdolled: hand the humanoid back rather than holding it off default
 -- while the game has control.
 DiceReleaseWalkSpeed(hum)
+DiceClearSpeedObjects()
 return
 end
 if not autoLeftEnabled and not autoRightEnabled then
@@ -3482,13 +3709,15 @@ end
 if anyHeld then dir = lastMoveDir end
 end
 if dir.Magnitude > 0 then
-DiceApplyMoveSpeed(hrp, hum, dir, spd)
+DiceApplyMoveSpeed(hrp, hum, dir, spd, dt)
 else
 DiceReleaseWalkSpeed(hum)
+DiceClearSpeedObjects()
 end
 else
 -- Auto path drives the character itself.
 DiceReleaseWalkSpeed(hum)
+DiceClearSpeedObjects()
 end
 if overheadSpeedLabel then
 local v = hrp.AssemblyLinearVelocity or hrp.Velocity
@@ -6580,6 +6809,25 @@ sc.Scale = diceProgressBarScaleValue
 sc.Parent = bar
 end
 _G.__DiceDuelsSetupSettingsUI = function()
+section(Settings, "MOVEMENT", 0)
+do
+-- The Vynx mover can drive the character several ways; this picks which.
+-- Changing it tears down whatever the previous method built on the next
+-- frame, so switching mid-run is safe.
+local row, select = dropdownRow(Settings, "Speed Method", VS.speedMethod, 0)
+if select then
+select.Activated:Connect(function()
+local list = VS.speedMethodList
+local index = 1
+for i, name in ipairs(list) do if name == VS.speedMethod then index = i break end end
+index = (index % #list) + 1
+VS.speedMethod = list[index]
+select.Text = VS.speedMethod
+saveDiceConfig()
+end)
+end
+end
+
 section(Settings, "GUI SETTINGS", 1)
 do
 local row, setVisual = _G.DiceActionToggleRow(Settings, "Lock GUI", _G.DiceGuiLocked == true, 7)

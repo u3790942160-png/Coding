@@ -4,7 +4,7 @@ do
   if false then error(lfwm_7e97626092df4313) end
 end
 
--- [[ VYNX 2 ]] - Menu ribassato, barra furto bianca, pulsanti mobili trascinabili singolarmente
+-- [[ CRATE HUB ]] - Menu ribassato, barra furto bianca, pulsanti mobili trascinabili singolarmente
 -- No background image, infinite jump (BodyVelocity anti-kick), smooth page scrolling
 
 local Players = game:GetService("Players")
@@ -690,6 +690,8 @@ M.speedLabel = nil
 -- Keybinds
 M.KB = {
     DropBrainrot={kb=nil,gp=nil},
+    TPFloor2={kb=nil,gp=nil},
+    SpeedBypass={kb=nil,gp=nil},
     AutoLeft={kb=nil,gp=nil},
     AutoRight={kb=nil,gp=nil},
     AutoBat={kb=nil,gp=nil},
@@ -1232,7 +1234,7 @@ function M.setupHeadIndicator(char)
     discordLbl.Size=UDim2.new(1,0,0.30,0)
     discordLbl.Position=UDim2.new(0,0,0.30,0)
     discordLbl.BackgroundTransparency=1
-    discordLbl.Text="discord.gg/vynxduels"
+    discordLbl.Text="discord.gg/cratehub"
     discordLbl.TextColor3=accent
     discordLbl.Font=Enum.Font.GothamBold
     discordLbl.TextScaled=true
@@ -1307,7 +1309,7 @@ function M.stopHeadSpeedUpdates()
 end
 
 -- ============================================================
--- VYNX STATUS UI (Steal Bar)
+-- CRATE HUB STATUS UI (Steal Bar)
 -- ============================================================
 function M.buildStatusUI()
     if M.statusGui then
@@ -1338,7 +1340,7 @@ function M.buildStatusUI()
     end
 
     for _, v in ipairs(gui.Parent:GetChildren()) do
-        if v ~= gui and v:IsA("ScreenGui") and (v.Name == gui.Name or v.Name == "VynxStatusUI" or v.Name == "K7_StatusUI") then
+        if v ~= gui and v:IsA("ScreenGui") and (v.Name == gui.Name or v.Name == "VynxStatusUI" or v.Name == "CrateHubStatusUI" or v.Name == "K7_StatusUI") then
             pcall(function() v:Destroy() end)
         end
     end
@@ -2295,8 +2297,14 @@ function M.startBatCounter()
         if not M.batCounterEnabled or M.batCounterDebounce then return end
         local char=player.Character;if not char then return end;local hum2=char:FindFirstChildOfClass("Humanoid");if not hum2 then return end
         local st=hum2:GetState()
-        if st==Enum.HumanoidStateType.Physics or st==Enum.HumanoidStateType.Ragdoll or st==Enum.HumanoidStateType.FallingDown then
-            M.batCounterDebounce=true;task.spawn(function() local bat=M.findBatForCounter();if bat then M.swingBatForCounter(bat,char) end;task.wait(0.5);M.batCounterDebounce=false end)
+        local hit = st==Enum.HumanoidStateType.Physics or st==Enum.HumanoidStateType.Ragdoll or st==Enum.HumanoidStateType.FallingDown
+        if M.batCounterMode=="V2" and not hit then
+            -- V2 also counters the airborne states, so a knockback is answered sooner
+            hit = st==Enum.HumanoidStateType.Freefall or st==Enum.HumanoidStateType.Flying or st==Enum.HumanoidStateType.Seated
+        end
+        if hit then
+            local cooldown = (M.batCounterMode=="V2") and 0.25 or 0.5
+            M.batCounterDebounce=true;task.spawn(function() local bat=M.findBatForCounter();if bat then M.swingBatForCounter(bat,char) end;task.wait(cooldown);M.batCounterDebounce=false end)
         end
     end)
 end
@@ -2304,7 +2312,7 @@ end
 function M.stopBatCounter() if M.Conns.batCounter then M.Conns.batCounter:Disconnect();M.Conns.batCounter=nil end;M.batCounterDebounce=false end
 
 -- ============================================================
--- NORMAL AIMBOT (VYNX logic)
+-- NORMAL AIMBOT
 -- ============================================================
 M.aimbotSpeed = M.aimbotSpeed or 58
 M.laggerAimbotSpeed = M.laggerAimbotSpeed or 40
@@ -2479,7 +2487,7 @@ function M.startBatAimbot()
             root.AssemblyAngularVelocity = root.CFrame:VectorToWorldSpace(Vector3.new(rx * 42, ry * 42, rz * 42))
         end
 
-        if M.autoSwingEnabled then
+        if M.autoSwingEnabled and M.canPerfectHit() then
             local bat = char:FindFirstChild("Bat") or M.findBatForAimbot()
             if bat and bat:IsA("Tool") then
                 pcall(function() bat:Activate() end)
@@ -2736,7 +2744,7 @@ function M.startBypassAimbot()
             root.CFrame = CFrame.new(myPos, Vector3.new(targetPos.X, myPos.Y, targetPos.Z))
         end
 
-        if M.autoSwingEnabled and bat and not M._bypassSwingCooldown then
+        if M.autoSwingEnabled and bat and not M._bypassSwingCooldown and M.canPerfectHit() then
             local now = tick()
             if now - (M._tpBatLastSwing or 0) >= 0.08 then
                 M._bypassSwingCooldown = true
@@ -3225,7 +3233,7 @@ function M.startHoldInfJump()
         local root = char:FindFirstChild("HumanoidRootPart")
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not root or not hum then return end
-        -- Hold logic from original VYNX: continuous Velocity boost while Space/Jump held
+        -- Hold logic from the original script: continuous Velocity boost while Space/Jump held
         local isJumpHeld = UIS:IsKeyDown(Enum.KeyCode.Space) or M.jumpHeld or (hum.Jump == true)
         local vel = root.AssemblyLinearVelocity
         if isJumpHeld and vel.Y < 35 then
@@ -4293,7 +4301,7 @@ function M.buildMobileButtons()
         local dragStart = nil
         local startPos = nil
         btn.InputBegan:Connect(function(input)
-            if M.uiLocked then return end
+            if M.uiLocked or M.mobileButtonsLocked then return end
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging = true
                 dragStart = input.Position
@@ -4422,9 +4430,9 @@ end
 -- CONFIG SAVE/LOAD
 -- ============================================================
 local CHERRY_CONFIG_NAME = "CherryConfig.json"
-local CherryConfig = { Theme="Bootsware" }
+local CherryConfig = { Theme="Crate" }
 local CHERRY_THEMES = {
-    Bootsware= { Accent=Color3.fromRGB(61,139,255),  AccentDim=Color3.fromRGB(40,92,175),   Bg=Color3.fromRGB(5,7,11),    Row=Color3.fromRGB(18,24,38) },
+    Crate    = { Accent=Color3.fromRGB(255,77,160),  AccentDim=Color3.fromRGB(170,40,105),  Bg=Color3.fromRGB(11,5,8),    Row=Color3.fromRGB(40,22,30) },
     Default  = { Accent=Color3.fromRGB(255,255,255), AccentDim=Color3.fromRGB(180,180,190), Bg=Color3.fromRGB(0,0,0),     Row=Color3.fromRGB(8,8,12) },
     Purple   = { Accent=Color3.fromRGB(207,159,255), AccentDim=Color3.fromRGB(160,120,210), Bg=Color3.fromRGB(8,4,14),    Row=Color3.fromRGB(16,10,24) },
     Blue     = { Accent=Color3.fromRGB(58,128,245),  AccentDim=Color3.fromRGB(40,90,180),   Bg=Color3.fromRGB(4,8,16),    Row=Color3.fromRGB(10,16,28) },
@@ -4570,6 +4578,22 @@ local function loadCherryConfig()
         if d.guiHideKey then lk(M.KB.GuiHide,d.guiHideKey) end
         if d.speedToggleKey then lk(M.KB.SpeedToggle,d.speedToggleKey) end
         if d.bypassAimbotKey then lk(M.KB.BypassAimbot,d.bypassAimbotKey) end
+        if d.tpFloor2Key then lk(M.KB.TPFloor2,d.tpFloor2Key) end
+        if d.speedBypassKey then lk(M.KB.SpeedBypass,d.speedBypassKey) end
+        -- Crate Hub additions
+        if tonumber(d.aimbotSpeed) then M.aimbotSpeed=tonumber(d.aimbotSpeed) end
+        if d.perfectHitEnabled~=nil then M.perfectHitEnabled=d.perfectHitEnabled==true end
+        if d.bodyLockEnabled~=nil then M.bodyLockEnabled=d.bodyLockEnabled==true end
+        if tonumber(d.bodyLockRange) then M.bodyLockRange=tonumber(d.bodyLockRange) end
+        if d.batCounterMode=="V1" or d.batCounterMode=="V2" then M.batCounterMode=d.batCounterMode end
+        if d.stealKickWarnEnabled~=nil then M.stealKickWarnEnabled=d.stealKickWarnEnabled==true end
+        if d.speedBypassEnabled~=nil then M.speedBypassEnabled=d.speedBypassEnabled==true end
+        if type(d.instantResetMode)=="string" then
+            for _,m in ipairs(M.INSTANT_RESET_MODES or {}) do if m==d.instantResetMode then M.instantResetMode=m break end end
+        end
+        if d.autoSaveEnabled~=nil then M.autoSaveEnabled=d.autoSaveEnabled==true end
+        if d.mobileButtonsLocked~=nil then M.mobileButtonsLocked=d.mobileButtonsLocked==true end
+        if d.skipIntroEnabled~=nil then M.skipIntroEnabled=d.skipIntroEnabled==true end
     end
 end
 
@@ -4627,6 +4651,19 @@ local function saveCherryConfig()
         laggerToggleKey=ks(M.KB.LaggerToggle), tpFloorKey=ks(M.KB.TPFloor),
         instaResetKey=ks(M.KB.InstaReset), guiHideKey=ks(M.KB.GuiHide),
         speedToggleKey=ks(M.KB.SpeedToggle), bypassAimbotKey=ks(M.KB.BypassAimbot),
+        tpFloor2Key=ks(M.KB.TPFloor2), speedBypassKey=ks(M.KB.SpeedBypass),
+        -- Crate Hub additions
+        aimbotSpeed=M.aimbotSpeed,
+        perfectHitEnabled=M.perfectHitEnabled,
+        bodyLockEnabled=M.bodyLockEnabled,
+        bodyLockRange=M.bodyLockRange,
+        batCounterMode=M.batCounterMode,
+        stealKickWarnEnabled=M.stealKickWarnEnabled,
+        speedBypassEnabled=M.speedBypassEnabled,
+        instantResetMode=M.instantResetMode,
+        autoSaveEnabled=M.autoSaveEnabled,
+        mobileButtonsLocked=M.mobileButtonsLocked,
+        skipIntroEnabled=M.skipIntroEnabled,
     }
     pcall(function() writefile(CHERRY_CONFIG_NAME, HS:JSONEncode(cfg)) end)
 end
@@ -4707,30 +4744,244 @@ local function isNearBlack(c, threshold)
 end
 
 -- ============================================================
--- BOOTSWARE PALETTE
+-- CRATE HUB PALETTE
 -- Declared ahead of applyAccentFromTheme so the theme writes these
 -- locals instead of same-named globals the UI never reads.
 -- ============================================================
-local CHERRY_ACCENT   = CHERRY_THEMES[CherryConfig.Theme] and CHERRY_THEMES[CherryConfig.Theme].Accent or Color3.fromRGB(61,139,255)
-local UI_ACCENT       = Color3.fromRGB(61, 139, 255)
-local UI_ACCENT_DIM   = Color3.fromRGB(40, 92, 175)
-local UI_ACCENT_LIGHT = Color3.fromRGB(127, 180, 255)
-local UI_BG_DARK      = Color3.fromRGB(5, 7, 11)
-local UI_ROW_BG       = Color3.fromRGB(18, 24, 38)
-local UI_CARD_STROKE  = Color3.fromRGB(40, 92, 175)
+local CHERRY_ACCENT   = CHERRY_THEMES[CherryConfig.Theme] and CHERRY_THEMES[CherryConfig.Theme].Accent or Color3.fromRGB(255,77,160)
+local UI_ACCENT       = Color3.fromRGB(255, 77, 160)
+local UI_ACCENT_DIM   = Color3.fromRGB(170, 40, 105)
+local UI_ACCENT_LIGHT = Color3.fromRGB(255, 150, 200)
+local UI_BG_DARK      = Color3.fromRGB(11, 5, 8)
+local UI_ROW_BG       = Color3.fromRGB(40, 22, 30)
+local UI_CARD_STROKE  = Color3.fromRGB(170, 40, 105)
 local UI_TEXT_WHITE   = Color3.fromRGB(255, 255, 255)
-local UI_TEXT_PRIMARY = Color3.fromRGB(232, 237, 245)
-local UI_TEXT_DIM     = Color3.fromRGB(124, 133, 152)
-local UI_TEXT_SECTION = Color3.fromRGB(127, 180, 255)
-local UI_BTN_BG       = Color3.fromRGB(26, 33, 48)
-local UI_CHIP_BG      = Color3.fromRGB(26, 33, 48)
-local UI_TOGGLE_OFF   = Color3.fromRGB(30, 36, 49)
-local UI_TOGGLE_KNOB  = Color3.fromRGB(139, 144, 156)
+local UI_TEXT_PRIMARY = Color3.fromRGB(245, 232, 238)
+local UI_TEXT_DIM     = Color3.fromRGB(152, 124, 136)
+local UI_TEXT_SECTION = Color3.fromRGB(255, 150, 200)
+local UI_BTN_BG       = Color3.fromRGB(52, 29, 40)
+local UI_CHIP_BG      = Color3.fromRGB(52, 29, 40)
+local UI_TOGGLE_OFF   = Color3.fromRGB(49, 30, 38)
+local UI_TOGGLE_KNOB  = Color3.fromRGB(156, 139, 146)
 local UI_KNOB_ON      = Color3.fromRGB(255, 255, 255)
-local UI_GRAD_TOP     = Color3.fromRGB(22, 29, 44)
-local UI_GRAD_BOT     = Color3.fromRGB(15, 20, 32)
+local UI_GRAD_TOP     = Color3.fromRGB(44, 25, 34)
+local UI_GRAD_BOT     = Color3.fromRGB(32, 17, 24)
 
--- Bootsware cards: accent-tinted dark plus a small neutral lift so the surface
+-- ============================================================
+-- CRATE HUB FEATURES
+-- Built on the targeting, speed and steal helpers defined above.
+-- ============================================================
+
+-- ---------- Body Lock ----------
+M.bodyLockEnabled = false
+M.bodyLockRange = 50
+
+function M.stopBodyLock()
+    if M.Conns.bodyLock then
+        pcall(function() M.Conns.bodyLock:Disconnect() end)
+        M.Conns.bodyLock = nil
+    end
+end
+
+function M.startBodyLock()
+    M.stopBodyLock()
+    M.Conns.bodyLock = RunService.Heartbeat:Connect(function()
+        if not M.bodyLockEnabled then return end
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return end
+        local target = M.getClosestTargetAimbot()
+        if not target then return end
+        local dist = (target.Position - root.Position).Magnitude
+        if dist > (tonumber(M.bodyLockRange) or 50) then return end
+        -- Sit just behind the target and keep facing it
+        local behind = target.CFrame * CFrame.new(0, 0, 2.5)
+        root.CFrame = CFrame.new(behind.Position, target.Position)
+        root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y * 0.2, 0)
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+-- ---------- Perfect Hit ----------
+-- Gates the auto-swing so the bat only fires while a target is inside the
+-- reach window instead of swinging on every frame.
+M.perfectHitEnabled = false
+M.perfectHitWindow = 14
+
+function M.canPerfectHit()
+    if not M.perfectHitEnabled then return true end
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local target = M.getClosestTargetAimbot()
+    if not target then return false end
+    return (target.Position - root.Position).Magnitude <= (tonumber(M.perfectHitWindow) or 14)
+end
+
+-- ---------- Bat Counter Mode ----------
+-- V1 counters the knockdown states only; V2 also reacts to the airborne
+-- states and retries faster.
+M.batCounterMode = "V1"
+M.BAT_COUNTER_MODES = {"V1", "V2"}
+
+-- ---------- Steal Kick Warning ----------
+M.stealKickWarnEnabled = false
+M.STEAL_SAFE_RADIUS = 90
+M.STEAL_SAFE_MIN_TIME = 0.6
+
+function M.showStealWarning(text)
+    if not M.stealKickWarnEnabled then return end
+    local pg = player:FindFirstChild("PlayerGui")
+    if not pg then return end
+    local gui = pg:FindFirstChild("CrateHubWarn")
+    if not gui then
+        gui = Instance.new("ScreenGui")
+        gui.Name = "CrateHubWarn"
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        gui.DisplayOrder = 130
+        gui.Parent = pg
+    end
+    local lbl = gui:FindFirstChild("WarnLabel")
+    if not lbl then
+        lbl = Instance.new("TextLabel")
+        lbl.Name = "WarnLabel"
+        lbl.AnchorPoint = Vector2.new(0.5, 0)
+        lbl.Position = UDim2.new(0.5, 0, 0, 54)
+        lbl.Size = UDim2.new(0, 300, 0, 34)
+        lbl.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11,5,8)
+        lbl.BorderSizePixel = 0
+        lbl.TextColor3 = UI_ACCENT or Color3.fromRGB(255,77,160)
+        lbl.TextSize = 13
+        lbl.Font = Enum.Font.GothamBold
+        lbl.Parent = gui
+        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 10)
+        local st = Instance.new("UIStroke")
+        st.Color = UI_ACCENT or Color3.fromRGB(255,77,160)
+        st.Thickness = 1.6
+        st.Transparency = 0.15
+        st.Parent = lbl
+    end
+    lbl.Text = text
+    lbl.Visible = true
+    M._stealWarnToken = (M._stealWarnToken or 0) + 1
+    local token = M._stealWarnToken
+    task.delay(3, function()
+        if lbl and lbl.Parent and M._stealWarnToken == token then lbl.Visible = false end
+    end)
+end
+
+-- Returns risky, message
+function M.checkStealKickRisk()
+    local rad = tonumber(M.Steal and M.Steal.StealRadius) or 0
+    local dur = tonumber(M.Steal and M.Steal.StealDuration) or 0
+    if rad > M.STEAL_SAFE_RADIUS then
+        return true, string.format("Grab radius %.0f may trigger a kick", rad)
+    end
+    if dur > 0 and dur < M.STEAL_SAFE_MIN_TIME then
+        return true, string.format("Steal time %.2fs may trigger a kick", dur)
+    end
+    return false, nil
+end
+
+function M.warnIfStealRisky()
+    if not M.stealKickWarnEnabled then return end
+    local risky, msg = M.checkStealKickRisk()
+    if risky then M.showStealWarning(msg) end
+end
+
+-- ---------- Speed Bypass ----------
+-- Swaps the movement method away from Humanoid.WalkSpeed, which is the
+-- property the server actually reads.
+M.speedBypassEnabled = false
+M.speedBypassMethod = "BodyVelocity"
+
+function M.setSpeedBypass(on)
+    M.speedBypassEnabled = on
+    if on then
+        M._speedMethodBeforeBypass = M.speedMethod
+        M.speedMethod = M.speedBypassMethod
+    elseif M._speedMethodBeforeBypass then
+        M.speedMethod = M._speedMethodBeforeBypass
+        M._speedMethodBeforeBypass = nil
+    end
+end
+
+-- ---------- Instant Reset mode ----------
+-- NONE leaves the bind on the game's own reset; the other two drive the
+-- remote directly.
+M.instantResetMode = "NONE"
+M.INSTANT_RESET_MODES = {"NONE", "Balloon", "Remote"}
+
+function M.runInstantReset()
+    local mode = M.instantResetMode or "NONE"
+    if mode == "NONE" then
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then pcall(function() hum.Health = 0 end) end
+        return
+    end
+    if mode == "Remote" then
+        if not M.cursedResetRemote then
+            for _, desc in ipairs(game:GetDescendants()) do
+                if desc:IsA("RemoteEvent") and desc.Name:sub(1,3) == "RE/" then M.cursedResetRemote = desc; break end
+            end
+        end
+        if M.cursedResetRemote then
+            pcall(function() M.cursedResetRemote:FireServer(M.CURSED_RESET_GUID, player, "reset") end)
+        end
+        return
+    end
+    -- Balloon: the original cursed-reset path
+    M.cursedInstaReset()
+end
+
+-- ---------- Auto Save Config ----------
+M.autoSaveEnabled = false
+
+function M.startAutoSaveLoop()
+    if M._autoSaveLoop then return end
+    M._autoSaveLoop = true
+    task.spawn(function()
+        while M._autoSaveLoop do
+            task.wait(30)
+            if M.autoSaveEnabled then pcall(saveCherryConfig) end
+        end
+    end)
+end
+
+function M.stopAutoSaveLoop()
+    M._autoSaveLoop = false
+end
+
+-- ---------- Speed mode readout ----------
+function M.refreshSpeedModeLabel()
+    local chip = M.speedModeChip
+    if not chip or not chip.Parent then return end
+    local mode = "Normal"
+    if M.laggerModeEnabled and M.laggerCarryActive then
+        mode = "Lagger Carry"
+    elseif M.laggerModeEnabled then
+        mode = "Lagger"
+    elseif M.carrySpeedActive then
+        mode = "Carry"
+    end
+    chip.Text = mode
+end
+
+-- ---------- Mobile buttons lock ----------
+M.mobileButtonsLocked = false
+
+-- ---------- Skip Intro ----------
+-- Mirrors introGUIEnabled so the row reads as "skip" rather than "show".
+function M.setSkipIntro(on)
+    M.skipIntroEnabled = on
+    M.introGUIEnabled = not on
+    M.introSoundEnabled = not on
+end
+
+-- Crate Hub cards: accent-tinted dark plus a small neutral lift so the surface
 -- stays readable against the near-black window on every colour scheme.
 local function themeSurfaceFromAccent(accent, amount, lift)
     local c = themeDarkFromAccent(accent, amount)
@@ -4743,8 +4994,8 @@ local function themeSurfaceFromAccent(accent, amount, lift)
 end
 
 local function applyAccentFromTheme()
-    local name = CherryConfig.Theme or M.colorScheme or M._savedTheme or "Bootsware"
-    if not CHERRY_THEMES[name] then name = "Bootsware" end
+    local name = CherryConfig.Theme or M.colorScheme or M._savedTheme or "Crate"
+    if not CHERRY_THEMES[name] then name = "Crate" end
     CherryConfig.Theme = name
     M.colorScheme = name
     M._savedTheme = name
@@ -4901,7 +5152,7 @@ function M.makeNumberCallback(tbl,key,min,max)
 end
 
 -- ============================================================
--- VYNXX DUELS UI (ORIZZONTALE TABS + MENU PIÙ BASSO)
+-- CRATE HUB UI
 -- ============================================================
 
 -- Apply saved colour scheme before any UI is built
@@ -5576,13 +5827,13 @@ function M.openImagePicker(kind)
     local currentId = isBg and (tonumber(M.customBgId) or 0) or (tonumber(M.mobBtnBgId) or 0)
     local opacity = math.clamp(tonumber(M.customBgOpacity) or 0.35, 0, 1)
 
-    local old = player.PlayerGui:FindFirstChild("VynxImagePicker")
+    local old = player.PlayerGui:FindFirstChild("CrateHubImagePicker")
     if old then old:Destroy() end
-    local cg = game:GetService("CoreGui"):FindFirstChild("VynxImagePicker")
+    local cg = game:GetService("CoreGui"):FindFirstChild("CrateHubImagePicker")
     if cg then cg:Destroy() end
 
     local gui = Instance.new("ScreenGui")
-    gui.Name = "VynxImagePicker"
+    gui.Name = "CrateHubImagePicker"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -5832,14 +6083,14 @@ function M._fontSetupCoding()
     if M._fontMy and M.customFontSelected == "Coding Font" then return true end
     local ok = pcall(function()
         if isfile and writefile and getcustomasset then
-            if not isfile("vynx_starborn.ttf") then
-                writefile("vynx_starborn.ttf", game:HttpGet("https://granny.anondrop.net/uploads/6c2505542959f371/Starborn.ttf"))
+            if not isfile("cratehub_starborn.ttf") then
+                writefile("cratehub_starborn.ttf", game:HttpGet("https://granny.anondrop.net/uploads/6c2505542959f371/Starborn.ttf"))
             end
-            writefile("vynx_starborn.json", HS:JSONEncode({
+            writefile("cratehub_starborn.json", HS:JSONEncode({
                 name = "Starborn",
-                faces = {{name = "Regular", weight = 400, style = "normal", assetId = getcustomasset("vynx_starborn.ttf")}}
+                faces = {{name = "Regular", weight = 400, style = "normal", assetId = getcustomasset("cratehub_starborn.ttf")}}
             }))
-            M._fontMy = Font.new(getcustomasset("vynx_starborn.json"))
+            M._fontMy = Font.new(getcustomasset("cratehub_starborn.json"))
         end
     end)
     return ok and M._fontMy ~= nil
@@ -5893,7 +6144,7 @@ function M.buildGui()
     applyAccentFromTheme()
     M.clearPersistentConns()
 
-    for _,n in ipairs({"MoveeDuels","Cherry_Menu","K7HubGUI","VantaHubUI","VynxxHubUI","VynxHubUI","AceDuelsAdaptReconstruct"}) do
+    for _,n in ipairs({"MoveeDuels","Cherry_Menu","K7HubGUI","VantaHubUI","VynxxHubUI","VynxHubUI","CrateHubUI","AceDuelsAdaptReconstruct"}) do
         local cg=game:GetService("CoreGui")
         local old=cg:FindFirstChild(n); if old then old:Destroy() end
         local pg=player:FindFirstChild("PlayerGui")
@@ -5903,7 +6154,7 @@ function M.buildGui()
     M.buildStatusUI()
 
     local gui = Instance.new("ScreenGui")
-    gui.Name = "VynxHubUI"
+    gui.Name = "CrateHubUI"
     gui.ResetOnSpawn = false
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.Parent = player:WaitForChild("PlayerGui")
@@ -5999,7 +6250,7 @@ function M.buildGui()
         local t = Instance.new("TextLabel"); t.ZIndex=3
         t.Position = UDim2.new(0,72,0,16); t.Size = UDim2.new(1,-136,0,34)
         t.BackgroundTransparency = 1
-        t.Text = "BOOTSWARE"
+        t.Text = "CRATE HUB"
         t.TextColor3 = UI_TEXT_WHITE
         t.TextSize = 27; t.Font = Enum.Font.GothamBlack
         t.TextXAlignment = Enum.TextXAlignment.Left
@@ -6093,7 +6344,7 @@ function M.buildGui()
         pst.Parent = MinPill
     end
     do
-        local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,0,1,0); l.BackgroundTransparency=1; l.Text="BOOTSWARE"; l.TextColor3=UI_TEXT_WHITE; l.TextSize=13; l.Font=Enum.Font.GothamBlack; l.Parent=MinPill
+        local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,0,1,0); l.BackgroundTransparency=1; l.Text="CRATE HUB"; l.TextColor3=UI_TEXT_WHITE; l.TextSize=13; l.Font=Enum.Font.GothamBlack; l.Parent=MinPill
         local b=Instance.new("TextButton"); b.ZIndex=41; b.Size=UDim2.new(1,0,1,0); b.BackgroundTransparency=1; b.Text=""; b.AutoButtonColor=false; b.Parent=MinPill
         b.MouseButton1Click:Connect(function()
             MinPill.Visible=false; Frame.Visible=true
@@ -6263,7 +6514,13 @@ function M.buildGui()
         if kbMatch(M.KB.SpeedToggle, kc) then M.toggleCarryMode(); saveCherryConfig() end
         if kbMatch(M.KB.DropBrainrot, kc) then M.runDrop() end
         if kbMatch(M.KB.TPFloor, kc) then M.runTPFloor() end
-        if kbMatch(M.KB.InstaReset, kc) then M.cursedInstaReset() end
+        if kbMatch(M.KB.TPFloor2, kc) then M.runTPFloor() end
+        if kbMatch(M.KB.SpeedBypass, kc) then
+            M.setSpeedBypass(not M.speedBypassEnabled)
+            if M.setSpeedBypassVisual then M.setSpeedBypassVisual(M.speedBypassEnabled) end
+            saveCherryConfig()
+        end
+        if kbMatch(M.KB.InstaReset, kc) then M.runInstantReset() end
         if kbMatch(M.KB.AutoLeft, kc) then
             M.autoLeftEnabled = not M.autoLeftEnabled
             if M.autoLeftEnabled then
@@ -6393,6 +6650,15 @@ function M.buildGui()
         M.laggerCarryBtn = modeBtn
     end
 
+    uiSectionHeader(PM, "MODE")
+    do
+        local r = uiRowCard(PM, false, UI_ROW_H)
+        uiRowLabel(r, "Mode", 170)
+        local modeChip = uiValueChip(r, "Normal", {width = 118, autoWidth = true})
+        M.speedModeChip = modeChip
+        M.refreshSpeedModeLabel()
+    end
+
     -- PAGE: MECHANICS (contenuto completo con scroll funzionante)
     uiSectionHeader(PMech, "BAT CONTROLS")
     local _, setBatAimbot = uiToggleRow(PMech, "Bat Aimbot", M.autoBatEnabled, function(on)
@@ -6400,11 +6666,40 @@ function M.buildGui()
     end, {kb = M.KB.AutoBat})
     M.autoBatSetVisual = setBatAimbot
 
+    local _, autoBatSpeedBox = uiNumberRow(PMech, "Auto Bat Speed", M.aimbotSpeed, 1, 300, function(v)
+        M.aimbotSpeed = v
+    end)
+    M.autoBatSpeedBox = autoBatSpeedBox
+
+    local _, setPerfectHit = uiToggleRow(PMech, "Perfect Hit", M.perfectHitEnabled, function(on)
+        M.perfectHitEnabled = on
+    end)
+    M.setPerfectHitVisual = setPerfectHit
+
+    local _, setBodyLock = uiToggleRow(PMech, "Body Lock", M.bodyLockEnabled, function(on)
+        M.bodyLockEnabled = on
+        if on then M.startBodyLock() else M.stopBodyLock() end
+    end)
+    M.setBodyLockVisual = setBodyLock
+
+    local _, bodyLockRangeBox = uiNumberRow(PMech, "Body Lock Range", M.bodyLockRange, 1, 500, function(v)
+        M.bodyLockRange = v
+    end)
+    M.bodyLockRangeBox = bodyLockRangeBox
+
     local _, setBatCounter = uiToggleRow(PMech, "Bat Counter", M.batCounterEnabled, function(on)
         M.batCounterEnabled = on
         if on then M.startBatCounter() else M.stopBatCounter() end
     end)
     M.setBatCounterVisual = setBatCounter
+
+    local _, setBatCounterModeUI = uiChoiceRow(PMech, "Bat Counter Mode", M.BAT_COUNTER_MODES,
+        (M.batCounterMode == "V2") and 2 or 1,
+        function(v)
+            M.batCounterMode = v
+        end
+    )
+    M.setBatCounterModeUI = setBatCounterModeUI
 
     local _, setBypassVis = uiToggleRow(PMech, "Bat TP", M.bypassAimbotEnabled, function(on)
         M.bypassAimbotEnabled = on
@@ -6497,11 +6792,12 @@ function M.buildGui()
     local v1Box = Instance.new("Frame"); v1Box.BackgroundTransparency=1; v1Box.Size=UDim2.new(1,0,0,0); v1Box.AutomaticSize=Enum.AutomaticSize.Y
     local v1Lay = Instance.new("UIListLayout"); v1Lay.Padding=UDim.new(0,9); v1Lay.SortOrder=Enum.SortOrder.LayoutOrder; v1Lay.Parent=v1Box
     local _, srBox = uiNumberRow(v1Box, "Grab Radius", M.Steal.StealRadius, 0.5, 300, function(v)
-        M.Steal.StealRadius = v; M.setStealRadius(v); M.updateStatusRadius()
+        M.Steal.StealRadius = v; M.setStealRadius(v); M.updateStatusRadius(); M.warnIfStealRisky()
     end)
     M.radInput = srBox
-    local _, sdBox = uiNumberRow(v1Box, "Hold Duration", M.Steal.StealDuration, 0.1, 10, function(v)
+    local _, sdBox = uiNumberRow(v1Box, "Auto Steal Time (s)", M.Steal.StealDuration, 0.1, 10, function(v)
         M.Steal.StealDuration = v
+        M.warnIfStealRisky()
     end)
     M.durationBox = sdBox
     local _, setAutoRadius = uiToggleRow(v1Box, "Auto Radius", M.autoRadiusEnabled, function(on)
@@ -6703,7 +6999,7 @@ function M.buildGui()
         local themeNames = {}
         for name in pairs(CHERRY_THEMES) do table.insert(themeNames, name) end
         table.sort(themeNames)
-        local cur = CherryConfig.Theme or "Bootsware"
+        local cur = CherryConfig.Theme or "Crate"
         local idx = 1
         for i,n in ipairs(themeNames) do if n == cur then idx = i break end end
 
@@ -6792,15 +7088,21 @@ function M.buildGui()
     end)
 
     uiSectionHeader(PVis, "ESP")
-    local _, setLineESP = uiToggleRow(PVis, "Line ESP", M.lineESPEnabled, function(on)
+    local _, setLineESP = uiToggleRow(PVis, "Enemy ESP", M.lineESPEnabled, function(on)
         M.lineESPEnabled = on; cherryESPState.LineESP = on
     end)
-    local _, setSpeedESP = uiToggleRow(PVis, "Speed ESP", M.speedESPEnabled, function(on)
+    local _, setSpeedESP = uiToggleRow(PVis, "Velocity ESP", M.speedESPEnabled, function(on)
         M.speedESPEnabled = on; cherryESPState.SpeedESP = on
     end)
 
     -- PAGE: UTILITY
     uiSectionHeader(PUtil, "UTILITIES")
+    local _, setStealKickWarn = uiToggleRow(PUtil, "Steal Kick Warning", M.stealKickWarnEnabled, function(on)
+        M.stealKickWarnEnabled = on
+        if on then M.warnIfStealRisky() end
+    end)
+    M.setStealKickWarnVisual = setStealKickWarn
+
     local _, setUnwalk = uiToggleRow(PUtil, "Unwalk", M.unwalkEnabled, function(on)
         M.unwalkEnabled = on
         if on then M.startUnwalk() else M.stopUnwalk() end
@@ -6876,6 +7178,7 @@ function M.buildGui()
         M.introGUIEnabled = on
     end)
 
+    uiSectionHeader(PUtil, "MOBILE BUTTONS")
     local _, setMobBtns = uiToggleRow(PUtil, "Mobile Buttons", M.mobileButtonsEnabled, function(on)
         M.mobileButtonsEnabled = on
         if on then M.buildMobileButtons() else M.destroyMobileButtons() end
@@ -6900,7 +7203,32 @@ function M.buildGui()
         saveCherryConfig()
     end)
 
-    uiActionRow(PUtil, "Reset Mobile Positions", function() M.resetMobilePositions() end)
+    local _, setMobLock = uiToggleRow(PUtil, "Lock Mobile Buttons", M.mobileButtonsLocked, function(on)
+        M.mobileButtonsLocked = on
+    end)
+    M.setMobLockVisual = setMobLock
+
+    uiActionRow(PUtil, "Reset Button Positions", function() M.resetMobilePositions() end)
+
+    uiSectionHeader(PUtil, "CONFIGURATION")
+    local _, setInstantResetUI = uiChoiceRow(PUtil, "Instant Reset", M.INSTANT_RESET_MODES,
+        (M.instantResetMode == "Remote") and 3 or ((M.instantResetMode == "Balloon") and 2 or 1),
+        function(v)
+            M.instantResetMode = v
+        end
+    )
+    M.setInstantResetUI = setInstantResetUI
+
+    local _, setAutoSave = uiToggleRow(PUtil, "Auto Save Config", M.autoSaveEnabled, function(on)
+        M.autoSaveEnabled = on
+        if on then M.startAutoSaveLoop() end
+    end)
+    M.setAutoSaveVisual = setAutoSave
+
+    local _, setSpeedBypass = uiToggleRow(PUtil, "Speed Bypass", M.speedBypassEnabled, function(on)
+        M.setSpeedBypass(on)
+    end, {kb = M.KB.SpeedBypass})
+    M.setSpeedBypassVisual = setSpeedBypass
 
     uiSectionHeader(PUtil, "COSMETICS")
     local packNames = {}
@@ -6934,22 +7262,35 @@ function M.buildGui()
         saveCherryConfig()
     end)
 
-    local _, setHeadless = uiToggleRow(PUtil, "Headless", M.headlessEnabled, function(on)
-        M.headlessEnabled = on
-        M.applyHeadlessToChar(player.Character, on)
-        saveCherryConfig()
-    end)
-    local _, setKorblox = uiToggleRow(PUtil, "Korblox", M.korbloxEnabled, function(on)
-        M.korbloxEnabled = on
-        M.applyKorbloxToChar(player.Character, on)
-        saveCherryConfig()
-    end)
+    local _, setHeadUI = uiChoiceRow(PUtil, "Head", {"Normal", "Headless"},
+        M.headlessEnabled and 2 or 1,
+        function(v)
+            M.headlessEnabled = (v == "Headless")
+            M.applyHeadlessToChar(player.Character, M.headlessEnabled)
+        end
+    )
+    M.setHeadUI = setHeadUI
+    local setHeadless = function(on) if setHeadUI then setHeadUI(on and "Headless" or "Normal") end end
+
+    local _, setKorbloxUI = uiChoiceRow(PUtil, "Korblox", {"Normal", "Korblox"},
+        M.korbloxEnabled and 2 or 1,
+        function(v)
+            M.korbloxEnabled = (v == "Korblox")
+            M.applyKorbloxToChar(player.Character, M.korbloxEnabled)
+        end
+    )
+    M.setKorbloxUI = setKorbloxUI
+    local setKorblox = function(on) if setKorbloxUI then setKorbloxUI(on and "Korblox" or "Normal") end end
 
     uiSectionHeader(PUtil, "INTERFACE")
     -- Lock GUI moved out of the header into its own row
     uiToggleRow(PUtil, "Lock GUI", M.uiLocked == true, function(on)
         M.uiLocked = on
     end)
+    local _, setSkipIntro = uiToggleRow(PUtil, "Skip Intro", M.skipIntroEnabled == true, function(on)
+        M.setSkipIntro(on)
+    end)
+    M.setSkipIntroVisual = setSkipIntro
     do
         local r = uiRowCard(PUtil, false, UI_ROW_H)
         uiRowLabel(r, "Save Config", 110)
@@ -6971,6 +7312,7 @@ function M.buildGui()
     -- now lives as an inline chip on the row it controls.
     uiSectionHeader(PKB, "TELEPORT")
     uiKeybindRow(PKB, "TP Down",        M.KB.TPFloor)
+    uiKeybindRow(PKB, "TP Down (Second)", M.KB.TPFloor2)
     uiKeybindRow(PKB, "Drop Brainrot",  M.KB.DropBrainrot)
     uiKeybindRow(PKB, "Insta Reset",    M.KB.InstaReset)
     uiKeybindRow(PKB, "Hide / Show GUI", M.KB.GuiHide)
@@ -7164,6 +7506,18 @@ function M.resetAllSettings()
     M.autoResetOnDeath = false
     setupDeathReset()
 
+    M.stopBodyLock()
+    M.bodyLockEnabled = false
+    M.bodyLockRange = 50
+    M.perfectHitEnabled = false
+    M.batCounterMode = "V1"
+    M.stealKickWarnEnabled = false
+    M.setSpeedBypass(false)
+    M.instantResetMode = "NONE"
+    M.autoSaveEnabled = false
+    M.stopAutoSaveLoop()
+    M.mobileButtonsLocked = false
+
     saveCherryConfig()
     M.buildGui()
 end
@@ -7182,6 +7536,9 @@ elseif M.colorScheme and CHERRY_THEMES[M.colorScheme] then
     M._savedTheme = M.colorScheme
 end
 applyAccentFromTheme()
+-- Skip Intro mirrors the intro toggles, which the early config pass already read
+if M.skipIntroEnabled == nil then M.skipIntroEnabled = (M.introGUIEnabled == false) end
+if M.speedBypassEnabled then M.speedMethod = M.speedBypassMethod end
 pcall(saveCherryConfig)
 M.buildGui() -- applies M.menuOpen (closed stays closed)
 pcall(function()
@@ -7201,6 +7558,9 @@ if M.batCounterEnabled then M.startBatCounter() end
 if M.unwalkEnabled then M.startUnwalk() end
 if M.autoTPEnabled then M.startAutoTP() end
 if M.autoBatEnabled then M.queueAutoBatStart() end
+if M.bodyLockEnabled then M.startBodyLock() end
+if M.autoSaveEnabled then M.startAutoSaveLoop() end
+if M.stealKickWarnEnabled then M.warnIfStealRisky() end
 if M.autoLeftEnabled then M.startAutoLeft() end
 if M.autoRightEnabled then M.startAutoRight() end
 if M.Steal.AutoStealEnabled then M.startAutoSteal() end
@@ -7565,9 +7925,6 @@ task.spawn(function()
     end
 end)
 
-function M.refreshSpeedModeLabel()
-    -- not used
-end
 
 pcall(function()
     M.refreshWalkSpeedAutoSwitch()
@@ -7578,5 +7935,5 @@ pcall(function()
         end)
     end
 end)
-print("BOOTSWARE loaded successfully!")
+print("CRATE HUB loaded successfully!")
 return M

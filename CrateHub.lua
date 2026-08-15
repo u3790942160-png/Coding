@@ -4790,25 +4790,25 @@ function M.showWarning(text, tone, title)
         card = Instance.new("Frame")
         card.Name = "WarnCard"
         card.AnchorPoint = Vector2.new(1, 0)
-        card.Size = UDim2.new(0, 300, 0, 96)
+        card.Size = UDim2.new(0, 258, 0, 82)
         card.BackgroundColor3 = Color3.fromRGB(10, 6, 8)
         card.BackgroundTransparency = 0.03
         card.BorderSizePixel = 0
         card.Visible = false
         card.Parent = gui
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 16)
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
 
         stroke = Instance.new("UIStroke")
         stroke.Name = "WarnStroke"
-        stroke.Thickness = 2.5
+        stroke.Thickness = 2.2
         stroke.Transparency = 0.02
         stroke.Parent = card
 
         edge = Instance.new("Frame")
         edge.Name = "WarnEdge"
         edge.AnchorPoint = Vector2.new(0, 0.5)
-        edge.Position = UDim2.new(0, 14, 0.5, 0)
-        edge.Size = UDim2.new(0, 6, 0, 58)
+        edge.Position = UDim2.new(0, 12, 0.5, 0)
+        edge.Size = UDim2.new(0, 5, 0, 50)
         edge.BorderSizePixel = 0
         edge.ZIndex = 2
         edge.Parent = card
@@ -4816,23 +4816,23 @@ function M.showWarning(text, tone, title)
 
         titleLbl = Instance.new("TextLabel")
         titleLbl.Name = "WarnTitle"
-        titleLbl.Position = UDim2.new(0, 32, 0, 16)
-        titleLbl.Size = UDim2.new(1, -46, 0, 24)
+        titleLbl.Position = UDim2.new(0, 28, 0, 12)
+        titleLbl.Size = UDim2.new(1, -42, 0, 20)
         titleLbl.BackgroundTransparency = 1
         titleLbl.Font = Enum.Font.GothamBlack
-        titleLbl.TextSize = 20
+        titleLbl.TextSize = 17
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
         titleLbl.ZIndex = 2
         titleLbl.Parent = card
 
         msgLbl = Instance.new("TextLabel")
         msgLbl.Name = "WarnMsg"
-        msgLbl.Position = UDim2.new(0, 32, 0, 44)
-        msgLbl.Size = UDim2.new(1, -46, 0, 40)
+        msgLbl.Position = UDim2.new(0, 28, 0, 34)
+        msgLbl.Size = UDim2.new(1, -42, 0, 36)
         msgLbl.BackgroundTransparency = 1
         msgLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
         msgLbl.Font = Enum.Font.GothamBold
-        msgLbl.TextSize = 16
+        msgLbl.TextSize = 14
         msgLbl.TextWrapped = true
         msgLbl.TextXAlignment = Enum.TextXAlignment.Left
         msgLbl.TextYAlignment = Enum.TextYAlignment.Top
@@ -4853,8 +4853,8 @@ function M.showWarning(text, tone, title)
     end
     if msgLbl then msgLbl.Text = text end
 
-    local SHOWN  = UDim2.new(1, -18, 0, 64)
-    local HIDDEN = UDim2.new(1, 330, 0, 64)
+    local SHOWN  = UDim2.new(1, -16, 0, 60)
+    local HIDDEN = UDim2.new(1, 290, 0, 60)
     local SLIDE_IN  = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local SLIDE_OUT = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 

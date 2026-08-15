@@ -6108,52 +6108,62 @@ function M.buildGui()
     Header.Active = true
     Header.Parent = Frame
 
-    -- Logo badge: rounded square that slowly turns to a diamond and back
+    -- Player card: avatar headshot with the hub name and the player's name
     do
-        local badge = Instance.new("Frame")
-        badge.Name = "LogoBadge"
-        badge.ZIndex = 3
-        badge.AnchorPoint = Vector2.new(0.5, 0.5)
-        badge.Position = UDim2.new(0, 38, 0, 34)
-        badge.Size = UDim2.new(0, 36, 0, 36)
-        badge.BackgroundColor3 = UI_BG_DARK
-        badge.BorderSizePixel = 0
-        badge.Parent = Header
-        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 12)
-        local bs = Instance.new("UIStroke")
-        bs.Color = UI_ACCENT
-        bs.Thickness = 2.5
-        bs.Transparency = 0.05
-        bs.Parent = badge
+        local avatar = Instance.new("ImageLabel")
+        avatar.Name = "PlayerAvatar"
+        avatar.ZIndex = 3
+        avatar.AnchorPoint = Vector2.new(0, 0.5)
+        avatar.Position = UDim2.new(0, 16, 0, 34)
+        avatar.Size = UDim2.new(0, 42, 0, 42)
+        avatar.BackgroundColor3 = UI_CHIP_BG
+        avatar.BorderSizePixel = 0
+        avatar.ScaleType = Enum.ScaleType.Crop
+        avatar.Parent = Header
+        Instance.new("UICorner", avatar).CornerRadius = UDim.new(0, 12)
+        local ring = Instance.new("UIStroke")
+        ring.Color = UI_ACCENT
+        ring.Thickness = 2
+        ring.Transparency = 0.1
+        ring.Parent = avatar
+        M.playerAvatar = avatar
 
-        local dot = Instance.new("Frame")
-        dot.AnchorPoint = Vector2.new(0.5, 0.5)
-        dot.Position = UDim2.new(0.5, 0, 0.5, 0)
-        dot.Size = UDim2.new(0, 12, 0, 12)
-        dot.BackgroundColor3 = UI_TEXT_WHITE
-        dot.BorderSizePixel = 0
-        dot.ZIndex = 4
-        dot.Parent = badge
-        Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 4)
-
-        M.logoBadge = badge
-        task.spawn(function()
-            local spin = TweenService:Create(
-                badge,
-                TweenInfo.new(3.2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut, -1, true, 0.8),
-                {Rotation = 45}
+        -- rbxthumb resolves without an async call; fall back if it is blocked
+        pcall(function()
+            avatar.Image = string.format(
+                "rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150",
+                player.UserId
             )
-            spin:Play()
         end)
 
         local t = Instance.new("TextLabel"); t.ZIndex=3
-        t.Position = UDim2.new(0,66,0,18); t.Size = UDim2.new(1,-130,0,32)
+        t.Position = UDim2.new(0,68,0,13); t.Size = UDim2.new(1,-136,0,22)
         t.BackgroundTransparency = 1
         t.Text = "CRATE HUB"
         t.TextColor3 = UI_TEXT_WHITE
-        t.TextSize = 20; t.Font = Enum.Font.GothamBlack
+        t.TextSize = 19; t.Font = Enum.Font.GothamBlack
         t.TextXAlignment = Enum.TextXAlignment.Left
+        t.TextYAlignment = Enum.TextYAlignment.Bottom
         t.Parent = Header
+
+        local nameLbl = Instance.new("TextLabel"); nameLbl.ZIndex=3
+        nameLbl.Name = "PlayerName"
+        nameLbl.Position = UDim2.new(0,68,0,36); nameLbl.Size = UDim2.new(1,-136,0,16)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text = "@" .. tostring(player.Name)
+        nameLbl.TextColor3 = UI_ACCENT_LIGHT
+        nameLbl.TextSize = 12; nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        nameLbl.Parent = Header
+        M.playerNameLbl = nameLbl
+
+        pcall(function()
+            local disp = player.DisplayName
+            if type(disp) == "string" and disp ~= "" and disp ~= player.Name then
+                nameLbl.Text = disp .. "  @" .. player.Name
+            end
+        end)
     end
 
     local MinBtn = Instance.new("TextButton")

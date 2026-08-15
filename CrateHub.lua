@@ -691,7 +691,6 @@ M.speedLabel = nil
 M.KB = {
     DropBrainrot={kb=nil,gp=nil},
     TPFloor2={kb=nil,gp=nil},
-    SpeedBypass={kb=nil,gp=nil},
     AutoLeft={kb=nil,gp=nil},
     AutoRight={kb=nil,gp=nil},
     AutoBat={kb=nil,gp=nil},
@@ -800,8 +799,16 @@ end
 M.ragdollTimerThread = nil
 M.ragdollTimerRemaining = 0
 M.isRagdollActive = false
+M.ragdollTimerEnabled = true
 
 function M.updateRagdollTimer(duration)
+    if not M.ragdollTimerEnabled then
+        M.isRagdollActive = false
+        if M.headIndicator and M.headIndicator.ragdollTimer then
+            M.headIndicator.ragdollTimer.Text = ""
+        end
+        return
+    end
     if M.ragdollTimerThread then
         task.cancel(M.ragdollTimerThread)
         M.ragdollTimerThread = nil
@@ -4230,22 +4237,6 @@ function M.buildMobileButtons()
             st0.Transparency = 0.45
             st0.Parent = btn
         end
-        local mobImgId = tonumber(M.mobBtnBgId) or 0
-        if mobImgId > 0 then
-            btn.BackgroundTransparency = 1
-            local bgImg = Instance.new("ImageLabel")
-            bgImg.Name = "BtnBgImage"
-            bgImg.BackgroundTransparency = 1
-            bgImg.Image = "rbxassetid://" .. tostring(mobImgId)
-            bgImg.ScaleType = Enum.ScaleType.Crop
-            bgImg.Size = UDim2.fromScale(1, 1)
-            bgImg.ZIndex = btn.ZIndex
-            bgImg.Parent = btn
-            local bgc = Instance.new("UICorner", bgImg)
-            bgc.CornerRadius = M.circleButtonsEnabled and UDim.new(1, 0) or UDim.new(0, CORNER_R)
-            -- keep text above image
-            btn.ZIndex = btn.ZIndex + 1
-        end
 
         local isOn = false
         local function setOn(v)
@@ -4448,25 +4439,6 @@ if M._savedTheme and CHERRY_THEMES[M._savedTheme] then
     CherryConfig.Theme = M._savedTheme
 end
 M.colorScheme = CherryConfig.Theme
-M.customBgId = 0
-M.customBgOpacity = 0.35
-M.mobBtnBgId = 0
-M.BG_IMAGE_IDS = {
-    79737099962715,
-    71211662493854,
-    15556272558,
-    1471587689,
-    14349182390,
-    108236541541009,
-}
-M.MOB_BTN_IMAGE_IDS = {
-    15101684346,
-    39396,
-    109592813321691,
-    83661129801187,
-    94353803110527,
-    109100201685955,
-}
 
 
 local function loadCherryConfig()
@@ -4542,9 +4514,6 @@ local function loadCherryConfig()
         if d.antiKick~=nil then M.antiKickEnabled=d.antiKick end
         if d.safeMode~=nil then M.safeModeEnabled=d.safeMode end
         if d.mirrorTPDown~=nil then M.mirrorTPDownEnabled=d.mirrorTPDown end
-        if type(d.customBgId)=="number" then M.customBgId=d.customBgId end
-        if type(d.customBgOpacity)=="number" then M.customBgOpacity=math.clamp(d.customBgOpacity,0,1) end
-        if type(d.mobBtnBgId)=="number" then M.mobBtnBgId=d.mobBtnBgId end
         if d.autoBat~=nil then M.autoBatEnabled=d.autoBat end
         if d.semiHoldMin then M.Semi.holdMin=d.semiHoldMin end
         if d.semiHoldMax then M.Semi.holdMax=d.semiHoldMax end
@@ -4579,7 +4548,6 @@ local function loadCherryConfig()
         if d.speedToggleKey then lk(M.KB.SpeedToggle,d.speedToggleKey) end
         if d.bypassAimbotKey then lk(M.KB.BypassAimbot,d.bypassAimbotKey) end
         if d.tpFloor2Key then lk(M.KB.TPFloor2,d.tpFloor2Key) end
-        if d.speedBypassKey then lk(M.KB.SpeedBypass,d.speedBypassKey) end
         -- Crate Hub additions
         if tonumber(d.aimbotSpeed) then M.aimbotSpeed=tonumber(d.aimbotSpeed) end
         if d.perfectHitEnabled~=nil then M.perfectHitEnabled=d.perfectHitEnabled==true end
@@ -4587,13 +4555,13 @@ local function loadCherryConfig()
         if tonumber(d.bodyLockRange) then M.bodyLockRange=tonumber(d.bodyLockRange) end
         if d.batCounterMode=="V1" or d.batCounterMode=="V2" then M.batCounterMode=d.batCounterMode end
         if d.stealKickWarnEnabled~=nil then M.stealKickWarnEnabled=d.stealKickWarnEnabled==true end
-        if d.speedBypassEnabled~=nil then M.speedBypassEnabled=d.speedBypassEnabled==true end
         if type(d.instantResetMode)=="string" then
             for _,m in ipairs(M.INSTANT_RESET_MODES or {}) do if m==d.instantResetMode then M.instantResetMode=m break end end
         end
         if d.autoSaveEnabled~=nil then M.autoSaveEnabled=d.autoSaveEnabled==true end
         if d.mobileButtonsLocked~=nil then M.mobileButtonsLocked=d.mobileButtonsLocked==true end
         if d.skipIntroEnabled~=nil then M.skipIntroEnabled=d.skipIntroEnabled==true end
+        if d.ragdollTimerEnabled~=nil then M.ragdollTimerEnabled=d.ragdollTimerEnabled==true end
     end
 end
 
@@ -4614,8 +4582,6 @@ local function saveCherryConfig()
         autoTPHeight=M.autoTPHeight, fovValue=M.fovValue, uiScale=M.uiScale,
         infJumpMode=M.infJumpMode,
         mobileButtonsSize=M.mobileButtonsSize, skyTheme=M.currentSkyTheme,
-        customBgId=tonumber(M.customBgId) or 0, customBgOpacity=tonumber(M.customBgOpacity) or 0.35,
-        mobBtnBgId=tonumber(M.mobBtnBgId) or 0,
         stealBarSize=M.stealBarSize,
         carrySpeedActive=M.carrySpeedActive, laggerModeEnabled=M.laggerModeEnabled,
         autoSwing=M.autoSwingEnabled, introSoundEnabled=M.introSoundEnabled,
@@ -4651,7 +4617,7 @@ local function saveCherryConfig()
         laggerToggleKey=ks(M.KB.LaggerToggle), tpFloorKey=ks(M.KB.TPFloor),
         instaResetKey=ks(M.KB.InstaReset), guiHideKey=ks(M.KB.GuiHide),
         speedToggleKey=ks(M.KB.SpeedToggle), bypassAimbotKey=ks(M.KB.BypassAimbot),
-        tpFloor2Key=ks(M.KB.TPFloor2), speedBypassKey=ks(M.KB.SpeedBypass),
+        tpFloor2Key=ks(M.KB.TPFloor2),
         -- Crate Hub additions
         aimbotSpeed=M.aimbotSpeed,
         perfectHitEnabled=M.perfectHitEnabled,
@@ -4659,11 +4625,11 @@ local function saveCherryConfig()
         bodyLockRange=M.bodyLockRange,
         batCounterMode=M.batCounterMode,
         stealKickWarnEnabled=M.stealKickWarnEnabled,
-        speedBypassEnabled=M.speedBypassEnabled,
         instantResetMode=M.instantResetMode,
         autoSaveEnabled=M.autoSaveEnabled,
         mobileButtonsLocked=M.mobileButtonsLocked,
         skipIntroEnabled=M.skipIntroEnabled,
+        ragdollTimerEnabled=M.ragdollTimerEnabled,
     }
     pcall(function() writefile(CHERRY_CONFIG_NAME, HS:JSONEncode(cfg)) end)
 end
@@ -4830,8 +4796,7 @@ M.stealKickWarnEnabled = false
 M.STEAL_SAFE_RADIUS = 90
 M.STEAL_SAFE_MIN_TIME = 0.6
 
-function M.showStealWarning(text)
-    if not M.stealKickWarnEnabled then return end
+function M.showWarning(text)
     local pg = player:FindFirstChild("PlayerGui")
     if not pg then return end
     local gui = pg:FindFirstChild("CrateHubWarn")
@@ -4867,9 +4832,56 @@ function M.showStealWarning(text)
     lbl.Visible = true
     M._stealWarnToken = (M._stealWarnToken or 0) + 1
     local token = M._stealWarnToken
-    task.delay(3, function()
+    task.delay(4, function()
         if lbl and lbl.Parent and M._stealWarnToken == token then lbl.Visible = false end
     end)
+end
+
+function M.showStealWarning(text)
+    if not M.stealKickWarnEnabled then return end
+    M.showWarning(text)
+end
+
+-- ---------- Ping warning ----------
+-- Duelling on a bad connection desyncs hits, so warn once each time the
+-- ping crosses the threshold and re-arm when it settles back down.
+M.PING_WARN_MS = 100
+M.pingWarnEnabled = true
+
+function M.getPingMs()
+    local ok, ms = pcall(function()
+        return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if ok and type(ms) == "number" and ms > 0 then return ms end
+    return nil
+end
+
+function M.startPingWatch()
+    if M._pingWatch then return end
+    M._pingWatch = true
+    M._pingWasHigh = false
+    task.spawn(function()
+        while M._pingWatch do
+            task.wait(4)
+            if M.pingWarnEnabled then
+                local ms = M.getPingMs()
+                if ms then
+                    local limit = tonumber(M.PING_WARN_MS) or 100
+                    if ms > limit and not M._pingWasHigh then
+                        M._pingWasHigh = true
+                        M.showWarning(string.format("Ping %dms - you shouldn't duel", math.floor(ms + 0.5)))
+                    elseif ms <= limit * 0.9 then
+                        -- small gap below the limit so a jittery ping does not spam
+                        M._pingWasHigh = false
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function M.stopPingWatch()
+    M._pingWatch = false
 end
 
 -- Returns risky, message
@@ -4889,23 +4901,6 @@ function M.warnIfStealRisky()
     if not M.stealKickWarnEnabled then return end
     local risky, msg = M.checkStealKickRisk()
     if risky then M.showStealWarning(msg) end
-end
-
--- ---------- Speed Bypass ----------
--- Swaps the movement method away from Humanoid.WalkSpeed, which is the
--- property the server actually reads.
-M.speedBypassEnabled = false
-M.speedBypassMethod = "BodyVelocity"
-
-function M.setSpeedBypass(on)
-    M.speedBypassEnabled = on
-    if on then
-        M._speedMethodBeforeBypass = M.speedMethod
-        M.speedMethod = M.speedBypassMethod
-    elseif M._speedMethodBeforeBypass then
-        M.speedMethod = M._speedMethodBeforeBypass
-        M._speedMethodBeforeBypass = nil
-    end
 end
 
 -- ---------- Instant Reset mode ----------
@@ -5801,267 +5796,6 @@ local function uiMakePage(parent, name, order, vis)
 end
 
 -- MAIN BUILD
-function M.applyCustomBackground(frame)
-    if not frame then return end
-    local existing = frame:FindFirstChild("CustomBgImage")
-    if existing then existing:Destroy() end
-    local id = tonumber(M.customBgId) or 0
-    if id <= 0 then return end
-    local img = Instance.new("ImageLabel")
-    img.Name = "CustomBgImage"
-    img.BackgroundTransparency = 1
-    img.Image = "rbxassetid://" .. tostring(id)
-    img.ScaleType = Enum.ScaleType.Crop
-    img.Size = UDim2.fromScale(1, 1)
-    img.Position = UDim2.fromScale(0, 0)
-    img.ZIndex = 0
-    img.ImageTransparency = math.clamp(tonumber(M.customBgOpacity) or 0.35, 0, 1)
-    img.Parent = frame
-end
-
-function M.openImagePicker(kind)
-    -- kind = "bg" | "mob"
-    local isBg = kind == "bg"
-    local ids = isBg and M.BG_IMAGE_IDS or M.MOB_BTN_IMAGE_IDS
-    local title = isBg and "CUSTOM BG" or "BUTTON BG"
-    local currentId = isBg and (tonumber(M.customBgId) or 0) or (tonumber(M.mobBtnBgId) or 0)
-    local opacity = math.clamp(tonumber(M.customBgOpacity) or 0.35, 0, 1)
-
-    local old = player.PlayerGui:FindFirstChild("CrateHubImagePicker")
-    if old then old:Destroy() end
-    local cg = game:GetService("CoreGui"):FindFirstChild("CrateHubImagePicker")
-    if cg then cg:Destroy() end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CrateHubImagePicker"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 120
-    pcall(function() gui.Parent = game:GetService("CoreGui") end)
-    if not gui.Parent then gui.Parent = player:WaitForChild("PlayerGui") end
-
-    -- dim backdrop (tap to close)
-    local dim = Instance.new("TextButton")
-    dim.Size = UDim2.fromScale(1, 1)
-    dim.BackgroundColor3 = Color3.new(0, 0, 0)
-    dim.BackgroundTransparency = 0.45
-    dim.Text = ""
-    dim.AutoButtonColor = false
-    dim.ZIndex = 1
-    dim.Parent = gui
-    dim.MouseButton1Click:Connect(function() gui:Destroy() end)
-
-    local panel = Instance.new("Frame")
-    panel.AnchorPoint = Vector2.new(0.5, 0.5)
-    panel.Position = UDim2.new(0.5, 0, 0.5, 0)
-    panel.Size = UDim2.new(0, 220, 0, isBg and 280 or 230)
-    panel.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-    panel.BorderSizePixel = 0
-    panel.ZIndex = 2
-    panel.ClipsDescendants = true
-    panel.Parent = gui
-    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 14)
-    local pst = Instance.new("UIStroke", panel)
-    pst.Color = Color3.fromRGB(50, 50, 60)
-    pst.Thickness = 1
-
-    local hdr = Instance.new("TextLabel")
-    hdr.Size = UDim2.new(1, -40, 0, 28)
-    hdr.Position = UDim2.new(0, 12, 0, 6)
-    hdr.BackgroundTransparency = 1
-    hdr.Text = title
-    hdr.TextColor3 = Color3.fromRGB(230, 230, 235)
-    hdr.Font = Enum.Font.GothamBold
-    hdr.TextSize = 12
-    hdr.TextXAlignment = Enum.TextXAlignment.Left
-    hdr.ZIndex = 3
-    hdr.Parent = panel
-
-    local close = Instance.new("TextButton")
-    close.Size = UDim2.new(0, 24, 0, 24)
-    close.Position = UDim2.new(1, -30, 0, 6)
-    close.BackgroundTransparency = 1
-    close.Text = "×"
-    close.TextColor3 = Color3.fromRGB(180, 180, 190)
-    close.Font = Enum.Font.GothamBold
-    close.TextSize = 18
-    close.ZIndex = 3
-    close.Parent = panel
-    close.MouseButton1Click:Connect(function() gui:Destroy() end)
-
-    local preview = Instance.new("ImageLabel")
-    preview.Name = "Preview"
-    preview.Size = UDim2.new(1, -24, 0, 100)
-    preview.Position = UDim2.new(0, 12, 0, 34)
-    preview.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
-    preview.BorderSizePixel = 0
-    preview.ScaleType = Enum.ScaleType.Crop
-    preview.Image = currentId > 0 and ("rbxassetid://" .. currentId) or ""
-    preview.ImageTransparency = isBg and opacity or 0
-    preview.ZIndex = 3
-    preview.Parent = panel
-    Instance.new("UICorner", preview).CornerRadius = UDim.new(0, 10)
-
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -24, 0, 56)
-    scroll.Position = UDim2.new(0, 12, 0, 142)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 4
-    scroll.ScrollBarImageColor3 = UI_ACCENT or Color3.fromRGB(200, 200, 200)
-    scroll.ScrollingDirection = Enum.ScrollingDirection.X
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.X
-    scroll.ZIndex = 3
-    scroll.Parent = panel
-
-    local lay = Instance.new("UIListLayout")
-    lay.FillDirection = Enum.FillDirection.Horizontal
-    lay.Padding = UDim.new(0, 8)
-    lay.VerticalAlignment = Enum.VerticalAlignment.Center
-    lay.Parent = scroll
-
-    local selectedId = currentId
-
-    local function selectId(id)
-        selectedId = id
-        preview.Image = id > 0 and ("rbxassetid://" .. id) or ""
-        if isBg then
-            M.customBgId = id
-            if M.mainFrame then M.applyCustomBackground(M.mainFrame) end
-        else
-            M.mobBtnBgId = id
-            if M.mobileButtonsEnabled then M.buildMobileButtons() end
-        end
-        saveCherryConfig()
-    end
-
-    -- None option
-    local none = Instance.new("TextButton")
-    none.Size = UDim2.new(0, 48, 0, 48)
-    none.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
-    none.Text = "OFF"
-    none.TextColor3 = Color3.fromRGB(200, 200, 210)
-    none.Font = Enum.Font.GothamBold
-    none.TextSize = 10
-    none.ZIndex = 4
-    none.Parent = scroll
-    Instance.new("UICorner", none).CornerRadius = UDim.new(0, 8)
-    none.MouseButton1Click:Connect(function() selectId(0) end)
-
-    for _, id in ipairs(ids) do
-        local thumb = Instance.new("ImageButton")
-        thumb.Size = UDim2.new(0, 48, 0, 48)
-        thumb.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
-        thumb.Image = "rbxassetid://" .. tostring(id)
-        thumb.ScaleType = Enum.ScaleType.Crop
-        thumb.ZIndex = 4
-        thumb.Parent = scroll
-        Instance.new("UICorner", thumb).CornerRadius = UDim.new(0, 8)
-        local st = Instance.new("UIStroke", thumb)
-        st.Color = Color3.fromRGB(255, 255, 255)
-        st.Transparency = (id == currentId) and 0.2 or 0.7
-        st.Thickness = 1
-        thumb.MouseButton1Click:Connect(function()
-            selectId(id)
-            for _, ch in ipairs(scroll:GetChildren()) do
-                if ch:IsA("ImageButton") then
-                    local s = ch:FindFirstChildOfClass("UIStroke")
-                    if s then s.Transparency = 0.7 end
-                end
-            end
-            st.Transparency = 0.2
-        end)
-    end
-
-    if isBg then
-        local opLbl = Instance.new("TextLabel")
-        opLbl.Size = UDim2.new(0.5, -12, 0, 18)
-        opLbl.Position = UDim2.new(0, 12, 0, 208)
-        opLbl.BackgroundTransparency = 1
-        opLbl.Text = "OPACITY"
-        opLbl.TextColor3 = Color3.fromRGB(160, 160, 170)
-        opLbl.Font = Enum.Font.GothamBold
-        opLbl.TextSize = 10
-        opLbl.TextXAlignment = Enum.TextXAlignment.Left
-        opLbl.ZIndex = 3
-        opLbl.Parent = panel
-
-        local opVal = Instance.new("TextLabel")
-        opVal.Size = UDim2.new(0.5, -12, 0, 18)
-        opVal.Position = UDim2.new(0.5, 0, 0, 208)
-        opVal.BackgroundTransparency = 1
-        opVal.Text = tostring(math.floor((1 - opacity) * 100)) .. "%"
-        opVal.TextColor3 = Color3.fromRGB(200, 200, 210)
-        opVal.Font = Enum.Font.GothamBold
-        opVal.TextSize = 10
-        opVal.TextXAlignment = Enum.TextXAlignment.Right
-        opVal.ZIndex = 3
-        opVal.Parent = panel
-
-        -- simple slider track
-        local track = Instance.new("Frame")
-        track.Size = UDim2.new(1, -24, 0, 8)
-        track.Position = UDim2.new(0, 12, 0, 232)
-        track.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-        track.BorderSizePixel = 0
-        track.ZIndex = 3
-        track.Parent = panel
-        Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
-
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new(1 - opacity, 0, 1, 0)
-        fill.BackgroundColor3 = Color3.fromRGB(220, 220, 230)
-        fill.BorderSizePixel = 0
-        fill.ZIndex = 4
-        fill.Parent = track
-        Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
-
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 16, 0, 16)
-        knob.AnchorPoint = Vector2.new(0.5, 0.5)
-        knob.Position = UDim2.new(1 - opacity, 0, 0.5, 0)
-        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        knob.BorderSizePixel = 0
-        knob.ZIndex = 5
-        knob.Parent = track
-        Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-
-        local dragging = false
-        local function setFromX(x)
-            local rel = math.clamp((x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
-            -- rel 1 = fully opaque image (low ImageTransparency)
-            local imageTransparency = 1 - rel
-            opacity = imageTransparency
-            M.customBgOpacity = opacity
-            fill.Size = UDim2.new(rel, 0, 1, 0)
-            knob.Position = UDim2.new(rel, 0, 0.5, 0)
-            preview.ImageTransparency = opacity
-            opVal.Text = tostring(math.floor(rel * 100)) .. "%"
-            if M.mainFrame then M.applyCustomBackground(M.mainFrame) end
-            saveCherryConfig()
-        end
-        track.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                setFromX(i.Position.X)
-            end
-        end)
-        UIS.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-                setFromX(i.Position.X)
-            end
-        end)
-        UIS.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-    end
-end
-
-
 -- ============================================================
 -- CUSTOM FONTS (from EXE)
 -- ============================================================
@@ -6162,14 +5896,13 @@ function M.buildGui()
     local Frame = Instance.new("Frame")
     Frame.Name = "Frame"
     Frame.ClipsDescendants = true
-    Frame.Position = UDim2.new(0,22,0.5,-150)
-    Frame.Size = UDim2.new(0,420,0,528)
+    Frame.Position = UDim2.new(0,22,0.5,-230)
+    Frame.Size = UDim2.new(0,420,0,700)
     Frame.BackgroundColor3 = UI_BG_DARK
     Frame.BorderSizePixel = 0
     Frame.Active = true
     Frame.Parent = gui
     M.mainFrame = Frame
-    M.applyCustomBackground(Frame)
 
     local UIScale = Instance.new("UIScale")
     UIScale.Name = "BDUIScale"
@@ -6314,20 +6047,6 @@ function M.buildGui()
     M.selectTab = function() end
 
     -- close / minimize
-    local function closeUI()
-        local tween = TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-            Size = UDim2.new(0, 420, 0, 0),
-            Position = Frame.Position + UDim2.new(0, 0, 0, 264),
-            BackgroundTransparency = 1
-        })
-        tween:Play()
-        tween.Completed:Connect(function()
-            Frame.Visible = false
-            Frame.Size = UDim2.new(0, 420, 0, 528)
-            Frame.Position = UDim2.new(0, 22, 0.5, -150)
-            Frame.BackgroundTransparency = 0
-        end)
-    end
     local MinPill = Instance.new("Frame")
     MinPill.Visible=false; MinPill.Active=true; MinPill.ZIndex=40
     MinPill.AnchorPoint = Vector2.new(0.5, 0)
@@ -6343,22 +6062,76 @@ function M.buildGui()
         pst.Transparency = 0.15
         pst.Parent = MinPill
     end
+    local pillScale = Instance.new("UIScale")
+    pillScale.Scale = 1
+    pillScale.Parent = MinPill
+
+    -- ---------- open / close animation ----------
+    -- Frame and pill each scale from their own centre, so the menu pops open
+    -- and folds away instead of blinking.
+    local ANIM_OUT = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    local ANIM_IN  = TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local animating = false
+
+    local function menuScale()
+        return M.uiScale or 0.8
+    end
+
+    local function openMenu()
+        if animating then return end
+        animating = true
+        local target = menuScale()
+        -- fold the pill away first
+        local pillOut = TweenService:Create(pillScale, ANIM_OUT, {Scale = 0.4})
+        pillOut:Play()
+        pillOut.Completed:Connect(function()
+            MinPill.Visible = false
+            pillScale.Scale = 1
+            Frame.Visible = true
+            UIScale.Scale = target * 0.55
+            local tw = TweenService:Create(UIScale, ANIM_IN, {Scale = target})
+            tw:Play()
+            tw.Completed:Connect(function()
+                UIScale.Scale = target
+                animating = false
+            end)
+        end)
+        M.menuOpen = true
+        pcall(saveCherryConfig)
+    end
+
+    local function closeMenu()
+        if animating then return end
+        animating = true
+        local target = menuScale()
+        local tw = TweenService:Create(UIScale, ANIM_OUT, {Scale = target * 0.55})
+        tw:Play()
+        tw.Completed:Connect(function()
+            Frame.Visible = false
+            UIScale.Scale = target
+            MinPill.Visible = true
+            pillScale.Scale = 0.4
+            local pillIn = TweenService:Create(pillScale, ANIM_IN, {Scale = 1})
+            pillIn:Play()
+            pillIn.Completed:Connect(function()
+                pillScale.Scale = 1
+                animating = false
+            end)
+        end)
+        M.menuOpen = false
+        pcall(saveCherryConfig)
+    end
+
+    M.openMenu = openMenu
+    M.closeMenu = closeMenu
+
     do
         local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,0,1,0); l.BackgroundTransparency=1; l.Text="CRATE HUB"; l.TextColor3=UI_TEXT_WHITE; l.TextSize=13; l.Font=Enum.Font.GothamBlack; l.Parent=MinPill
         local b=Instance.new("TextButton"); b.ZIndex=41; b.Size=UDim2.new(1,0,1,0); b.BackgroundTransparency=1; b.Text=""; b.AutoButtonColor=false; b.Parent=MinPill
-        b.MouseButton1Click:Connect(function()
-            MinPill.Visible=false; Frame.Visible=true
-            M.menuOpen = true
-            pcall(saveCherryConfig)
-        end)
+        b.MouseButton1Click:Connect(openMenu)
     end
 
-    local function minimize()
-        Frame.Visible=false; MinPill.Visible=true
-
-        M.menuOpen=false; pcall(saveCherryConfig)
-    end
-    MinBtn.MouseButton1Click:Connect(minimize)
+    MinBtn.MouseButton1Click:Connect(closeMenu)
 
     -- DRAGGING
     do
@@ -6515,11 +6288,6 @@ function M.buildGui()
         if kbMatch(M.KB.DropBrainrot, kc) then M.runDrop() end
         if kbMatch(M.KB.TPFloor, kc) then M.runTPFloor() end
         if kbMatch(M.KB.TPFloor2, kc) then M.runTPFloor() end
-        if kbMatch(M.KB.SpeedBypass, kc) then
-            M.setSpeedBypass(not M.speedBypassEnabled)
-            if M.setSpeedBypassVisual then M.setSpeedBypassVisual(M.speedBypassEnabled) end
-            saveCherryConfig()
-        end
         if kbMatch(M.KB.InstaReset, kc) then M.runInstantReset() end
         if kbMatch(M.KB.AutoLeft, kc) then
             M.autoLeftEnabled = not M.autoLeftEnabled
@@ -6561,10 +6329,7 @@ function M.buildGui()
         end
         if kbMatch(M.KB.GuiHide, kc) then
             if Frame then
-                Frame.Visible = not Frame.Visible
-                MinPill.Visible = not Frame.Visible
-                M.menuOpen = Frame.Visible == true
-                pcall(saveCherryConfig)
+                if Frame.Visible then closeMenu() else openMenu() end
             end
         end
     end)
@@ -6579,24 +6344,8 @@ function M.buildGui()
     local _, csBox = uiNumberRow(PM, "Carry Speed", M.CS, 1, 500, function(v) M.CS = v end)
     M.normalBox = nsBox; M.carryBox = csBox
 
-    do
-        local r = uiRowCard(PM, false, UI_ROW_H)
-        uiRowLabel(r, "Carry Mode", 160)
-        local carryBtn = uiValueChip(r, M.carrySpeedActive and "Carry On" or "Carry Off", {width = 118, autoWidth = true})
-        carryBtn.MouseButton1Click:Connect(function()
-            M.carrySpeedActive = not M.carrySpeedActive
-            carryBtn.Text = M.carrySpeedActive and "Carry On" or "Carry Off"
-            M.refreshSpeedModeLabel()
-            if M.mobBtnRefs.carrySpeed then M.mobBtnRefs.carrySpeed(M.carrySpeedActive) end
-            if M.mobBtnRefs.laggerCarry then M.mobBtnRefs.laggerCarry(M.laggerCarryActive) end
-            if M.carryModeBtn then M.carryModeBtn.Text = M.carrySpeedActive and "Carry On" or "Carry Off" end
-            if M.laggerCarryBtn then M.laggerCarryBtn.Text = M.laggerCarryActive and "L.Carry On" or "L.Carry Off" end
-            saveCherryConfig()
-        end)
-        M.carryModeBtn = carryBtn
-    end
 
-    local _, setAutoCarry = uiToggleRow(PM, "Auto Carry Speed", M.autoSwitchSpeedEnabled, function(on)
+    local _, setAutoCarry = uiToggleRow(PM, "Auto Carry Mode", M.autoSwitchSpeedEnabled, function(on)
         M.autoSwitchSpeedEnabled = on
         M._autoSwitchWasSteal = nil
         if not on then
@@ -6610,45 +6359,10 @@ function M.buildGui()
     end)
     M.setAutoCarryVisual = setAutoCarry
 
-    local _, setAutoTurnOff = uiToggleRow(PM, "Auto Turn Off Speed", M.autoTurnOffSpeedEnabled, function(on)
-        M.autoTurnOffSpeedEnabled = on
-        M.refreshWalkSpeedAutoSwitch()
-        saveCherryConfig()
-    end)
-    M.setAutoTurnOffVisual = setAutoTurnOff
-
-    local _, setAutoLagSwitch = uiToggleRow(PM, "Auto Switch Lagger Speed", M.autoSwitchLaggerSpeedEnabled, function(on)
-        M.autoSwitchLaggerSpeedEnabled = on
-        M.refreshWalkSpeedAutoSwitch()
-        saveCherryConfig()
-    end)
-    M.setAutoSwitchLaggerVisual = setAutoLagSwitch
-
-    uiSectionHeader(PM, "LAGGER")
-    local _, lsBox = uiNumberRow(PM, "Lagger Normal", M.LAGGER_SPEED, 1, 500, function(v) M.LAGGER_SPEED = v end, M.KB.LaggerToggle)
+    local _, lsBox = uiNumberRow(PM, "Lagger Speed", M.LAGGER_SPEED, 1, 500, function(v) M.LAGGER_SPEED = v end, M.KB.LaggerToggle)
     local _, lcBox = uiNumberRow(PM, "Lagger Carry", math.min(M.LAGGER_CARRY_SPEED,23), 1, 23, function(v) M.LAGGER_CARRY_SPEED = math.min(v,23) end)
 
-    do
-        local r = uiRowCard(PM, false, UI_ROW_H)
-        uiRowLabel(r, "Lagger Mode", 160)
-        local modeBtn = uiValueChip(r, M.laggerModeEnabled and "Lag On" or "Lag Off", {width = 118, autoWidth = true})
-        modeBtn.MouseButton1Click:Connect(function()
-            M.toggleLaggerMode()
-            modeBtn.Text = M.laggerModeEnabled and "Lag On" or "Lag Off"
-        end)
-        M.laggerModeBtn = modeBtn
-    end
 
-    do
-        local r = uiRowCard(PM, false, UI_ROW_H)
-        uiRowLabel(r, "Lagger Carry Mode", 160)
-        local modeBtn = uiValueChip(r, M.laggerCarryActive and "L.Carry On" or "L.Carry Off", {width = 118, autoWidth = true})
-        modeBtn.MouseButton1Click:Connect(function()
-            M.toggleLaggerCarry()
-            modeBtn.Text = M.laggerCarryActive and "L.Carry On" or "L.Carry Off"
-        end)
-        M.laggerCarryBtn = modeBtn
-    end
 
     uiSectionHeader(PM, "MODE")
     do
@@ -6716,36 +6430,16 @@ function M.buildGui()
     end)
     M.setAntiRagVisual = setAntiRag
 
-    local _, setAntiRagModeUI = uiChoiceRow(PMech, "Anti Ragdoll Mode", {"Splatter","No Splatter"},
-        M.antiRagdollMode == "No Splatter" and 2 or 1,
-        function(newMode)
-            M.antiRagdollMode = (newMode == "No Splatter") and "No Splatter" or "Splatter"
-            if M.antiRagdollEnabled then M.stopAntiRagdoll(); M.startAntiRagdoll() end
-        end
-    )
-    M.setAntiRagModeUI = setAntiRagModeUI
-
     local _, setMedusa = uiToggleRow(PMech, "Medusa Counter", M.medusaCounterEnabled, function(on)
         M.medusaCounterEnabled = on
         if on then M.setupMedusa(player.Character) else M.stopMedusaCounter() end
     end)
     M.setMedusaVisual = setMedusa
 
-    local _, setMedReset = uiToggleRow(PMech, "Medusa Reset", M.medusaResetEnabled, function(on)
-        M.medusaResetEnabled = on
-    end)
-    M.setMedusaResetVisual = setMedReset
-
     local _, setAutoSwing = uiToggleRow(PMech, "Auto Swing", M.autoSwingEnabled, function(on)
         M.autoSwingEnabled = on
     end)
     M.setAutoSwingVisual = setAutoSwing
-
-    local _, setAutoResetOnDeath = uiToggleRow(PMech, "Auto Reset on Death", M.autoResetOnDeath, function(on)
-        M.autoResetOnDeath = on
-        setupDeathReset()
-    end)
-    M.setAutoResetOnDeath = setAutoResetOnDeath
 
 
     uiSectionHeader(PMech, "AUTO STEAL")
@@ -6900,11 +6594,13 @@ function M.buildGui()
     end)
     regStealSettings("V3", v3Box)
 
-    local _, sbBox = uiNumberRow(PMech, "Steal Bar Size", M.stealBarSize, 100, 600, function(v)
-        M.stealBarSize = v; M.buildStatusUI()
-    end)
-
     uiSectionHeader(PMech, "RAGDOLL TELEPORT")
+    local _, setRagdollTimer = uiToggleRow(PMech, "Ragdoll Timer", M.ragdollTimerEnabled, function(on)
+        M.ragdollTimerEnabled = on
+        if not on then M.updateRagdollTimer(0) end
+    end)
+    M.setRagdollTimerVisual = setRagdollTimer
+
     local jumpDefaultIdx = (M.infJumpMode == "hold") and 2 or 1
     local _, setInfJump, setJumpModeUI = uiExpandToggleRow(
         PMech,
@@ -6964,14 +6660,14 @@ function M.buildGui()
     end)
     M.setAutoTPVisual = setATP
 
-    local _, tpHBox = uiNumberRow(PMech, "TP Height", M.autoTPHeight, 1, 100, function(v) M.autoTPHeight = v end)
+    local _, tpHBox = uiNumberRow(PMech, "TP Down Height", M.autoTPHeight, 1, 100, function(v) M.autoTPHeight = v end)
     M.autoTPHeightBox = tpHBox
 
     -- PAGE: VISUALS
     uiSectionHeader(PVis, "SKYBOX")
     do
         local r = uiRowCard(PVis, false, UI_ROW_H)
-        uiRowLabel(r, "Sky Theme", 170)
+        uiRowLabel(r, "Skybox", 170)
         local skyLbl = uiValueChip(r, M.currentSkyTheme, {width = 118, autoWidth = true})
         local skyIdx = 1
         for i,t in ipairs(M.SkyOrder) do if t == M.currentSkyTheme then skyIdx = i; break end end
@@ -6982,110 +6678,6 @@ function M.buildGui()
             skyLbl.Text = t; M.currentSkyTheme = t; M.CandyApplyCustomSky(t); saveCherryConfig()
         end)
     end
-    do
-        local r = uiRowCard(PVis, false, UI_ROW_H)
-        uiRowLabel(r, "FOV", 170)
-        local fovLbl = uiValueChip(r, tostring(M.fovValue), {width = 90})
-        local fovIdx = 1
-        local btn = Instance.new("TextButton",r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=6; btn.AutoButtonColor=false
-        btn.Activated:Connect(function()
-            fovIdx = fovIdx % #M.fovOptions + 1
-            M.fovValue = M.fovOptions[fovIdx]; fovLbl.Text = tostring(M.fovValue); M.applyFOV(); saveCherryConfig()
-        end)
-    end
-
-    uiSectionHeader(PVis, "COLOUR SCHEME")
-    do
-        local themeNames = {}
-        for name in pairs(CHERRY_THEMES) do table.insert(themeNames, name) end
-        table.sort(themeNames)
-        local cur = CherryConfig.Theme or "Crate"
-        local idx = 1
-        for i,n in ipairs(themeNames) do if n == cur then idx = i break end end
-
-        local r = uiRowCard(PVis, false, UI_ROW_H)
-        uiRowLabel(r, "Theme", 170)
-        local themeLbl = uiValueChip(r, cur, {width = 118, autoWidth = true})
-
-        -- color swatches
-        local sw = Instance.new("Frame"); sw.Size=UDim2.new(1,0,0,36); sw.BackgroundTransparency=1; sw.LayoutOrder=uiNextOrder(); sw.Parent=PVis
-        local swLay = Instance.new("UIListLayout"); swLay.FillDirection=Enum.FillDirection.Horizontal
-        swLay.Padding=UDim.new(0,6); swLay.VerticalAlignment=Enum.VerticalAlignment.Center; swLay.Parent=sw
-        local function applyTheme(name)
-            local t = CHERRY_THEMES[name]; if not t then return end
-            CherryConfig.Theme = name
-            M.colorScheme = name
-            M._savedTheme = name
-            applyAccentFromTheme()
-            themeLbl.Text = name
-            themeLbl.TextColor3 = t.Accent
-            if M.mainFrame then
-                M.mainFrame.BackgroundColor3 = UI_BG_DARK
-                local st = M.mainFrame:FindFirstChild("MainStroke")
-                if st then st.Color = t.Accent end
-                local gr = M.mainFrame:FindFirstChild("MainGradient")
-                if gr then
-                    gr.Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, UI_GRAD_TOP),
-                        ColorSequenceKeypoint.new(0.45, UI_BG_DARK),
-                        ColorSequenceKeypoint.new(1, UI_GRAD_BOT),
-                    })
-                end
-            end
-            -- Recolor any remaining pure-black parts immediately
-            pcall(function()
-                if M.mainFrame then M.recolorBlacksToTheme(M.mainFrame) end
-                if M.mobGuiRef then M.recolorBlacksToTheme(M.mobGuiRef) end
-                if M.statusGui then M.recolorBlacksToTheme(M.statusGui) end
-            end)
-            M.applyStealBarTheme(t.Accent)
-            M.updateHeadTheme()
-            saveCherryConfig()
-            task.defer(function()
-                local wasOpen = M.menuOpen ~= false
-                applyAccentFromTheme()
-                M.menuOpen = wasOpen
-                M.buildGui()
-                -- buildGui restores menuOpen from M.menuOpen
-                pcall(function()
-                    if M.mainFrame then M.recolorBlacksToTheme(M.mainFrame) end
-                    if M.mobGuiRef then M.recolorBlacksToTheme(M.mobGuiRef) end
-                    if M.statusGui then M.recolorBlacksToTheme(M.statusGui) end
-                end)
-                pcall(function() M.applyStealBarTheme(UI_ACCENT) end)
-                pcall(function() M.updateHeadTheme() end)
-                if M.mobileButtonsEnabled then
-                    pcall(function() M.buildMobileButtons() end)
-                end
-                saveCherryConfig()
-            end)
-        end
-        for _, name in ipairs(themeNames) do
-            local t = CHERRY_THEMES[name]
-            local b = Instance.new("TextButton")
-            b.Size = UDim2.new(0, 28, 0, 16)
-            b.BackgroundColor3 = t.Accent
-            b.Text = ""
-            b.AutoButtonColor = false
-            b.Parent = sw
-            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
-            local st = Instance.new("UIStroke"); st.Color = Color3.fromRGB(255,255,255); st.Transparency = 0.4; st.Parent = b
-            b.MouseButton1Click:Connect(function() applyTheme(name) end)
-        end
-        local btn = Instance.new("TextButton", r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""
-        btn.Activated:Connect(function()
-            idx = idx % #themeNames + 1
-            applyTheme(themeNames[idx])
-        end)
-    end
-
-    uiSectionHeader(PVis, "BACKGROUND")
-    uiActionRow(PVis, "Custom Background", function()
-        M.openImagePicker("bg")
-    end)
-    uiActionRow(PVis, "Mobile Button Images", function()
-        M.openImagePicker("mob")
-    end)
 
     uiSectionHeader(PVis, "ESP")
     local _, setLineESP = uiToggleRow(PVis, "Enemy ESP", M.lineESPEnabled, function(on)
@@ -7109,38 +6701,6 @@ function M.buildGui()
     end)
     M.setUnwalkVisual = setUnwalk
 
-    local _, setAntiLag = uiToggleRow(PUtil, "Anti-Lag", M.antiLagEnabled, function(on)
-        M.antiLagEnabled = on
-        if on then M.enableAntiLag() else M.disableAntiLag() end
-        saveCherryConfig()
-    end)
-    M.setAntiLagVisual = setAntiLag
-
-    local _, setAntiSummer = uiToggleRow(PUtil, "Anti Summer Base", M.antiSummerBaseEnabled, function(on)
-        M.antiSummerBaseEnabled = on
-        if on then M.enableAntiSummerBase() else M.disableAntiSummerBase() end
-        saveCherryConfig()
-    end)
-    M.setAntiSummerVisual = setAntiSummer
-
-    local _, setStretch = uiToggleRow(PUtil, "Stretch Rez", M.stretchRezEnabled, function(on)
-        M.stretchRezEnabled = on
-        if on then M.enableStretchRez() else M.disableStretchRez() end
-    end)
-    M.setStretchRezVisual = setStretch
-
-    local _, setRemoveAcc = uiToggleRow(PUtil, "Remove Accessories", M.removeAccEnabled, function(on)
-        M.removeAccEnabled = on
-        if on then M.startRemoveAcc() else M.stopRemoveAcc() end
-    end)
-
-    local _, setAntiKick = uiToggleRow(PUtil, "Anti-Kick", M.antiKickEnabled, function(on)
-        M.antiKickEnabled = on
-        if on then M.enableAntiKick() else M.disableAntiKick() end
-        saveCherryConfig()
-    end)
-    M.antiKickSetVisual = setAntiKick
-
     local _, setSafeMode = uiToggleRow(PUtil, "Safe Mode", M.safeModeEnabled, function(on)
         M.safeModeEnabled = on
         if on then M.enableSafeMode() else M.disableSafeMode() end
@@ -7148,59 +6708,43 @@ function M.buildGui()
     end)
     M.setSafeModeVisual = setSafeMode
 
+
+    uiSectionHeader(PUtil, "PERFORMANCE")
+    local _, setAntiLag = uiToggleRow(PUtil, "Anti Lag", M.antiLagEnabled, function(on)
+        M.antiLagEnabled = on
+        if on then M.enableAntiLag() else M.disableAntiLag() end
+        saveCherryConfig()
+    end)
+    M.setAntiLagVisual = setAntiLag
+
+    local _, setStretch = uiToggleRow(PUtil, "Stretch Rez", M.stretchRezEnabled, function(on)
+        M.stretchRezEnabled = on
+        if on then M.enableStretchRez() else M.disableStretchRez() end
+    end)
+    M.setStretchRezVisual = setStretch
+
     do
-        local fontIdx = 1
-        for i, n in ipairs(M.FONT_NAMES) do
-            if n == (M.customFontSelected or "None") then fontIdx = i break end
-        end
-        local _, setFontUI = uiChoiceRow(PUtil, "Custom Font", M.FONT_NAMES, fontIdx, function(v)
-            M.applyCustomFont(v)
-            saveCherryConfig()
+        local r = uiRowCard(PVis, false, UI_ROW_H)
+        uiRowLabel(r, "Custom FOV", 170)
+        local fovLbl = uiValueChip(r, tostring(M.fovValue), {width = 90})
+        local fovIdx = 1
+        local btn = Instance.new("TextButton",r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=6; btn.AutoButtonColor=false
+        btn.Activated:Connect(function()
+            fovIdx = fovIdx % #M.fovOptions + 1
+            M.fovValue = M.fovOptions[fovIdx]; fovLbl.Text = tostring(M.fovValue); M.applyFOV(); saveCherryConfig()
         end)
     end
 
-    local _, setIntro = uiToggleRow(PUtil, "Intro Song", M.introSoundEnabled, function(on)
-        M.introSoundEnabled = on
-        if not on and introSoundInstance and introSoundInstance.IsPlaying then
-            pcall(function() introSoundInstance:Stop() end)
-        end
-    end)
-
-    local _, setIntroSongUI = uiChoiceRow(PUtil, "Intro Song Choice", {"Song 1","Song 2","Song 3"},
-        M.introSongChoice or 3,
-        function(v)
-            local map = {["Song 1"]=1, ["Song 2"]=2, ["Song 3"]=3}
-            M.introSongChoice = map[v] or 3
-        end
-    )
-
-    local _, setIntroGUI = uiToggleRow(PUtil, "Intro GUI", M.introGUIEnabled, function(on)
-        M.introGUIEnabled = on
-    end)
-
     uiSectionHeader(PUtil, "MOBILE BUTTONS")
-    local _, setMobBtns = uiToggleRow(PUtil, "Mobile Buttons", M.mobileButtonsEnabled, function(on)
+    local _, setMobBtns = uiToggleRow(PUtil, "Show Mobile Buttons", M.mobileButtonsEnabled, function(on)
         M.mobileButtonsEnabled = on
         if on then M.buildMobileButtons() else M.destroyMobileButtons() end
         saveCherryConfig()
     end)
 
-    local _, setCircleBtns = uiToggleRow(PUtil, "Circle Buttons", M.circleButtonsEnabled, function(on)
-        M.circleButtonsEnabled = on
-        if M.mobileButtonsEnabled then M.buildMobileButtons() end
-        saveCherryConfig()
-    end)
-    M.setCircleBtnsVisual = setCircleBtns
-
-    local _, btnSzBox = uiNumberRow(PUtil, "Button Size", M.mobileButtonsSize, 40, 150, function(v)
+    local _, btnSzBox = uiNumberRow(PUtil, "Quick Button Size", M.mobileButtonsSize, 40, 150, function(v)
         M.mobileButtonsSize = v
         if M.mobileButtonsEnabled then M.buildMobileButtons() end
-    end)
-
-    local _, menuScaleBox = uiNumberRow(PUtil, "Menu Scale", M.uiScale, 0.5, 2.0, function(v)
-        M.uiScale = v
-        if M.uiScaleRef then M.uiScaleRef.Scale = v end
-        saveCherryConfig()
     end)
 
     local _, setMobLock = uiToggleRow(PUtil, "Lock Mobile Buttons", M.mobileButtonsLocked, function(on)
@@ -7211,13 +6755,23 @@ function M.buildGui()
     uiActionRow(PUtil, "Reset Button Positions", function() M.resetMobilePositions() end)
 
     uiSectionHeader(PUtil, "CONFIGURATION")
-    local _, setInstantResetUI = uiChoiceRow(PUtil, "Instant Reset", M.INSTANT_RESET_MODES,
-        (M.instantResetMode == "Remote") and 3 or ((M.instantResetMode == "Balloon") and 2 or 1),
-        function(v)
-            M.instantResetMode = v
+    do
+        local r = uiRowCard(PUtil, false, UI_ROW_H)
+        uiRowLabel(r, "Instant Reset", 230)
+        local kbChip = uiKeybindChip(r, M.KB.InstaReset, 12, 66)
+        local modes = M.INSTANT_RESET_MODES
+        local idx = (M.instantResetMode == "Remote") and 3 or ((M.instantResetMode == "Balloon") and 2 or 1)
+        local modeChip = uiValueChip(r, modes[idx], {right = 88, width = 92, autoWidth = true, color = UI_TEXT_PRIMARY})
+        modeChip.MouseButton1Click:Connect(function()
+            idx = idx % #modes + 1
+            M.instantResetMode = modes[idx]
+            modeChip.Text = modes[idx]
+            saveCherryConfig()
+        end)
+        M.setInstantResetUI = function(v)
+            for i, m in ipairs(modes) do if m == v then idx = i; modeChip.Text = m; break end end
         end
-    )
-    M.setInstantResetUI = setInstantResetUI
+    end
 
     local _, setAutoSave = uiToggleRow(PUtil, "Auto Save Config", M.autoSaveEnabled, function(on)
         M.autoSaveEnabled = on
@@ -7225,10 +6779,6 @@ function M.buildGui()
     end)
     M.setAutoSaveVisual = setAutoSave
 
-    local _, setSpeedBypass = uiToggleRow(PUtil, "Speed Bypass", M.speedBypassEnabled, function(on)
-        M.setSpeedBypass(on)
-    end, {kb = M.KB.SpeedBypass})
-    M.setSpeedBypassVisual = setSpeedBypass
 
     uiSectionHeader(PUtil, "COSMETICS")
     local packNames = {}
@@ -7257,11 +6807,6 @@ function M.buildGui()
     )
     M.setPackModeUI = setPackUI
 
-    uiActionRow(PUtil, "Apply Animation Pack", function()
-        if M.animPackEnabled then M.applyAnimPack(M.animPack) end
-        saveCherryConfig()
-    end)
-
     local _, setHeadUI = uiChoiceRow(PUtil, "Head", {"Normal", "Headless"},
         M.headlessEnabled and 2 or 1,
         function(v)
@@ -7284,6 +6829,12 @@ function M.buildGui()
 
     uiSectionHeader(PUtil, "INTERFACE")
     -- Lock GUI moved out of the header into its own row
+    local _, menuScaleBox = uiNumberRow(PUtil, "GUI Scale (%)", math.floor((M.uiScale or 0.8) * 100 + 0.5), 50, 200, function(v)
+        M.uiScale = v / 100
+        if M.uiScaleRef then M.uiScaleRef.Scale = M.uiScale end
+        saveCherryConfig()
+    end)
+
     uiToggleRow(PUtil, "Lock GUI", M.uiLocked == true, function(on)
         M.uiLocked = on
     end)
@@ -7291,22 +6842,6 @@ function M.buildGui()
         M.setSkipIntro(on)
     end)
     M.setSkipIntroVisual = setSkipIntro
-    do
-        local r = uiRowCard(PUtil, false, UI_ROW_H)
-        uiRowLabel(r, "Save Config", 110)
-        local sBtn = uiValueChip(r, "SAVE", {width = 84, color = UI_TEXT_PRIMARY, textSize = 13})
-        sBtn.Activated:Connect(function()
-            saveCherryConfig()
-            sBtn.Text = "OK"
-            task.delay(0.8, function() if sBtn and sBtn.Parent then sBtn.Text = "SAVE" end end)
-        end)
-    end
-    do
-        local r = uiRowCard(PUtil, false, UI_ROW_H)
-        uiRowLabel(r, "Reset All Settings", 110)
-        local rBtn = uiValueChip(r, "RESET", {width = 84, color = UI_TEXT_PRIMARY, textSize = 13})
-        rBtn.Activated:Connect(function() M.resetAllSettings() end)
-    end
 
     -- TELEPORT: the binds with no feature row of their own. Every other keybind
     -- now lives as an inline chip on the row it controls.
@@ -7314,7 +6849,6 @@ function M.buildGui()
     uiKeybindRow(PKB, "TP Down",        M.KB.TPFloor)
     uiKeybindRow(PKB, "TP Down (Second)", M.KB.TPFloor2)
     uiKeybindRow(PKB, "Drop Brainrot",  M.KB.DropBrainrot)
-    uiKeybindRow(PKB, "Insta Reset",    M.KB.InstaReset)
     uiKeybindRow(PKB, "Hide / Show GUI", M.KB.GuiHide)
 
 
@@ -7347,8 +6881,7 @@ if M.setCircleBtnsVisual then M.setCircleBtnsVisual(M.circleButtonsEnabled) end
     end
     if M.setMirrorTPVisual then M.setMirrorTPVisual(M.mirrorTPDownEnabled) end
     if M.safeModeEnabled then M.enableSafeMode() end
-    if M.antiKickEnabled then M.enableAntiKick() end
-
+    
     if M.setAntiRagModeUI then M.setAntiRagModeUI(M.antiRagdollMode == "No Splatter" and "No Splatter" or "Splatter") end
     if M.setInfJumpVisual then M.setInfJumpVisual(M.infJumpEnabled) end
     if M.setMedusaVisual then M.setMedusaVisual(M.medusaCounterEnabled) end
@@ -7512,7 +7045,6 @@ function M.resetAllSettings()
     M.perfectHitEnabled = false
     M.batCounterMode = "V1"
     M.stealKickWarnEnabled = false
-    M.setSpeedBypass(false)
     M.instantResetMode = "NONE"
     M.autoSaveEnabled = false
     M.stopAutoSaveLoop()
@@ -7538,7 +7070,18 @@ end
 applyAccentFromTheme()
 -- Skip Intro mirrors the intro toggles, which the early config pass already read
 if M.skipIntroEnabled == nil then M.skipIntroEnabled = (M.introGUIEnabled == false) end
-if M.speedBypassEnabled then M.speedMethod = M.speedBypassMethod end
+-- Features dropped to match the reference script: force them off so an older
+-- saved config cannot re-enable something with no row to turn it back off.
+M.antiKickEnabled = false
+M.antiSummerBaseEnabled = false
+M.removeAccEnabled = false
+M.autoResetOnDeath = false
+M.medusaResetEnabled = false
+M.circleButtonsEnabled = false
+M.autoTurnOffSpeedEnabled = false
+M.autoSwitchLaggerSpeedEnabled = false
+M.customFontSelected = "None"
+M.antiRagdollMode = "Splatter"
 pcall(saveCherryConfig)
 M.buildGui() -- applies M.menuOpen (closed stays closed)
 pcall(function()
@@ -7561,16 +7104,14 @@ if M.autoBatEnabled then M.queueAutoBatStart() end
 if M.bodyLockEnabled then M.startBodyLock() end
 if M.autoSaveEnabled then M.startAutoSaveLoop() end
 if M.stealKickWarnEnabled then M.warnIfStealRisky() end
+M.startPingWatch()
 if M.autoLeftEnabled then M.startAutoLeft() end
 if M.autoRightEnabled then M.startAutoRight() end
 if M.Steal.AutoStealEnabled then M.startAutoSteal() end
 if M.bypassAimbotEnabled then M.startBypassAimbot() end
 if M.antiKickEnabled then M.enableAntiKick() end
 if M.antiLagEnabled then M.enableAntiLag() end
-if M.antiSummerBaseEnabled then M.enableAntiSummerBase() end
 if M.stretchRezEnabled then M.enableStretchRez() end
-if M.removeAccEnabled then M.startRemoveAcc() end
-if M.autoResetOnDeath then setupDeathReset() end
 
 if M.animPackEnabled and M.animPack and M.PACKS[M.animPack] then
     task.wait(0.5)

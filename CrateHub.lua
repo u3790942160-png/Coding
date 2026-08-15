@@ -19,6 +19,22 @@ local player = Players.LocalPlayer
 local M = {}
 
 -- ------------------------------------------------------------
+-- FORWARD DECLARATIONS
+-- These are assigned further down, but code above that point reads them.
+-- Without the forward declaration those reads resolve to nil globals: the
+-- accent silently fell back to white in the status bar and the mobile
+-- buttons, and saveCherryConfig() threw "attempt to call a nil value".
+-- ------------------------------------------------------------
+local saveCherryConfig
+local CHERRY_ACCENT
+local UI_ACCENT, UI_ACCENT_DIM, UI_ACCENT_LIGHT
+local UI_BG_DARK, UI_ROW_BG, UI_CARD_STROKE
+local UI_TEXT_WHITE, UI_TEXT_PRIMARY, UI_TEXT_DIM, UI_TEXT_SECTION
+local UI_BTN_BG, UI_CHIP_BG
+local UI_TOGGLE_OFF, UI_TOGGLE_KNOB, UI_KNOB_ON
+local UI_GRAD_TOP, UI_GRAD_BOT
+
+-- ------------------------------------------------------------
 -- EARLY CONFIG LOAD
 -- ------------------------------------------------------------
 M.introSoundEnabled = true
@@ -727,7 +743,6 @@ M.setAutoSwingVisual = nil
 M.setTranspVisual = nil
 M.setLockVisual = nil
 M.setMobVisual = nil
-M.setCircleBtnsVisual = nil
 M.setMedusaResetVisual = nil
 M.antiKickSetVisual = nil
 M.autoLeftSetVisual = nil
@@ -4534,7 +4549,7 @@ local function loadCherryConfig()
     end
 end
 
-local function saveCherryConfig()
+function saveCherryConfig()
     if type(writefile)~="function" then return end
     local function ks(e)
         if type(e) ~= "table" then return {kb=nil,gp=nil} end
@@ -4683,26 +4698,26 @@ end
 -- Declared ahead of applyAccentFromTheme so the theme writes these
 -- locals instead of same-named globals the UI never reads.
 -- ============================================================
-local CHERRY_ACCENT   = CHERRY_THEMES[CherryConfig.Theme] and CHERRY_THEMES[CherryConfig.Theme].Accent or Color3.fromRGB(255,77,160)
-local UI_ACCENT       = Color3.fromRGB(255, 77, 160)
-local UI_ACCENT_DIM   = Color3.fromRGB(170, 40, 105)
-local UI_ACCENT_LIGHT = Color3.fromRGB(255, 150, 200)
-local UI_BG_DARK      = Color3.fromRGB(11, 5, 8)
-local UI_ROW_BG       = Color3.fromRGB(40, 22, 30)
-local UI_CARD_STROKE  = Color3.fromRGB(170, 40, 105)
-local UI_TEXT_WHITE   = Color3.fromRGB(255, 255, 255)
-local UI_TEXT_PRIMARY = Color3.fromRGB(245, 232, 238)
-local UI_TEXT_DIM     = Color3.fromRGB(152, 124, 136)
-local UI_TEXT_SECTION = Color3.fromRGB(255, 150, 200)
-local UI_BTN_BG       = Color3.fromRGB(52, 29, 40)
-local UI_CHIP_BG      = Color3.fromRGB(52, 29, 40)
-local UI_TOGGLE_OFF   = Color3.fromRGB(49, 30, 38)
-local UI_TOGGLE_KNOB  = Color3.fromRGB(156, 139, 146)
-local UI_KNOB_ON      = Color3.fromRGB(255, 255, 255)
+CHERRY_ACCENT   = CHERRY_THEMES[CherryConfig.Theme] and CHERRY_THEMES[CherryConfig.Theme].Accent or Color3.fromRGB(255,77,160)
+UI_ACCENT       = Color3.fromRGB(255, 77, 160)
+UI_ACCENT_DIM   = Color3.fromRGB(170, 40, 105)
+UI_ACCENT_LIGHT = Color3.fromRGB(255, 150, 200)
+UI_BG_DARK      = Color3.fromRGB(11, 5, 8)
+UI_ROW_BG       = Color3.fromRGB(40, 22, 30)
+UI_CARD_STROKE  = Color3.fromRGB(170, 40, 105)
+UI_TEXT_WHITE   = Color3.fromRGB(255, 255, 255)
+UI_TEXT_PRIMARY = Color3.fromRGB(245, 232, 238)
+UI_TEXT_DIM     = Color3.fromRGB(152, 124, 136)
+UI_TEXT_SECTION = Color3.fromRGB(255, 150, 200)
+UI_BTN_BG       = Color3.fromRGB(52, 29, 40)
+UI_CHIP_BG      = Color3.fromRGB(52, 29, 40)
+UI_TOGGLE_OFF   = Color3.fromRGB(49, 30, 38)
+UI_TOGGLE_KNOB  = Color3.fromRGB(156, 139, 146)
+UI_KNOB_ON      = Color3.fromRGB(255, 255, 255)
 -- Gradient stops are multipliers over BackgroundColor3, not colours in their
 -- own right: keep them near white or the surface they sit on goes black.
-local UI_GRAD_TOP     = Color3.fromRGB(255, 255, 255)
-local UI_GRAD_BOT     = Color3.fromRGB(226, 226, 232)
+UI_GRAD_TOP     = Color3.fromRGB(255, 255, 255)
+UI_GRAD_BOT     = Color3.fromRGB(226, 226, 232)
 
 -- ============================================================
 -- CRATE HUB FEATURES
@@ -6671,7 +6686,8 @@ function M.buildGui()
     -- V2 settings
     local v2Box = Instance.new("Frame"); v2Box.BackgroundTransparency=1; v2Box.Size=UDim2.new(1,0,0,0); v2Box.AutomaticSize=Enum.AutomaticSize.Y
     local v2Lay = Instance.new("UIListLayout"); v2Lay.Padding=UDim.new(0,9); v2Lay.SortOrder=Enum.SortOrder.LayoutOrder; v2Lay.Parent=v2Box
-    local _, semiRadBox = uiNumberRow(v2Box, "Semi Radius (max 10)", math.min(M.Semi.radius,10), 0.5, 10, function(v)
+    local _, semiRadBox
+    _, semiRadBox = uiNumberRow(v2Box, "Semi Radius (max 10)", math.min(M.Semi.radius,10), 0.5, 10, function(v)
         M.Semi.radius = math.min(v,10)
         if semiRadBox then semiRadBox.Text = tostring(M.Semi.radius) end
     end)
@@ -6966,7 +6982,6 @@ function M.buildGui()
     M.radInput = srBox
     M.durationBox = sdBox
     M.btnSzBox = btnSzBox
-    M.sbBox = sbBox
 
     if M.setAntiRagVisual then M.setAntiRagVisual(M.antiRagdollEnabled) end
         if M.setSafeModeVisual then M.setSafeModeVisual(M.safeModeEnabled) end
@@ -6978,14 +6993,12 @@ function M.buildGui()
     if M.setMirrorTPVisual then M.setMirrorTPVisual(M.mirrorTPDownEnabled) end
     if M.safeModeEnabled then M.enableSafeMode() end
     
-    if M.setAntiRagModeUI then M.setAntiRagModeUI(M.antiRagdollMode == "No Splatter" and "No Splatter" or "Splatter") end
     if M.setInfJumpVisual then M.setInfJumpVisual(M.infJumpEnabled) end
     if M.setMedusaVisual then M.setMedusaVisual(M.medusaCounterEnabled) end
     if M.setMedusaResetVisual then M.setMedusaResetVisual(M.medusaResetEnabled) end
     if M.setBatCounterVisual then M.setBatCounterVisual(M.batCounterEnabled) end
     if M.setUnwalkVisual then M.setUnwalkVisual(M.unwalkEnabled) end
     if M.setAntiLagVisual then M.setAntiLagVisual(M.antiLagEnabled) end
-    if M.setAntiSummerVisual then M.setAntiSummerVisual(M.antiSummerBaseEnabled) end
     if M.setStretchRezVisual then M.setStretchRezVisual(M.stretchRezEnabled) end
     if M.setAutoTPVisual then M.setAutoTPVisual(M.autoTPEnabled) end
     if M.antiKickSetVisual then M.antiKickSetVisual(M.antiKickEnabled) end

@@ -1366,7 +1366,7 @@ function M.buildStatusUI()
     end
 
     local accent = UI_ACCENT or CHERRY_ACCENT or Color3.fromRGB(255, 255, 255)
-    local barW = math.clamp(tonumber(M.stealBarSize) or 340, 220, 600)
+    local barW = math.clamp(tonumber(M.stealBarSize) or 350, 240, 600)
 
     -- Panel: percent and radius on the top line, an info line under it, and the
     -- progress track along the bottom.
@@ -1383,15 +1383,15 @@ function M.buildStatusUI()
 
     local stroke = Instance.new("UIStroke")
     stroke.Color = accent
-    stroke.Thickness = 1.4
-    stroke.Transparency = 0.35
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.72
     stroke.Parent = frame
 
     -- percent, top left
     local label = Instance.new("TextLabel")
     label.Name = "StatusLabel"
     label.Size = UDim2.new(0.4, 0, 0, 18)
-    label.Position = UDim2.new(0, 14, 0, 8)
+    label.Position = UDim2.new(0, 22, 0, 9)
     label.BackgroundTransparency = 1
     label.Text = "0%"
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1407,7 +1407,7 @@ function M.buildStatusUI()
     radiusLbl.Name = "RadiusLbl"
     radiusLbl.AnchorPoint = Vector2.new(1, 0)
     radiusLbl.Size = UDim2.new(0.5, 0, 0, 18)
-    radiusLbl.Position = UDim2.new(1, -14, 0, 8)
+    radiusLbl.Position = UDim2.new(1, -22, 0, 9)
     radiusLbl.BackgroundTransparency = 1
     radiusLbl.Text = "Radius: " .. tostring(M.getActiveStealRadius())
     radiusLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1435,8 +1435,8 @@ function M.buildStatusUI()
     -- progress track along the bottom
     local barBg = Instance.new("Frame")
     barBg.Name = "Track"
-    barBg.Size = UDim2.new(1, -24, 0, 12)
-    barBg.Position = UDim2.new(0, 12, 1, -18)
+    barBg.Size = UDim2.new(1, -44, 0, 14)
+    barBg.Position = UDim2.new(0, 22, 1, -20)
     barBg.BackgroundColor3 = UI_CHIP_BG or Color3.fromRGB(52, 29, 40)
     barBg.BackgroundTransparency = 0.25
     barBg.BorderSizePixel = 0
@@ -1447,7 +1447,7 @@ function M.buildStatusUI()
     local barStroke = Instance.new("UIStroke")
     barStroke.Color = accent
     barStroke.Thickness = 1
-    barStroke.Transparency = 0.6
+    barStroke.Transparency = 0.75
     barStroke.Parent = barBg
 
     local fill = Instance.new("Frame")
@@ -4456,7 +4456,7 @@ local function loadCherryConfig()
         if type(d.stealDuration)=="number" then M.Steal.StealDuration=d.stealDuration end
         if type(d.stealStopTime)=="number" then M.Steal.StopTime=d.stealStopTime end
         if type(d.stealMode)=="string" then
-            if d.stealMode == "Semi" or d.stealMode == "Normal" or d.stealMode == "V1" or d.stealMode == "V2" then
+            if d.stealMode == "Semi" or d.stealMode == "Normal" or d.stealMode == "V1" or d.stealMode == "V2" or d.stealMode == "V3" then
                 M.stealMode=d.stealMode
             end
         end
@@ -5275,6 +5275,12 @@ local UI_SECTION_ORDER = {
     ["CONFIGURATION"]       = 15,
     ["COSMETICS"]           = 16,
 }
+-- Registry of built rows and sections, used by the search filter and by the
+-- collapse toggle on each section heading.
+local _uiRegistry = {}
+local _uiEntryOf = {}
+local _uiCurrentSection = nil
+
 local _uiOrderSeq = 0
 local _uiSectionBase = 0
 local function uiNextOrder()
@@ -5405,14 +5411,85 @@ local function uiAutoCanvas(scroll)
     task.delay(0.5, upd)
 end
 
+-- Search filter and per-section collapse. A row is visible when it matches the
+-- query and its section is not collapsed; a heading hides when nothing under it
+-- matches. Rows created hidden stay hidden regardless.
+local _uiQuery = ""
+
+local function uiRowMatches(e, q)
+    if e.hidden then return false end
+    if q == "" then return true end
+    return string.find(string.lower(e.text), q, 1, true) ~= nil
+end
+
+local function uiRefreshVisibility()
+    local q = _uiQuery
+    for _, e in ipairs(_uiRegistry) do
+        if e.kind == "row" then
+            local show = uiRowMatches(e, q)
+            if show and q == "" and e.section and e.section.collapsed then show = false end
+            e.obj.Visible = show
+        end
+    end
+    for _, e in ipairs(_uiRegistry) do
+        if e.kind == "section" then
+            if q == "" then
+                e.obj.Visible = true
+            else
+                local any = false
+                for _, r in ipairs(e.rows) do
+                    if uiRowMatches(r, q) then any = true break end
+                end
+                e.obj.Visible = any
+            end
+        end
+    end
+end
+
+local function uiSetQuery(text)
+    _uiQuery = string.lower(tostring(text or ""))
+    uiRefreshVisibility()
+end
+
 local function uiSectionHeader(parent, text)
     local r = Instance.new("Frame"); r.Size = UDim2.new(1,0,0,42); r.BackgroundTransparency = 1
     local base = uiBeginSection(text)
     r.LayoutOrder = base or uiNextOrder(); r.Parent = parent
+    local entry = {obj = r, kind = "section", text = string.upper(tostring(text)), rows = {}, collapsed = false}
+    table.insert(_uiRegistry, entry)
+    _uiEntryOf[r] = entry
+    _uiCurrentSection = entry
     local l = Instance.new("TextLabel"); l.Position = UDim2.new(0,2,0,0); l.Size = UDim2.new(1,-2,1,-6)
     l.BackgroundTransparency = 1; l.Text = string.upper(tostring(text)); l.TextColor3 = UI_TEXT_SECTION; l.TextSize = 13
     l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left
     l.TextYAlignment = Enum.TextYAlignment.Bottom; l.Parent = r
+
+    -- tap a heading to fold its rows away
+    local caret = Instance.new("TextLabel")
+    caret.Name = "SectionCaret"
+    caret.AnchorPoint = Vector2.new(1, 1)
+    caret.Position = UDim2.new(1, -6, 1, -4)
+    caret.Size = UDim2.new(0, 16, 0, 16)
+    caret.BackgroundTransparency = 1
+    caret.Text = "▾"
+    caret.TextColor3 = UI_TEXT_SECTION
+    caret.TextSize = 12
+    caret.Font = Enum.Font.GothamBold
+    caret.Parent = r
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1, 0, 1, 0)
+    hit.BackgroundTransparency = 1
+    hit.Text = ""
+    hit.AutoButtonColor = false
+    hit.ZIndex = 3
+    hit.Parent = r
+    hit.MouseButton1Click:Connect(function()
+        entry.collapsed = not entry.collapsed
+        TweenService:Create(caret, UI_TWEEN_FAST, {Rotation = entry.collapsed and -90 or 0}):Play()
+        uiRefreshVisibility()
+    end)
+
     return r
 end
 
@@ -5427,6 +5504,11 @@ local function uiRowCard(parent, hidden, height)
     if hidden then r.Visible = false end
     r.Parent = parent
     uiCardStyle(r)
+
+    local entry = {obj = r, kind = "row", text = "", section = _uiCurrentSection, hidden = hidden and true or false}
+    table.insert(_uiRegistry, entry)
+    _uiEntryOf[r] = entry
+    if _uiCurrentSection then table.insert(_uiCurrentSection.rows, entry) end
 
     -- the card lifts a little under the cursor so the row you are about to
     -- hit is obvious; no-op on touch, where there is no hover
@@ -5453,6 +5535,8 @@ local function uiRowLabel(parent, label, rightGap)
     l.TextTruncate = Enum.TextTruncate.AtEnd
     l.ZIndex = 2
     l.Parent = parent
+    local e = _uiEntryOf[parent]
+    if e then e.text = tostring(label) end
     return l
 end
 
@@ -5699,6 +5783,12 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
     container.ClipsDescendants = false
     container.LayoutOrder = uiNextOrder()
     container.Parent = parent
+    do
+        local entry = {obj = container, kind = "row", text = tostring(label), section = _uiCurrentSection, hidden = false}
+        table.insert(_uiRegistry, entry)
+        _uiEntryOf[container] = entry
+        if _uiCurrentSection then table.insert(_uiCurrentSection.rows, entry) end
+    end
 
     local col = Instance.new("UIListLayout")
     col.FillDirection = Enum.FillDirection.Vertical
@@ -6253,11 +6343,77 @@ function M.buildGui()
         g.Parent=Div
     end
 
+    -- SEARCH: filters the whole list live, which matters with everything on
+    -- one scroll
+    do
+        local sb = Instance.new("Frame")
+        sb.Name = "SearchBar"
+        sb.Position = UDim2.new(0, 14, 0, 78)
+        sb.Size = UDim2.new(1, -28, 0, 32)
+        sb.BackgroundColor3 = UI_CHIP_BG
+        sb.BorderSizePixel = 0
+        sb.Parent = Frame
+        Instance.new("UICorner", sb).CornerRadius = UDim.new(0, 10)
+        local ss = Instance.new("UIStroke")
+        ss.Color = UI_CARD_STROKE
+        ss.Thickness = 1
+        ss.Transparency = 0.8
+        ss.Parent = sb
+
+        local icon = Instance.new("TextLabel")
+        icon.Position = UDim2.new(0, 10, 0, 0)
+        icon.Size = UDim2.new(0, 18, 1, 0)
+        icon.BackgroundTransparency = 1
+        icon.Text = "⌕"
+        icon.TextColor3 = UI_ACCENT_LIGHT
+        icon.TextSize = 17
+        icon.Font = Enum.Font.GothamBold
+        icon.Parent = sb
+
+        local box = Instance.new("TextBox")
+        box.Name = "SearchBox"
+        box.Position = UDim2.new(0, 30, 0, 0)
+        box.Size = UDim2.new(1, -62, 1, 0)
+        box.BackgroundTransparency = 1
+        box.Text = ""
+        box.PlaceholderText = "Search settings..."
+        box.PlaceholderColor3 = UI_TEXT_DIM
+        box.TextColor3 = UI_TEXT_PRIMARY
+        box.TextSize = 13
+        box.Font = Enum.Font.GothamMedium
+        box.TextXAlignment = Enum.TextXAlignment.Left
+        box.ClearTextOnFocus = false
+        box.Parent = sb
+        M.searchBox = box
+
+        local clear = Instance.new("TextButton")
+        clear.AnchorPoint = Vector2.new(1, 0.5)
+        clear.Position = UDim2.new(1, -8, 0.5, 0)
+        clear.Size = UDim2.new(0, 22, 0, 22)
+        clear.BackgroundTransparency = 1
+        clear.Text = "✕"
+        clear.TextColor3 = UI_TEXT_DIM
+        clear.TextSize = 13
+        clear.Font = Enum.Font.GothamBold
+        clear.AutoButtonColor = false
+        clear.Visible = false
+        clear.Parent = sb
+
+        box:GetPropertyChangedSignal("Text"):Connect(function()
+            clear.Visible = box.Text ~= ""
+            uiSetQuery(box.Text)
+        end)
+        clear.MouseButton1Click:Connect(function()
+            box.Text = ""
+            uiSetQuery("")
+        end)
+    end
+
     -- CONTENT: one continuous scroll, no tab bar
     local PagedContent = Instance.new("Frame")
     PagedContent.Name = "Content"
-    PagedContent.Position = UDim2.new(0,8,0,78)
-    PagedContent.Size = UDim2.new(1,-16,1,-90)
+    PagedContent.Position = UDim2.new(0,8,0,118)
+    PagedContent.Size = UDim2.new(1,-16,1,-130)
     PagedContent.BackgroundTransparency = 1
     PagedContent.Parent = Frame
 
@@ -6661,13 +6817,15 @@ function M.buildGui()
 
 
     uiSectionHeader(PMech, "AUTO STEAL")
-    local stealModeLabels = {"V1", "V2"}
+    local stealModeLabels = {"V1", "V2", "V3"}
     local function stealLabelToMode(lab)
         if lab == "V2" then return "V2" end
+        if lab == "V3" then return "V3" end
         return "V1"
     end
     local function stealModeToLabel(mode)
         if mode == "Semi" or mode == "V2" then return "V2" end
+        if mode == "V3" then return "V3" end
         return "V1"
     end
     local stealDefaultIdx = 1
@@ -6729,6 +6887,42 @@ function M.buildGui()
     local _, semiHoldMax = uiNumberRow(v2Box, "Hold Max", M.Semi.holdMax or 2.6, 0.1, 8, function(v) M.Semi.holdMax = v end)
     regStealSettings("V2", v2Box)
 
+
+    -- V3 settings
+    local v3Box = Instance.new("Frame"); v3Box.BackgroundTransparency=1; v3Box.Size=UDim2.new(1,0,0,0); v3Box.AutomaticSize=Enum.AutomaticSize.Y
+    local v3Lay = Instance.new("UIListLayout"); v3Lay.Padding=UDim.new(0,9); v3Lay.SortOrder=Enum.SortOrder.LayoutOrder; v3Lay.Parent=v3Box
+    local _, v3Rad = uiNumberRow(v3Box, "Grab Radius", M.Steal.StealRadius, 0.5, 300, function(v)
+        M.Steal.StealRadius = v; M.setStealRadius(v); M.updateStatusRadius()
+    end)
+    local _, v3Dur = uiNumberRow(v3Box, "Fill Duration", M.Steal.StealDuration, 0.1, 10, function(v)
+        M.Steal.StealDuration = v
+    end)
+    -- Stop Time in seconds (how long after leaving range before fill cancels)
+    do
+        local r = uiRowCard(v3Box, false, UI_ROW_H)
+        uiRowLabel(r, "Stop Time (s)", 170)
+        local function clampStop(n)
+            n = tonumber(n) or 0.35
+            return math.clamp(n, 0.1, 30)
+        end
+        local box = uiValueChip(r, string.format("%.2f", clampStop(M.Steal.StopTime)), {width = 78})
+        local function applyStop(n)
+            n = clampStop(n)
+            M.Steal.StopTime = n
+            box.Text = string.format("%.2f", n)
+            saveCherryConfig()
+        end
+        local plus  = uiSmallBtn({Parent=r, Pos=UDim2.new(1,-134,0.5,-17), Size=UDim2.new(0,30,0,34), Text="+", Col=UI_TEXT_PRIMARY, TS=15, CR=10, Z=3})
+        local minus = uiSmallBtn({Parent=r, Pos=UDim2.new(1,-170,0.5,-17), Size=UDim2.new(0,30,0,34), Text="-", Col=UI_TEXT_PRIMARY, TS=15, CR=10, Z=3})
+        minus.MouseButton1Click:Connect(function() applyStop((tonumber(M.Steal.StopTime) or 0.35) - 0.25) end)
+        plus.MouseButton1Click:Connect(function() applyStop((tonumber(M.Steal.StopTime) or 0.35) + 0.25) end)
+        box.MouseButton1Click:Connect(function() applyStop((tonumber(M.Steal.StopTime) or 0.35) + 0.25) end)
+        M.stopTimeBox = box
+    end
+    local _, setAutoRadius3 = uiToggleRow(v3Box, "Auto Radius", M.autoRadiusEnabled, function(on)
+        M.autoRadiusEnabled = on; M.updateStatusRadius()
+    end)
+    regStealSettings("V3", v3Box)
 
     uiSectionHeader(PMech, "MEDUSA")
     local _, setMedusa = uiToggleRow(PMech, "Medusa Counter", M.medusaCounterEnabled, function(on)
@@ -7053,7 +7247,8 @@ function M.buildGui()
     if M.korbloxEnabled then M.applyKorbloxToChar(player.Character, true) end
     if M.setStealModeUI then
         local lab = "V1"
-        if M.stealMode == "Semi" or M.stealMode == "V2" then lab = "V2" end
+        if M.stealMode == "Semi" or M.stealMode == "V2" then lab = "V2"
+        elseif M.stealMode == "V3" then lab = "V3" end
         M.setStealModeUI(lab)
     end
     if M.setJumpModeUI then M.setJumpModeUI(M.infJumpMode == "hold" and "Hold" or "Manual") end
@@ -7209,7 +7404,6 @@ M._savedTheme = "Crate"
 applyAccentFromTheme()
 -- Skip Intro mirrors the intro toggles, which the early config pass already read
 if M.skipIntroEnabled == nil then M.skipIntroEnabled = (M.introGUIEnabled == false) end
-if M.stealMode == "V3" then M.stealMode = "V1" end
 -- Features dropped to match the reference script: force them off so an older
 -- saved config cannot re-enable something with no row to turn it back off.
 M.antiKickEnabled = false

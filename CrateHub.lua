@@ -567,7 +567,6 @@ M.guiTransparencyEnabled = false
 M.mobileButtonsEnabled = true
 M.mobileButtonsLocked = false
 M.mobileButtonsSize = 100
-M.circleButtonsEnabled = false
 M.mobBtnRefs = {}
 M.mobGuiRef = nil
 M.fovValue = 80
@@ -4134,14 +4133,9 @@ function M.buildMobileButtons()
     local savedPositions = M._forceDefaultMobPos and {} or M.loadBtnPositions()
     local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
 
-    local BTN_H    = math.max(44, math.floor(M.mobileButtonsSize * M.uiScale * 0.65))
-    local BTN_W    = math.floor(BTN_H * 1.3)
-    local CORNER_R = 18
-    if M.circleButtonsEnabled then
-        local side = math.max(BTN_H, math.floor(BTN_W * 0.92))
-        BTN_H, BTN_W = side, side
-        CORNER_R = math.floor(side / 2)
-    end
+    local BTN_H    = math.max(52, math.floor(M.mobileButtonsSize * M.uiScale * 0.85))
+    local BTN_W    = math.floor(BTN_H * 1.05)
+    local CORNER_R = 20
 
     local mobGui = Instance.new("ScreenGui")
     mobGui.Name = "MoveeMobileButtons"
@@ -4162,11 +4156,7 @@ function M.buildMobileButtons()
     )
     local BTN_ON    = accent
     local TXT_OFF   = Color3.fromRGB(255, 255, 255)
-    local TXT_ON    = Color3.fromRGB(0, 0, 0)
-    -- If accent is very dark, keep on-text readable
-    if (accent.R + accent.G + accent.B) < 0.45 then
-        TXT_ON = Color3.fromRGB(255, 255, 255)
-    end
+    local TXT_ON    = Color3.fromRGB(255, 255, 255)
 
     local btnDefs = {
         {"drop", "DROP\nBRAINROT", false},
@@ -4174,16 +4164,16 @@ function M.buildMobileButtons()
         {"autoBat", "AUTO\nBAT", true},
         {"autoRight", "AUTO\nRIGHT", true},
         {"tpDown", "TP\nDOWN", false},
-        {"carrySpeed", "CARRY\nSPEED", true},
-        {"lagger", "LAGGER\nMODE", true},
-        {"instaReset", "INSTA\nRESET", false},
+        {"carrySpeed", "CARRY\nSPD", true},
+        {"lagger", "LAGGER\nNORMAL", true},
+        {"instaReset", "INSTANT\nRESET", false},
         {"laggerCarry", "LAGGER\nCARRY", true},
         {"bypass", "BAT\nTP", true},
     }
 
-    local cols = 2
-    local gap = 8
-    local padding = 6
+    local cols = 3
+    local gap = 7
+    local padding = 10
     local startX = vp.X - (cols * (BTN_W + gap)) - padding
     local startY = 50
 
@@ -4208,11 +4198,11 @@ function M.buildMobileButtons()
         btn:SetAttribute("DefaultX", defaultX)
         btn:SetAttribute("DefaultY", defaultY)
         btn.BackgroundColor3 = BTN_OFF
-        btn.BackgroundTransparency = 0.05
+        btn.BackgroundTransparency = 0
         btn.Text = label
         btn.TextColor3 = TXT_OFF
-        btn.TextSize = 10
-        btn.Font = Enum.Font.GothamBlack
+        btn.TextSize = math.max(11, math.floor(BTN_H * 0.17))
+        btn.Font = Enum.Font.GothamBold
         btn.TextWrapped = true
         btn.BorderSizePixel = 0
         btn.ZIndex = 101
@@ -4221,11 +4211,7 @@ function M.buildMobileButtons()
         btn.Parent = mobGui
 
         local corner = Instance.new("UICorner", btn)
-        if M.circleButtonsEnabled then
-            corner.CornerRadius = UDim.new(1, 0)
-        else
-            corner.CornerRadius = UDim.new(0, CORNER_R)
-        end
+        corner.CornerRadius = UDim.new(0, CORNER_R)
         btn.TextStrokeTransparency = 1
         do
             local st0 = Instance.new("UIStroke")
@@ -4233,7 +4219,7 @@ function M.buildMobileButtons()
             st0.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
             st0.Color = accent
             st0.Thickness = 1
-            st0.Transparency = 0.45
+            st0.Transparency = 0.92
             st0.Parent = btn
         end
 
@@ -4252,11 +4238,10 @@ function M.buildMobileButtons()
                     BackgroundColor3 = BTN_ON,
                     TextColor3 = TXT_ON,
                 }):Play()
-                btn.TextStrokeColor3 = BTN_ON
-                btn.TextStrokeTransparency = 0.35
+                btn.TextStrokeTransparency = 1
                 stroke.Color = BTN_ON
                 stroke.Thickness = 2
-                stroke.Transparency = 0.05
+                stroke.Transparency = 0.1
             else
                 TweenService:Create(btn, TweenInfo.new(0.12), {
                     BackgroundColor3 = BTN_OFF,
@@ -4265,7 +4250,7 @@ function M.buildMobileButtons()
                 btn.TextStrokeTransparency = 1
                 stroke.Color = accent
                 stroke.Thickness = 1
-                stroke.Transparency = 0.45
+                stroke.Transparency = 0.92
             end
         end
 
@@ -4475,7 +4460,6 @@ local function loadCherryConfig()
         if d.introSongChoice then M.introSongChoice=d.introSongChoice end
         if d.introGUIEnabled~=nil then M.introGUIEnabled=d.introGUIEnabled==true end
         if d.ragdollGui~=nil then M.ragdollGuiEnabled=d.ragdollGui==true end
-        if d.circleButtonsEnabled~=nil then M.circleButtonsEnabled=d.circleButtonsEnabled==true end
         if d.perButtonDrag~=nil then M.perButtonDragEnabled=d.perButtonDrag==true end
         if d.mobileButtonsEnabled~=nil then M.mobileButtonsEnabled=d.mobileButtonsEnabled end
         if d.medusaReset~=nil then M.medusaResetEnabled=d.medusaReset==true end
@@ -4575,7 +4559,7 @@ local function saveCherryConfig()
         autoSwing=M.autoSwingEnabled, introSoundEnabled=M.introSoundEnabled,
         introSongChoice=M.introSongChoice,
         introGUIEnabled=M.introGUIEnabled,
-        ragdollGui=M.ragdollGuiEnabled, circleButtonsEnabled=M.circleButtonsEnabled,
+        ragdollGui=M.ragdollGuiEnabled,
         perButtonDrag=M.perButtonDragEnabled, mobileButtonsEnabled=M.mobileButtonsEnabled,
         medusaReset=M.medusaResetEnabled, autoMoveSwing=M.autoMoveSwingEnabled,
         autoSwitchSpeed=M.autoSwitchSpeedEnabled, autoTurnOffSpeed=M.autoTurnOffSpeedEnabled, autoSwitchLaggerSpeed=M.autoSwitchLaggerSpeedEnabled, customFont=M.customFontSelected, showPlayerSpeeds=M.showPlayerSpeeds,
@@ -4786,6 +4770,7 @@ M.stealKickWarnEnabled = false
 M.STEAL_SAFE_RADIUS = 90
 M.STEAL_SAFE_MIN_TIME = 0.6
 
+-- Wide banner that slides in from off the right edge, holds, then slides back.
 function M.showWarning(text)
     local pg = player:FindFirstChild("PlayerGui")
     if not pg then return end
@@ -4798,32 +4783,74 @@ function M.showWarning(text)
         gui.DisplayOrder = 130
         gui.Parent = pg
     end
+
+    local accent = UI_ACCENT or Color3.fromRGB(255,77,160)
     local lbl = gui:FindFirstChild("WarnLabel")
     if not lbl then
         lbl = Instance.new("TextLabel")
         lbl.Name = "WarnLabel"
-        lbl.AnchorPoint = Vector2.new(0.5, 0)
-        lbl.Position = UDim2.new(0.5, 0, 0, 54)
-        lbl.Size = UDim2.new(0, 300, 0, 34)
+        lbl.AnchorPoint = Vector2.new(1, 0)
+        lbl.Size = UDim2.new(0, 460, 0, 62)
         lbl.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11,5,8)
+        lbl.BackgroundTransparency = 0.05
         lbl.BorderSizePixel = 0
-        lbl.TextColor3 = UI_ACCENT or Color3.fromRGB(255,77,160)
-        lbl.TextSize = 13
+        lbl.TextColor3 = Color3.fromRGB(255,255,255)
+        lbl.TextSize = 19
         lbl.Font = Enum.Font.GothamBold
+        lbl.TextWrapped = true
+        lbl.Visible = false
         lbl.Parent = gui
-        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 14)
         local st = Instance.new("UIStroke")
-        st.Color = UI_ACCENT or Color3.fromRGB(255,77,160)
-        st.Thickness = 1.6
-        st.Transparency = 0.15
+        st.Name = "WarnStroke"
+        st.Color = accent
+        st.Thickness = 2
+        st.Transparency = 0.05
         st.Parent = lbl
+        -- accent edge down the left of the banner
+        local edge = Instance.new("Frame")
+        edge.Name = "WarnEdge"
+        edge.AnchorPoint = Vector2.new(0, 0.5)
+        edge.Position = UDim2.new(0, 12, 0.5, 0)
+        edge.Size = UDim2.new(0, 5, 0, 34)
+        edge.BackgroundColor3 = accent
+        edge.BorderSizePixel = 0
+        edge.ZIndex = 2
+        edge.Parent = lbl
+        Instance.new("UICorner", edge).CornerRadius = UDim.new(0, 3)
+        local pad = Instance.new("UIPadding")
+        pad.PaddingLeft = UDim.new(0, 30)
+        pad.PaddingRight = UDim.new(0, 14)
+        pad.Parent = lbl
     end
+
+    local SHOWN  = UDim2.new(1, -18, 0, 60)
+    local HIDDEN = UDim2.new(1, 480, 0, 60)
+    local SLIDE_IN  = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local SLIDE_OUT = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+
     lbl.Text = text
-    lbl.Visible = true
     M._stealWarnToken = (M._stealWarnToken or 0) + 1
     local token = M._stealWarnToken
+
+    if M._warnTween then pcall(function() M._warnTween:Cancel() end) end
+    if not lbl.Visible then
+        lbl.Position = HIDDEN
+        lbl.Visible = true
+    end
+    M._warnTween = TweenService:Create(lbl, SLIDE_IN, {Position = SHOWN})
+    M._warnTween:Play()
+
     task.delay(4, function()
-        if lbl and lbl.Parent and M._stealWarnToken == token then lbl.Visible = false end
+        if not (lbl and lbl.Parent) then return end
+        if M._stealWarnToken ~= token then return end
+        if M._warnTween then pcall(function() M._warnTween:Cancel() end) end
+        local out = TweenService:Create(lbl, SLIDE_OUT, {Position = HIDDEN})
+        M._warnTween = out
+        out:Play()
+        out.Completed:Connect(function()
+            if M._stealWarnToken == token then lbl.Visible = false end
+        end)
     end)
 end
 
@@ -6901,7 +6928,6 @@ function M.buildGui()
     if M.setAntiRagVisual then M.setAntiRagVisual(M.antiRagdollEnabled) end
         if M.setSafeModeVisual then M.setSafeModeVisual(M.safeModeEnabled) end
     if M.setAutoCarryVisual then M.setAutoCarryVisual(M.autoSwitchSpeedEnabled) end
-if M.setCircleBtnsVisual then M.setCircleBtnsVisual(M.circleButtonsEnabled) end
     -- re-apply saved font after GUI rebuild
     if M.customFontSelected and M.customFontSelected ~= "None" then
         task.defer(function() pcall(function() M.applyCustomFont(M.customFontSelected) end) end)
@@ -7008,7 +7034,6 @@ function M.resetAllSettings()
     M.guiTransparencyEnabled = false
     M.mobileButtonsEnabled = true
     M.mobileButtonsSize = 100
-    M.circleButtonsEnabled = false
     M.fovValue = 80
     M.fovIndex = 1
     M.autoSwitchSpeedEnabled = false
@@ -7103,7 +7128,6 @@ M.antiSummerBaseEnabled = false
 M.removeAccEnabled = false
 M.autoResetOnDeath = false
 M.medusaResetEnabled = false
-M.circleButtonsEnabled = false
 M.autoTurnOffSpeedEnabled = false
 M.autoSwitchLaggerSpeedEnabled = false
 M.customFontSelected = "None"

@@ -4148,9 +4148,11 @@ function M.buildMobileButtons()
     local savedPositions = M._forceDefaultMobPos and {} or M.loadBtnPositions()
     local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
 
-    local BTN_H    = math.max(52, math.floor(M.mobileButtonsSize * M.uiScale * 0.85))
+    local BTN_H    = math.max(56, math.floor(M.mobileButtonsSize * M.uiScale))
     local BTN_W    = BTN_H
-    local CORNER_R = 20
+    -- radius scales with the tile: a fixed 20 on a small tile rounded it off
+    -- so far it read as a circle rather than a square
+    local CORNER_R = math.max(6, math.floor(BTN_H * 0.17))
 
     local mobGui = Instance.new("ScreenGui")
     mobGui.Name = "MoveeMobileButtons"
@@ -5341,6 +5343,12 @@ local function uiValueChip(parent, text, opts)
     b.ZIndex = 3
     b.Parent = parent
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, opts.radius or 10)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG:Lerp(UI_ACCENT, 0.22)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG}):Play()
+    end)
     if opts.autoWidth then
         -- Grows leftwards so long key names ("LeftControl") still fit
         b.AutomaticSize = Enum.AutomaticSize.X
@@ -5398,10 +5406,10 @@ local function uiAutoCanvas(scroll)
 end
 
 local function uiSectionHeader(parent, text)
-    local r = Instance.new("Frame"); r.Size = UDim2.new(1,0,0,34); r.BackgroundTransparency = 1
+    local r = Instance.new("Frame"); r.Size = UDim2.new(1,0,0,42); r.BackgroundTransparency = 1
     local base = uiBeginSection(text)
     r.LayoutOrder = base or uiNextOrder(); r.Parent = parent
-    local l = Instance.new("TextLabel"); l.Position = UDim2.new(0,2,0,0); l.Size = UDim2.new(1,-2,1,0)
+    local l = Instance.new("TextLabel"); l.Position = UDim2.new(0,2,0,0); l.Size = UDim2.new(1,-2,1,-6)
     l.BackgroundTransparency = 1; l.Text = string.upper(tostring(text)); l.TextColor3 = UI_TEXT_SECTION; l.TextSize = 13
     l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left
     l.TextYAlignment = Enum.TextYAlignment.Bottom; l.Parent = r
@@ -5419,6 +5427,16 @@ local function uiRowCard(parent, hidden, height)
     if hidden then r.Visible = false end
     r.Parent = parent
     uiCardStyle(r)
+
+    -- the card lifts a little under the cursor so the row you are about to
+    -- hit is obvious; no-op on touch, where there is no hover
+    local hoverCol = UI_ROW_BG:Lerp(UI_ACCENT, 0.10)
+    r.MouseEnter:Connect(function()
+        TweenService:Create(r, UI_TWEEN_FAST, {BackgroundColor3 = hoverCol}):Play()
+    end)
+    r.MouseLeave:Connect(function()
+        TweenService:Create(r, UI_TWEEN_FAST, {BackgroundColor3 = UI_ROW_BG}):Play()
+    end)
     return r
 end
 
@@ -5513,6 +5531,13 @@ local function uiToggleRow(parent, label, on, callback, opts)
     knob.Position = on and UDim2.new(1,-23,0.5,-10) or UDim2.new(0,3,0.5,-10)
     knob.BackgroundColor3 = on and UI_KNOB_ON or UI_TOGGLE_KNOB; knob.ZIndex = 4; knob.Parent = tb
     Instance.new("UICorner",knob)
+    do
+        local ks = Instance.new("UIStroke")
+        ks.Color = Color3.fromRGB(0, 0, 0)
+        ks.Thickness = 1
+        ks.Transparency = 0.85
+        ks.Parent = knob
+    end
 
     if opts.kb then uiKeybindChip(r, opts.kb, 72, 56) end
 
@@ -5955,9 +5980,9 @@ end
 local function uiMakePage(parent, name, order, vis)
     local p = Instance.new("ScrollingFrame"); p.Name=name; p.Visible=true; p.LayoutOrder=order or 1
     p.Size=UDim2.new(1,0,1,0); p.BackgroundTransparency=1; p.BorderSizePixel=0
-    p.ScrollBarThickness=6
-    p.ScrollBarImageColor3=Color3.fromRGB(150,158,175)
-    p.ScrollBarImageTransparency=0.35
+    p.ScrollBarThickness=5
+    p.ScrollBarImageColor3=UI_ACCENT_LIGHT
+    p.ScrollBarImageTransparency=0.45
     p.ScrollingEnabled=true
     p.ScrollingDirection=Enum.ScrollingDirection.Y
     p.ElasticBehavior=Enum.ElasticBehavior.Always
@@ -6114,6 +6139,14 @@ function M.buildGui()
         stroke.Thickness = 2
         stroke.Transparency = 0.08
         stroke.Parent = Frame
+
+        -- wider, fainter second outline reads as a glow around the panel
+        local halo = Instance.new("UIStroke")
+        halo.Name = "MainHalo"
+        halo.Color = accent
+        halo.Thickness = 6
+        halo.Transparency = 0.86
+        halo.Parent = Frame
     end
 
     -- HEADER

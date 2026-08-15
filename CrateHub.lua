@@ -4548,6 +4548,8 @@ local function loadCherryConfig()
         if d.mobileButtonsLocked~=nil then M.mobileButtonsLocked=d.mobileButtonsLocked==true end
         if d.skipIntroEnabled~=nil then M.skipIntroEnabled=d.skipIntroEnabled==true end
         if d.ragdollTimerEnabled~=nil then M.ragdollTimerEnabled=d.ragdollTimerEnabled==true end
+        if type(d.bgIndex)=="number" and d.bgIndex >= 1 and d.bgIndex <= #M.BACKGROUNDS then M.bgIndex=math.floor(d.bgIndex) end
+        if type(d.bgOpacity)=="number" then M.bgOpacity=math.clamp(d.bgOpacity, 0, 1) end
     end
 end
 
@@ -4616,6 +4618,7 @@ function saveCherryConfig()
         mobileButtonsLocked=M.mobileButtonsLocked,
         skipIntroEnabled=M.skipIntroEnabled,
         ragdollTimerEnabled=M.ragdollTimerEnabled,
+        bgIndex=M.bgIndex, bgOpacity=M.bgOpacity,
     }
     pcall(function() writefile(CHERRY_CONFIG_NAME, HS:JSONEncode(cfg)) end)
 end
@@ -5061,6 +5064,43 @@ function M.refreshSpeedModeLabel()
     chip.Text = mode
 end
 
+-- ---------- Menu background image ----------
+-- Six presets plus an off state. The image sits behind the content at ZIndex
+-- 0 and is dimmed so rows stay readable.
+M.BACKGROUNDS = {
+    {name = "None",     id = 0},
+    {name = "Nebula",   id = 79737099962715},
+    {name = "Cherry",   id = 71211662493854},
+    {name = "Circuit",  id = 15556272558},
+    {name = "Mountain", id = 1471587689},
+    {name = "Neon City",id = 14349182390},
+    {name = "Aurora",   id = 108236541541009},
+}
+M.bgIndex = 1
+M.bgOpacity = 0.72
+
+function M.applyMenuBackground(frame)
+    frame = frame or M.mainFrame
+    if not frame then return end
+    local old = frame:FindFirstChild("MenuBgImage")
+    if old then old:Destroy() end
+    local preset = M.BACKGROUNDS[M.bgIndex or 1]
+    if not preset or (tonumber(preset.id) or 0) <= 0 then return end
+    local img = Instance.new("ImageLabel")
+    img.Name = "MenuBgImage"
+    img.BackgroundTransparency = 1
+    img.Image = "rbxassetid://" .. tostring(preset.id)
+    img.ScaleType = Enum.ScaleType.Crop
+    img.Size = UDim2.fromScale(1, 1)
+    img.Position = UDim2.fromScale(0, 0)
+    img.ZIndex = 0
+    img.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.72, 0, 1)
+    img.Parent = frame
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 16)
+    c.Parent = img
+end
+
 -- ---------- Mobile buttons lock ----------
 M.mobileButtonsLocked = false
 
@@ -5268,12 +5308,13 @@ local UI_SECTION_ORDER = {
     ["TELEPORT"]            = 8,
     ["AUTO"]                = 9,
     ["ANIMATIONS"]          = 10,
-    ["SKYBOX"]              = 11,
-    ["PERFORMANCE"]         = 12,
-    ["INTERFACE"]           = 13,
-    ["MOBILE BUTTONS"]      = 14,
-    ["CONFIGURATION"]       = 15,
-    ["COSMETICS"]           = 16,
+    ["BACKGROUND"]          = 11,
+    ["SKYBOX"]              = 12,
+    ["PERFORMANCE"]         = 13,
+    ["INTERFACE"]           = 14,
+    ["MOBILE BUTTONS"]      = 15,
+    ["CONFIGURATION"]       = 16,
+    ["COSMETICS"]           = 17,
 }
 -- Registry of built rows and sections, used by the search filter and by the
 -- collapse toggle on each section heading.
@@ -5287,6 +5328,14 @@ local function uiNextOrder()
     _uiOrderSeq = _uiOrderSeq + 1
     return _uiSectionBase + _uiOrderSeq
 end
+-- buildGui can run more than once (Reset All Settings rebuilds the menu), so
+-- the registry has to start empty or it accumulates destroyed rows.
+local function uiResetRegistry()
+    _uiRegistry = {}
+    _uiEntryOf = {}
+    _uiCurrentSection = nil
+end
+
 local function uiBeginSection(name)
     local ord = UI_SECTION_ORDER[string.upper(tostring(name))]
     if not ord then return nil end
@@ -5419,7 +5468,10 @@ local _uiQuery = ""
 local function uiRowMatches(e, q)
     if e.hidden then return false end
     if q == "" then return true end
-    return string.find(string.lower(e.text), q, 1, true) ~= nil
+    if string.find(string.lower(e.text), q, 1, true) then return true end
+    -- a hit on the section name surfaces everything under it
+    if e.section and string.find(string.lower(e.section.text), q, 1, true) then return true end
+    return false
 end
 
 local function uiRefreshVisibility()
@@ -6090,6 +6142,258 @@ local function uiMakePage(parent, name, order, vis)
     return p
 end
 
+-- Background picker: list of presets on the left, live preview on the right
+-- showing the menu's own colours behind the chosen image.
+function M.openBackgroundPicker()
+    local pg = player:FindFirstChild("PlayerGui")
+    if not pg then return end
+    local old = pg:FindFirstChild("CrateHubBgPicker")
+    if old then old:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "CrateHubBgPicker"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 140
+    gui.Parent = pg
+
+    local dim = Instance.new("TextButton")
+    dim.Size = UDim2.fromScale(1, 1)
+    dim.BackgroundColor3 = Color3.new(0, 0, 0)
+    dim.BackgroundTransparency = 0.45
+    dim.Text = ""
+    dim.AutoButtonColor = false
+    dim.Parent = gui
+
+    local panel = Instance.new("Frame")
+    panel.Name = "Panel"
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    panel.Size = UDim2.new(0, 560, 0, 330)
+    panel.BackgroundColor3 = UI_BG_DARK
+    panel.BorderSizePixel = 0
+    panel.Parent = gui
+    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
+    do
+        local st = Instance.new("UIStroke")
+        st.Color = UI_ACCENT; st.Thickness = 2; st.Transparency = 0.1; st.Parent = panel
+    end
+
+    local title = Instance.new("TextLabel")
+    title.Position = UDim2.new(0, 20, 0, 14)
+    title.Size = UDim2.new(1, -80, 0, 24)
+    title.BackgroundTransparency = 1
+    title.Text = "BACKGROUND"
+    title.TextColor3 = UI_TEXT_SECTION
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = panel
+
+    local close = Instance.new("TextButton")
+    close.AnchorPoint = Vector2.new(1, 0)
+    close.Position = UDim2.new(1, -14, 0, 12)
+    close.Size = UDim2.new(0, 30, 0, 28)
+    close.BackgroundColor3 = UI_CHIP_BG
+    close.BorderSizePixel = 0
+    close.Text = "✕"
+    close.TextColor3 = UI_TEXT_PRIMARY
+    close.TextSize = 14
+    close.Font = Enum.Font.GothamBold
+    close.AutoButtonColor = false
+    close.Parent = panel
+    Instance.new("UICorner", close).CornerRadius = UDim.new(0, 9)
+
+    -- left: the preset list
+    local list = Instance.new("ScrollingFrame")
+    list.Position = UDim2.new(0, 16, 0, 48)
+    list.Size = UDim2.new(0, 236, 1, -110)
+    list.BackgroundTransparency = 1
+    list.BorderSizePixel = 0
+    list.ScrollBarThickness = 4
+    list.ScrollBarImageColor3 = UI_ACCENT_LIGHT
+    list.ScrollingDirection = Enum.ScrollingDirection.Y
+    list.CanvasSize = UDim2.new(0, 0, 0, 0)
+    list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    list.Parent = panel
+    local lay = Instance.new("UIListLayout")
+    lay.Padding = UDim.new(0, 7)
+    lay.SortOrder = Enum.SortOrder.LayoutOrder
+    lay.Parent = list
+
+    -- right: preview of the menu with that background
+    local preview = Instance.new("Frame")
+    preview.Name = "Preview"
+    preview.Position = UDim2.new(0, 268, 0, 48)
+    preview.Size = UDim2.new(1, -284, 1, -110)
+    preview.BackgroundColor3 = UI_BG_DARK
+    preview.BorderSizePixel = 0
+    preview.ClipsDescendants = true
+    preview.Parent = panel
+    Instance.new("UICorner", preview).CornerRadius = UDim.new(0, 12)
+    do
+        local st = Instance.new("UIStroke")
+        st.Color = UI_CARD_STROKE; st.Thickness = 1; st.Transparency = 0.6; st.Parent = preview
+    end
+
+    local pvImg = Instance.new("ImageLabel")
+    pvImg.Name = "PreviewImage"
+    pvImg.BackgroundTransparency = 1
+    pvImg.Size = UDim2.fromScale(1, 1)
+    pvImg.ScaleType = Enum.ScaleType.Crop
+    pvImg.ZIndex = 0
+    pvImg.Image = ""
+    pvImg.Parent = preview
+
+    -- a couple of mock rows so the preview shows real contrast
+    local function mockRow(y, w, on)
+        local r = Instance.new("Frame")
+        r.Position = UDim2.new(0, 12, 0, y)
+        r.Size = UDim2.new(1, -24, 0, 26)
+        r.BackgroundColor3 = UI_ROW_BG
+        r.BorderSizePixel = 0
+        r.ZIndex = 2
+        r.Parent = preview
+        Instance.new("UICorner", r).CornerRadius = UDim.new(0, 8)
+        local t = Instance.new("TextLabel")
+        t.Position = UDim2.new(0, 10, 0, 0)
+        t.Size = UDim2.new(1, -50, 1, 0)
+        t.BackgroundTransparency = 1
+        t.Text = ("Setting %d"):format(y)
+        t.TextColor3 = UI_TEXT_PRIMARY
+        t.TextSize = 11
+        t.Font = Enum.Font.GothamMedium
+        t.TextXAlignment = Enum.TextXAlignment.Left
+        t.ZIndex = 3
+        t.Parent = r
+        local pill = Instance.new("Frame")
+        pill.AnchorPoint = Vector2.new(1, 0.5)
+        pill.Position = UDim2.new(1, -8, 0.5, 0)
+        pill.Size = UDim2.new(0, 26, 0, 14)
+        pill.BackgroundColor3 = on and UI_ACCENT or UI_TOGGLE_OFF
+        pill.BorderSizePixel = 0
+        pill.ZIndex = 3
+        pill.Parent = r
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
+        return r
+    end
+    do
+        local hdr = Instance.new("TextLabel")
+        hdr.Position = UDim2.new(0, 14, 0, 10)
+        hdr.Size = UDim2.new(1, -28, 0, 16)
+        hdr.BackgroundTransparency = 1
+        hdr.Text = "PREVIEW"
+        hdr.TextColor3 = UI_TEXT_SECTION
+        hdr.TextSize = 11
+        hdr.Font = Enum.Font.GothamBold
+        hdr.TextXAlignment = Enum.TextXAlignment.Left
+        hdr.ZIndex = 3
+        hdr.Parent = preview
+        mockRow(32, 0, true); mockRow(66, 0, false); mockRow(100, 0, false)
+    end
+
+    local pending = M.bgIndex or 1
+    local rowBtns = {}
+    local function refresh()
+        for i, b in ipairs(rowBtns) do
+            local active = (i == pending)
+            TweenService:Create(b, UI_TWEEN_FAST, {
+                BackgroundColor3 = active and UI_ACCENT or UI_CHIP_BG,
+            }):Play()
+            local lbl = b:FindFirstChild("Label")
+            if lbl then lbl.TextColor3 = active and Color3.fromRGB(255,255,255) or UI_TEXT_PRIMARY end
+        end
+        local preset = M.BACKGROUNDS[pending]
+        if preset and (tonumber(preset.id) or 0) > 0 then
+            pvImg.Image = "rbxassetid://" .. tostring(preset.id)
+            pvImg.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.72, 0, 1)
+        else
+            pvImg.Image = ""
+        end
+    end
+
+    for i, preset in ipairs(M.BACKGROUNDS) do
+        local b = Instance.new("TextButton")
+        b.LayoutOrder = i
+        b.Size = UDim2.new(1, -6, 0, 34)
+        b.BackgroundColor3 = UI_CHIP_BG
+        b.BorderSizePixel = 0
+        b.Text = ""
+        b.AutoButtonColor = false
+        b.Parent = list
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 9)
+        local lbl = Instance.new("TextLabel")
+        lbl.Name = "Label"
+        lbl.Position = UDim2.new(0, 12, 0, 0)
+        lbl.Size = UDim2.new(1, -24, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = preset.name
+        lbl.TextColor3 = UI_TEXT_PRIMARY
+        lbl.TextSize = 13
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = b
+        rowBtns[i] = b
+        b.MouseButton1Click:Connect(function()
+            pending = i
+            refresh()
+        end)
+    end
+
+    -- opacity slider row under the preview
+    local opacityLbl = Instance.new("TextLabel")
+    opacityLbl.Position = UDim2.new(0, 268, 1, -54)
+    opacityLbl.Size = UDim2.new(0, 120, 0, 18)
+    opacityLbl.BackgroundTransparency = 1
+    opacityLbl.Text = string.format("Fade  %d%%", math.floor((M.bgOpacity or 0.72) * 100 + 0.5))
+    opacityLbl.TextColor3 = UI_TEXT_DIM
+    opacityLbl.TextSize = 11
+    opacityLbl.Font = Enum.Font.GothamMedium
+    opacityLbl.TextXAlignment = Enum.TextXAlignment.Left
+    opacityLbl.Parent = panel
+    local less = uiSmallBtn({Parent=panel, Pos=UDim2.new(1, -104, 1, -56), Size=UDim2.new(0,28,0,24), Text="-", Col=UI_TEXT_PRIMARY, TS=14, CR=8})
+    local more = uiSmallBtn({Parent=panel, Pos=UDim2.new(1, -70, 1, -56), Size=UDim2.new(0,28,0,24), Text="+", Col=UI_TEXT_PRIMARY, TS=14, CR=8})
+    local function bumpOpacity(d)
+        M.bgOpacity = math.clamp((tonumber(M.bgOpacity) or 0.72) + d, 0, 0.95)
+        opacityLbl.Text = string.format("Fade  %d%%", math.floor(M.bgOpacity * 100 + 0.5))
+        refresh()
+    end
+    less.MouseButton1Click:Connect(function() bumpOpacity(-0.06) end)
+    more.MouseButton1Click:Connect(function() bumpOpacity(0.06) end)
+
+    -- apply / cancel
+    local apply = Instance.new("TextButton")
+    apply.AnchorPoint = Vector2.new(1, 1)
+    apply.Position = UDim2.new(1, -16, 1, -14)
+    apply.Size = UDim2.new(0, 110, 0, 30)
+    apply.BackgroundColor3 = UI_ACCENT
+    apply.BorderSizePixel = 0
+    apply.Text = "APPLY"
+    apply.TextColor3 = Color3.fromRGB(255,255,255)
+    apply.TextSize = 13
+    apply.Font = Enum.Font.GothamBold
+    apply.AutoButtonColor = false
+    apply.Parent = panel
+    Instance.new("UICorner", apply).CornerRadius = UDim.new(0, 9)
+
+    local function closePicker() gui:Destroy() end
+    local function applyPick()
+        M.bgIndex = pending
+        M.applyMenuBackground(M.mainFrame)
+        if M.bgChip and M.bgChip.Parent then
+            M.bgChip.Text = (M.BACKGROUNDS[M.bgIndex] or {}).name or "None"
+        end
+        pcall(saveCherryConfig)
+        closePicker()
+    end
+    apply.MouseButton1Click:Connect(applyPick)
+    close.MouseButton1Click:Connect(closePicker)
+    dim.MouseButton1Click:Connect(closePicker)
+
+    refresh()
+    return gui
+end
+
 -- MAIN BUILD
 -- ============================================================
 -- CUSTOM FONTS (from EXE)
@@ -6170,6 +6474,7 @@ function M.applyCustomFont(name)
 end
 
 function M.buildGui()
+    uiResetRegistry()
     applyAccentFromTheme()
     M.clearPersistentConns()
 
@@ -6198,6 +6503,7 @@ function M.buildGui()
     Frame.Active = true
     Frame.Parent = gui
     M.mainFrame = Frame
+    M.applyMenuBackground(Frame)
 
     local UIScale = Instance.new("UIScale")
     UIScale.Name = "BDUIScale"
@@ -6941,6 +7247,29 @@ function M.buildGui()
     local jumpDefaultIdx = (M.infJumpMode == "hold") and 2 or 1
 
     -- PAGE: VISUALS
+    uiSectionHeader(PVis, "BACKGROUND")
+    do
+        local r = uiRowCard(PVis, false, UI_ROW_H)
+        uiRowLabel(r, "Background Image", 200)
+        local chip = uiValueChip(r, (M.BACKGROUNDS[M.bgIndex or 1] or {}).name or "None",
+            {width = 120, autoWidth = true})
+        M.bgChip = chip
+        local function openIt()
+            chip.BackgroundColor3 = UI_ACCENT
+            TweenService:Create(chip, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG}):Play()
+            M.openBackgroundPicker()
+        end
+        chip.MouseButton1Click:Connect(openIt)
+        local hit = Instance.new("TextButton")
+        hit.Size = UDim2.new(1, 0, 1, 0)
+        hit.BackgroundTransparency = 1
+        hit.Text = ""
+        hit.AutoButtonColor = false
+        hit.ZIndex = 2
+        hit.Parent = r
+        hit.MouseButton1Click:Connect(openIt)
+    end
+
     uiSectionHeader(PVis, "SKYBOX")
     do
         local r = uiRowCard(PVis, false, UI_ROW_H)

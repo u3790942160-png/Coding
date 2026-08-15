@@ -4134,7 +4134,7 @@ function M.buildMobileButtons()
     local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(800,600)
 
     local BTN_H    = math.max(52, math.floor(M.mobileButtonsSize * M.uiScale * 0.85))
-    local BTN_W    = math.floor(BTN_H * 1.05)
+    local BTN_W    = BTN_H
     local CORNER_R = 20
 
     local mobGui = Instance.new("ScreenGui")
@@ -4149,8 +4149,8 @@ function M.buildMobileButtons()
     M.mobGuiRef = mobGui
 
     local accent = UI_ACCENT or CHERRY_ACCENT or Color3.fromRGB(255, 255, 255)
-    -- black while off, accent while active
-    local BTN_OFF   = Color3.fromRGB(10, 10, 12)
+    -- pink throughout: a deep accent while off, the full accent while active
+    local BTN_OFF   = accent:Lerp(Color3.fromRGB(0, 0, 0), 0.74)
     local BTN_ON    = accent
     local TXT_OFF   = Color3.fromRGB(255, 255, 255)
     local TXT_ON    = Color3.fromRGB(255, 255, 255)
@@ -4216,7 +4216,7 @@ function M.buildMobileButtons()
             st0.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
             st0.Color = accent
             st0.Thickness = 1
-            st0.Transparency = 0.92
+            st0.Transparency = 0.72
             st0.Parent = btn
         end
 
@@ -4247,7 +4247,7 @@ function M.buildMobileButtons()
                 btn.TextStrokeTransparency = 1
                 stroke.Color = accent
                 stroke.Thickness = 1
-                stroke.Transparency = 0.92
+                stroke.Transparency = 0.72
             end
         end
 

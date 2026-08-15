@@ -30,8 +30,7 @@ if isfile and isfile("CherryConfig.json") then
         if data.introSoundEnabled ~= nil then M.introSoundEnabled = data.introSoundEnabled end
         if data.introSongChoice then M.introSongChoice = data.introSongChoice end
         if data.introGUIEnabled ~= nil then M.introGUIEnabled = data.introGUIEnabled end
-        if type(data.Theme) == "string" then M._savedTheme = data.Theme end
-        if type(data.colorScheme) == "string" then M._savedTheme = data.colorScheme end
+        -- Theme/colorScheme deliberately ignored: the accent is pinned to Crate
     end
 end
 
@@ -1353,103 +1352,103 @@ function M.buildStatusUI()
     end
 
     local accent = UI_ACCENT or CHERRY_ACCENT or Color3.fromRGB(255, 255, 255)
-    local barW = math.clamp(tonumber(M.stealBarSize) or 260, 180, 600)
+    local barW = math.clamp(tonumber(M.stealBarSize) or 340, 220, 600)
 
-    -- Ghost / low-profile bar: fixed, not draggable, almost invisible chrome
+    -- Panel: percent and radius on the top line, an info line under it, and the
+    -- progress track along the bottom.
     local frame = Instance.new("Frame")
     frame.Name = "StealBar"
-    frame.Size = UDim2.new(0, barW, 0, 52)
+    frame.Size = UDim2.new(0, barW, 0, 62)
     frame.Position = UDim2.new(0.5, -math.floor(barW / 2), 0.68, 0)
-    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    frame.BackgroundTransparency = 0.82 -- nearly invisible shell
+    frame.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11, 5, 8)
+    frame.BackgroundTransparency = 0.12
     frame.BorderSizePixel = 0
     frame.Active = false -- not interactive / not draggable
     frame.Parent = gui
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
 
     local stroke = Instance.new("UIStroke")
     stroke.Color = accent
-    stroke.Thickness = 1
-    stroke.Transparency = 0.75 -- soft edge
+    stroke.Thickness = 1.4
+    stroke.Transparency = 0.35
     stroke.Parent = frame
 
-    -- Status label (subtle)
+    -- percent, top left
     local label = Instance.new("TextLabel")
     label.Name = "StatusLabel"
-    label.Size = UDim2.new(1, -16, 0, 16)
-    label.Position = UDim2.new(0, 8, 0, 4)
+    label.Size = UDim2.new(0.4, 0, 0, 18)
+    label.Position = UDim2.new(0, 14, 0, 8)
     label.BackgroundTransparency = 1
-    label.Text = "IDLE"
-    label.TextColor3 = Color3.fromRGB(220, 220, 225)
-    label.TextTransparency = 0.15
-    label.TextSize = 11
+    label.Text = "0%"
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
     label.Font = Enum.Font.GothamBold
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.TextTruncate = Enum.TextTruncate.AtEnd
     label.Parent = frame
     M.statusPctLbl = label
 
-    -- Progress track (dark glass)
+    -- radius, top right
+    local radiusLbl = Instance.new("TextLabel")
+    radiusLbl.Name = "RadiusLbl"
+    radiusLbl.AnchorPoint = Vector2.new(1, 0)
+    radiusLbl.Size = UDim2.new(0.5, 0, 0, 18)
+    radiusLbl.Position = UDim2.new(1, -14, 0, 8)
+    radiusLbl.BackgroundTransparency = 1
+    radiusLbl.Text = "Radius: " .. tostring(M.getActiveStealRadius())
+    radiusLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    radiusLbl.TextSize = 13
+    radiusLbl.Font = Enum.Font.GothamBold
+    radiusLbl.TextXAlignment = Enum.TextXAlignment.Right
+    radiusLbl.Parent = frame
+    M.statusRadiusLbl = radiusLbl
+
+    -- fps / ping / tag, centered under them
+    local infoLbl = Instance.new("TextLabel")
+    infoLbl.Name = "InfoLbl"
+    infoLbl.Size = UDim2.new(1, -20, 0, 14)
+    infoLbl.Position = UDim2.new(0, 10, 0, 27)
+    infoLbl.BackgroundTransparency = 1
+    infoLbl.Text = "FPS: -- PING: --ms discord.gg/cratehub"
+    infoLbl.TextColor3 = Color3.fromRGB(228, 228, 235)
+    infoLbl.TextSize = 11
+    infoLbl.Font = Enum.Font.GothamMedium
+    infoLbl.TextXAlignment = Enum.TextXAlignment.Center
+    infoLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    infoLbl.Parent = frame
+    M.statusFpsLbl = infoLbl
+
+    -- progress track along the bottom
     local barBg = Instance.new("Frame")
     barBg.Name = "Track"
-    barBg.Size = UDim2.new(1, -16, 0, 14)
-    barBg.Position = UDim2.new(0, 8, 0, 24)
-    barBg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    barBg.BackgroundTransparency = 0.45
+    barBg.Size = UDim2.new(1, -24, 0, 12)
+    barBg.Position = UDim2.new(0, 12, 1, -18)
+    barBg.BackgroundColor3 = UI_CHIP_BG or Color3.fromRGB(52, 29, 40)
+    barBg.BackgroundTransparency = 0.25
     barBg.BorderSizePixel = 0
     barBg.ClipsDescendants = true
     barBg.Parent = frame
     Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
 
     local barStroke = Instance.new("UIStroke")
-    barStroke.Color = Color3.fromRGB(255, 255, 255)
+    barStroke.Color = accent
     barStroke.Thickness = 1
-    barStroke.Transparency = 0.7
+    barStroke.Transparency = 0.6
     barStroke.Parent = barBg
 
-    -- Fill (visible accent — the only “solid” part)
     local fill = Instance.new("Frame")
     fill.Name = "Fill"
     fill.Size = UDim2.new(0, 0, 1, 0)
     fill.BackgroundColor3 = accent
-    fill.BackgroundTransparency = 0.15
+    fill.BackgroundTransparency = 0
     fill.BorderSizePixel = 0
     fill.Parent = barBg
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
     M.statusFill = fill
 
-    -- % on bar
-    local pctOnBar = Instance.new("TextLabel")
-    pctOnBar.Name = "PctOnBar"
-    pctOnBar.Size = UDim2.new(1, 0, 1, 0)
-    pctOnBar.BackgroundTransparency = 1
-    pctOnBar.Text = "0%"
-    pctOnBar.TextColor3 = Color3.fromRGB(255, 255, 255)
-    pctOnBar.TextTransparency = 0.1
-    pctOnBar.TextSize = 10
-    pctOnBar.Font = Enum.Font.GothamBold
-    pctOnBar.TextXAlignment = Enum.TextXAlignment.Center
-    pctOnBar.ZIndex = 2
-    pctOnBar.Parent = barBg
-    M.statusBarPctLbl = pctOnBar
-
-    -- tiny radius hint (very faint)
-    local radiusLbl = Instance.new("TextLabel")
-    radiusLbl.Name = "RadiusLbl"
-    radiusLbl.Size = UDim2.new(1, -16, 0, 10)
-    radiusLbl.Position = UDim2.new(0, 8, 1, -12)
-    radiusLbl.BackgroundTransparency = 1
-    radiusLbl.Text = "r " .. tostring(M.getActiveStealRadius())
-    radiusLbl.TextColor3 = Color3.fromRGB(180, 180, 190)
-    radiusLbl.TextTransparency = 0.35
-    radiusLbl.TextSize = 9
-    radiusLbl.Font = Enum.Font.Gotham
-    radiusLbl.TextXAlignment = Enum.TextXAlignment.Left
-    radiusLbl.Parent = frame
-    M.statusRadiusLbl = radiusLbl
+    M.statusBarPctLbl = nil
 
     M.statusDot = nil
-    M.statusFpsLbl = nil
     M.statusRadiusMarker = nil
     M.statusRadiusMarkerLbl = nil
     M.updateRadiusMarker = function()
@@ -4435,9 +4434,7 @@ local CHERRY_THEMES = {
     Cyan     = { Accent=Color3.fromRGB(0,220,255),   AccentDim=Color3.fromRGB(0,160,190),   Bg=Color3.fromRGB(4,12,16),   Row=Color3.fromRGB(8,20,26) },
     Orange   = { Accent=Color3.fromRGB(255,140,40),  AccentDim=Color3.fromRGB(200,100,30),  Bg=Color3.fromRGB(14,8,4),    Row=Color3.fromRGB(24,14,8) },
 }
-if M._savedTheme and CHERRY_THEMES[M._savedTheme] then
-    CherryConfig.Theme = M._savedTheme
-end
+
 M.colorScheme = CherryConfig.Theme
 
 
@@ -4448,14 +4445,7 @@ local function loadCherryConfig()
         return HS:JSONDecode(readfile(CHERRY_CONFIG_NAME))
     end)
     if ok and type(d)=="table" then
-        local themeName = nil
-        if type(d.Theme)=="string" and CHERRY_THEMES[d.Theme] then themeName = d.Theme end
-        if type(d.colorScheme)=="string" and CHERRY_THEMES[d.colorScheme] then themeName = d.colorScheme end
-        if themeName then
-            CherryConfig.Theme = themeName
-            M.colorScheme = themeName
-            M._savedTheme = themeName
-        end
+        -- Saved theme intentionally not restored: accent is pinned to Crate
         if type(d.normalSpeed)=="number" then M.NS=d.normalSpeed end
         if type(d.carrySpeed)=="number" then M.CS=d.carrySpeed end
         if type(d.laggerSpeed)=="number" then M.LAGGER_SPEED=d.laggerSpeed end
@@ -4522,9 +4512,7 @@ local function loadCherryConfig()
         if type(d.semiRadius)=="number" then M.Semi.radius=math.min(d.semiRadius, 10) end
         if d.lineESPEnabled~=nil then M.lineESPEnabled=d.lineESPEnabled end
         if d.menuOpen~=nil then M.menuOpen=d.menuOpen~=false end
-        -- theme already applied above; keep M._savedTheme in sync
-        if type(d.Theme)=="string" and CHERRY_THEMES[d.Theme] then M._savedTheme=d.Theme; M.colorScheme=d.Theme end
-        if type(d.colorScheme)=="string" and CHERRY_THEMES[d.colorScheme] then M._savedTheme=d.colorScheme; M.colorScheme=d.colorScheme end
+
         if d.speedESPEnabled~=nil then M.speedESPEnabled=d.speedESPEnabled end
         if d.autoResetOnDeath~=nil then M.autoResetOnDeath=d.autoResetOnDeath end
         if type(d.animPack)=="string" then M.animPack=d.animPack end
@@ -4856,6 +4844,35 @@ function M.getPingMs()
     end)
     if ok and type(ms) == "number" and ms > 0 then return ms end
     return nil
+end
+
+-- FPS / ping readout for the auto grab bar
+M._fpsValue = 0
+function M.startStatusInfoWatch()
+    if M._statusInfoWatch then return end
+    M._statusInfoWatch = true
+    task.spawn(function()
+        local frames, last = 0, tick()
+        local conn = RunService.RenderStepped:Connect(function()
+            frames = frames + 1
+            local now = tick()
+            if now - last >= 1 then
+                M._fpsValue = math.floor(frames / (now - last) + 0.5)
+                frames, last = 0, now
+            end
+        end)
+        if M.trackConn then M.trackConn(conn) end
+        while M._statusInfoWatch do
+            task.wait(1)
+            local lbl = M.statusFpsLbl
+            if lbl and lbl.Parent then
+                local ms = M.getPingMs()
+                lbl.Text = string.format("FPS: %d  PING: %sms  discord.gg/cratehub",
+                    M._fpsValue,
+                    ms and tostring(math.floor(ms + 0.5)) or "--")
+            end
+        end
+    end)
 end
 
 function M.startPingWatch()
@@ -7069,13 +7086,12 @@ end
 repeat task.wait() until game:IsLoaded()
 task.wait(0.5)
 loadCherryConfig()
-if M._savedTheme and CHERRY_THEMES[M._savedTheme] then
-    CherryConfig.Theme = M._savedTheme
-    M.colorScheme = M._savedTheme
-elseif M.colorScheme and CHERRY_THEMES[M.colorScheme] then
-    CherryConfig.Theme = M.colorScheme
-    M._savedTheme = M.colorScheme
-end
+-- The colour scheme picker is gone, so the theme is pinned to Crate rather
+-- than restored from the config. Without this a config saved back when the
+-- picker existed keeps loading that old accent with no way to change it.
+CherryConfig.Theme = "Crate"
+M.colorScheme = "Crate"
+M._savedTheme = "Crate"
 applyAccentFromTheme()
 -- Skip Intro mirrors the intro toggles, which the early config pass already read
 if M.skipIntroEnabled == nil then M.skipIntroEnabled = (M.introGUIEnabled == false) end
@@ -7115,6 +7131,7 @@ if M.bodyLockEnabled then M.startBodyLock() end
 if M.autoSaveEnabled then M.startAutoSaveLoop() end
 if M.stealKickWarnEnabled then M.warnIfStealRisky() end
 M.startPingWatch()
+M.startStatusInfoWatch()
 if M.autoLeftEnabled then M.startAutoLeft() end
 if M.autoRightEnabled then M.startAutoRight() end
 if M.Steal.AutoStealEnabled then M.startAutoSteal() end

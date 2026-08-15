@@ -4438,6 +4438,7 @@ M.colorScheme = CherryConfig.Theme
 
 
 local function loadCherryConfig()
+M.loadProfiles()
     if type(readfile)~="function" or type(isfile)~="function" then return end
     local ok,d = pcall(function()
         if not isfile(CHERRY_CONFIG_NAME) then return nil end
@@ -4548,8 +4549,6 @@ local function loadCherryConfig()
         if d.mobileButtonsLocked~=nil then M.mobileButtonsLocked=d.mobileButtonsLocked==true end
         if d.skipIntroEnabled~=nil then M.skipIntroEnabled=d.skipIntroEnabled==true end
         if d.ragdollTimerEnabled~=nil then M.ragdollTimerEnabled=d.ragdollTimerEnabled==true end
-        if type(d.bgIndex)=="number" and d.bgIndex >= 1 and d.bgIndex <= #M.BACKGROUNDS then M.bgIndex=math.floor(d.bgIndex) end
-        if type(d.bgOpacity)=="number" then M.bgOpacity=math.clamp(d.bgOpacity, 0, 1) end
     end
 end
 
@@ -4618,12 +4617,118 @@ function saveCherryConfig()
         mobileButtonsLocked=M.mobileButtonsLocked,
         skipIntroEnabled=M.skipIntroEnabled,
         ragdollTimerEnabled=M.ragdollTimerEnabled,
-        bgIndex=M.bgIndex, bgOpacity=M.bgOpacity,
     }
     pcall(function() writefile(CHERRY_CONFIG_NAME, HS:JSONEncode(cfg)) end)
 end
 
 M.saveConfig = saveCherryConfig
+
+-- ============================================================
+-- PROFILES
+-- Named snapshots of the whole config, so a loadout for one matchup can be
+-- swapped in without re-tuning every row. Snapshots reuse the existing
+-- serialiser rather than duplicating it: save writes the live config, then
+-- copies the file; load writes a stored snapshot back and re-reads it.
+-- ============================================================
+M.PROFILE_FILE = "CrateHubProfiles.json"
+M.profiles = {}        -- name -> config table
+M.profileOrder = {}    -- display order
+M.activeProfile = nil
+
+local function profileIndex(name)
+    for i, n in ipairs(M.profileOrder) do if n == name then return i end end
+    return nil
+end
+
+function M.loadProfiles()
+    M.profiles, M.profileOrder = {}, {}
+    if type(readfile) ~= "function" or type(isfile) ~= "function" then return end
+    local ok, data = pcall(function()
+        if not isfile(M.PROFILE_FILE) then return nil end
+        return HS:JSONDecode(readfile(M.PROFILE_FILE))
+    end)
+    if not ok or type(data) ~= "table" then return end
+    for _, entry in ipairs(data.order or {}) do
+        if type(entry) == "string" and type(data.profiles) == "table" and type(data.profiles[entry]) == "table" then
+            M.profiles[entry] = data.profiles[entry]
+            table.insert(M.profileOrder, entry)
+        end
+    end
+    if type(data.active) == "string" and M.profiles[data.active] then
+        M.activeProfile = data.active
+    end
+end
+
+function M.persistProfiles()
+    if type(writefile) ~= "function" then return end
+    pcall(function()
+        writefile(M.PROFILE_FILE, HS:JSONEncode({
+            order = M.profileOrder,
+            profiles = M.profiles,
+            active = M.activeProfile,
+        }))
+    end)
+end
+
+-- Snapshot the live settings by writing them out and reading the file back,
+-- which keeps profiles in step with whatever saveCherryConfig stores.
+function M.captureProfile()
+    pcall(saveCherryConfig)
+    if type(readfile) ~= "function" or type(isfile) ~= "function" then return nil end
+    local ok, data = pcall(function()
+        if not isfile(CHERRY_CONFIG_NAME) then return nil end
+        return HS:JSONDecode(readfile(CHERRY_CONFIG_NAME))
+    end)
+    if ok and type(data) == "table" then return data end
+    return nil
+end
+
+function M.saveProfileAs(name)
+    name = tostring(name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if name == "" then name = "Profile " .. tostring(#M.profileOrder + 1) end
+    local snap = M.captureProfile()
+    if not snap then return false, "no file access" end
+    if not M.profiles[name] then table.insert(M.profileOrder, name) end
+    M.profiles[name] = snap
+    M.activeProfile = name
+    M.persistProfiles()
+    return true, name
+end
+
+function M.applyProfile(name)
+    local snap = M.profiles[name]
+    if not snap then return false end
+    if type(writefile) ~= "function" then return false end
+    local ok = pcall(function() writefile(CHERRY_CONFIG_NAME, HS:JSONEncode(snap)) end)
+    if not ok then return false end
+    pcall(loadCherryConfig)
+    M.activeProfile = name
+    M.persistProfiles()
+    -- rebuild so every row shows the values that were just loaded
+    pcall(function() M.buildGui() end)
+    return true
+end
+
+function M.deleteProfile(name)
+    if not M.profiles[name] then return false end
+    M.profiles[name] = nil
+    local i = profileIndex(name)
+    if i then table.remove(M.profileOrder, i) end
+    if M.activeProfile == name then M.activeProfile = M.profileOrder[1] end
+    M.persistProfiles()
+    return true
+end
+
+function M.cycleProfile(dir)
+    if #M.profileOrder == 0 then return nil end
+    local i = (M.activeProfile and profileIndex(M.activeProfile)) or 1
+    i = i + (dir or 1)
+    if i < 1 then i = #M.profileOrder end
+    if i > #M.profileOrder then i = 1 end
+    M.activeProfile = M.profileOrder[i]
+    return M.activeProfile
+end
+
 
 -- ============================================================
 -- CHERRY ESP
@@ -5067,229 +5172,6 @@ end
 -- ---------- Menu background image ----------
 -- Six presets plus an off state. The image sits behind the content at ZIndex
 -- 0 and is dimmed so rows stay readable.
--- Backgrounds are drawn in-script from UI primitives rather than loaded as
--- images, so nothing depends on an asset id staying valid and every style is
--- built from the hub's own accent. Everything is scale-based, which means the
--- same builder fills the menu, the big preview and a thumbnail.
-local function bgRand(seed)
-    local st = seed
-    return function(a, b)
-        st = (st * 1103515245 + 12345) % 2147483648
-        local r = st / 2147483648
-        if not a then return r end
-        return a + r * (b - a)
-    end
-end
-
--- A frame whose colour comes from its gradient must be white underneath,
--- because UIGradient multiplies rather than replaces.
-local function bgPiece(parent, pos, size, z)
-    local f = Instance.new("Frame")
-    f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    f.BorderSizePixel = 0
-    f.Position = pos
-    f.Size = size
-    f.ZIndex = z or 1
-    f.Parent = parent
-    return f
-end
-
-local function bgGradient(f, c1, c2, rot, t1, tMid, t2)
-    local g = Instance.new("UIGradient")
-    g.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, c1),
-        ColorSequenceKeypoint.new(1, c2),
-    })
-    g.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, t1 or 0),
-        NumberSequenceKeypoint.new(0.5, tMid or ((t1 or 0) + (t2 or 0)) / 2),
-        NumberSequenceKeypoint.new(1, t2 or 0),
-    })
-    g.Rotation = rot or 0
-    g.Parent = f
-    return g
-end
-
-local function bgRound(f, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = r or UDim.new(1, 0)
-    c.Parent = f
-end
-
-M.BACKGROUNDS = {
-    {name = "OFF"},
-
-    {name = "AURORA", build = function(p, accent, animate)
-        local rnd = bgRand(41)
-        local deep = accent:Lerp(Color3.fromRGB(90, 30, 200), 0.55)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, deep, accent, 90, 0.82, 0.9, 0.62)
-        for i = 1, 6 do
-            local y = rnd(-0.05, 0.9)
-            local bar = bgPiece(p, UDim2.fromScale(-0.3, y), UDim2.fromScale(1.6, rnd(0.08, 0.2)), 2)
-            bar.Rotation = rnd(-22, -8)
-            bgGradient(bar, accent, deep, rnd(0, 180), 1, rnd(0.45, 0.72), 1)
-            if animate then
-                TweenService:Create(bar,
-                    TweenInfo.new(rnd(9, 16), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-                    {Position = UDim2.fromScale(-0.3, y + rnd(-0.09, 0.09))}):Play()
-            end
-        end
-    end},
-
-    {name = "GRID", build = function(p, accent, animate)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, Color3.fromRGB(20, 8, 16), accent, 90, 0.9, 0.86, 0.55)
-        for i = 1, 13 do
-            local t = i / 13
-            local y = 0.42 + (t * t) * 0.62
-            local ln = bgPiece(p, UDim2.fromScale(0, y), UDim2.new(1, 0, 0, 1 + math.floor(t * 2)), 2)
-            bgGradient(ln, accent, accent, 0, 1, 0.5 - t * 0.3, 1)
-        end
-        for i = 0, 12 do
-            local x = i / 12
-            local ln = bgPiece(p, UDim2.fromScale(x, 0.42), UDim2.new(0, 1, 1, 0), 2)
-            ln.Rotation = (x - 0.5) * 26
-            bgGradient(ln, accent, accent, 90, 1, 0.72, 0.4)
-        end
-    end},
-
-    {name = "BOKEH", build = function(p, accent, animate)
-        local rnd = bgRand(7)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, accent:Lerp(Color3.new(0,0,0), 0.6), Color3.fromRGB(14, 6, 11), 135, 0.6, 0.78, 0.92)
-        local light = accent:Lerp(Color3.fromRGB(255,255,255), 0.35)
-        for i = 1, 26 do
-            local d = rnd(0.03, 0.17)
-            local dot = bgPiece(p, UDim2.fromScale(rnd(-0.05, 1), rnd(-0.05, 1)), UDim2.fromScale(d, d), 2)
-            bgRound(dot)
-            bgGradient(dot, light, accent, 45, rnd(0.68, 0.86), nil, 0.97)
-        end
-    end},
-
-    {name = "WAVES", build = function(p, accent, animate)
-        local rnd = bgRand(913)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, Color3.fromRGB(16, 6, 12), accent, 90, 0.88, 0.8, 0.5)
-        for i = 1, 9 do
-            local y = i / 10
-            local bar = bgPiece(p, UDim2.fromScale(-0.2, y), UDim2.fromScale(1.4, 0.055), 2)
-            bar.Rotation = math.sin(i * 1.1) * 9
-            bgRound(bar, UDim.new(1, 0))
-            bgGradient(bar, accent, accent:Lerp(Color3.fromRGB(120,40,220), 0.7), 0, 1, rnd(0.42, 0.68), 1)
-            if animate then
-                TweenService:Create(bar,
-                    TweenInfo.new(rnd(7, 13), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-                    {Rotation = -bar.Rotation}):Play()
-            end
-        end
-    end},
-
-    {name = "NEBULA", build = function(p, accent, animate)
-        local rnd = bgRand(2024)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, Color3.fromRGB(30, 8, 26), Color3.fromRGB(8, 4, 10), 120, 0.5, 0.7, 0.9)
-        for i = 1, 5 do
-            local d = rnd(0.35, 0.8)
-            local blob = bgPiece(p, UDim2.fromScale(rnd(-0.2, 0.8), rnd(-0.2, 0.8)), UDim2.fromScale(d, d), 2)
-            bgRound(blob)
-            bgGradient(blob, accent, accent:Lerp(Color3.fromRGB(80, 30, 220), 0.8), rnd(0, 360), 0.72, 0.86, 1)
-            if animate then
-                TweenService:Create(blob,
-                    TweenInfo.new(rnd(14, 22), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-                    {Size = UDim2.fromScale(d * 1.18, d * 1.18)}):Play()
-            end
-        end
-        for i = 1, 46 do
-            local sz = rnd(0.004, 0.011)
-            local star = bgPiece(p, UDim2.fromScale(rnd(0, 1), rnd(0, 1)), UDim2.fromScale(sz, sz), 3)
-            bgRound(star)
-            star.BackgroundTransparency = rnd(0.15, 0.7)
-        end
-    end},
-
-    {name = "CARBON", build = function(p, accent, animate)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, Color3.fromRGB(18, 8, 14), Color3.fromRGB(8, 4, 8), 90, 0.55, 0.7, 0.86)
-        for i = -6, 26 do
-            local x = i / 20
-            local ln = bgPiece(p, UDim2.fromScale(x, -0.3), UDim2.new(0, 2, 1.6, 0), 2)
-            ln.Rotation = 32
-            bgGradient(ln, accent, accent, 90, 1, (i % 3 == 0) and 0.72 or 0.88, 1)
-        end
-    end},
-
-    {name = "EMBER", build = function(p, accent, animate)
-        local rnd = bgRand(555)
-        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
-        bgGradient(base, Color3.fromRGB(10, 4, 8), accent, 90, 0.95, 0.82, 0.42)
-        for i = 1, 34 do
-            local sz = rnd(0.006, 0.022)
-            local x, y = rnd(0, 1), rnd(0.1, 1.05)
-            local dot = bgPiece(p, UDim2.fromScale(x, y), UDim2.fromScale(sz, sz), 2)
-            bgRound(dot)
-            bgGradient(dot, accent:Lerp(Color3.fromRGB(255,255,255), 0.4), accent, 90, rnd(0.2, 0.6), nil, 0.95)
-            if animate then
-                TweenService:Create(dot,
-                    TweenInfo.new(rnd(6, 14), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false),
-                    {Position = UDim2.fromScale(x + rnd(-0.06, 0.06), -0.1)}):Play()
-            end
-        end
-    end},
-}
-M.bgIndex = 1
-M.bgOpacity = 0.35
-
--- Shared by the menu, the picker preview and every thumbnail, so what you see
--- in the library is exactly what you get.
-function M.renderBackground(container, index, animate)
-    if not container then return end
-    for _, c in ipairs(container:GetChildren()) do
-        if c:IsA("GuiObject") then c:Destroy() end
-    end
-    local style = M.BACKGROUNDS[index or 1]
-    if not style or not style.build then return false end
-    local accent = UI_ACCENT or Color3.fromRGB(255, 77, 160)
-    local ok = pcall(function() style.build(container, accent, animate and true or false) end)
-    return ok
-end
-
-function M.applyMenuBackground(frame)
-    frame = frame or M.mainFrame
-    if not frame then return end
-    local old = frame:FindFirstChild("MenuBgImage")
-    if old then old:Destroy() end
-
-    local style = M.BACKGROUNDS[M.bgIndex or 1]
-    if not style or not style.build then
-        if M.setRowTransparency then M.setRowTransparency(0) end
-        return
-    end
-    if M.setRowTransparency then M.setRowTransparency(0.28) end
-
-    local holder = Instance.new("Frame")
-    holder.Name = "MenuBgImage"
-    holder.BackgroundTransparency = 1
-    holder.Size = UDim2.fromScale(1, 1)
-    holder.Position = UDim2.fromScale(0, 0)
-    holder.ZIndex = 0
-    holder.ClipsDescendants = true
-    holder.Parent = frame
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 16)
-    c.Parent = holder
-
-    -- one extra veil so text stays readable over busier styles
-    M.renderBackground(holder, M.bgIndex or 1, true)
-    local veil = Instance.new("Frame")
-    veil.Name = "Veil"
-    veil.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11, 5, 8)
-    veil.BackgroundTransparency = math.clamp(1 - (tonumber(M.bgOpacity) or 0.35), 0, 1)
-    veil.BorderSizePixel = 0
-    veil.Size = UDim2.fromScale(1, 1)
-    veil.ZIndex = 9
-    veil.Parent = holder
-end
 
 -- ---------- Mobile buttons lock ----------
 M.mobileButtonsLocked = false
@@ -5498,34 +5380,20 @@ local UI_SECTION_ORDER = {
     ["TELEPORT"]            = 8,
     ["AUTO"]                = 9,
     ["ANIMATIONS"]          = 10,
-    ["BACKGROUND"]          = 11,
     ["SKYBOX"]              = 12,
     ["PERFORMANCE"]         = 13,
     ["INTERFACE"]           = 14,
     ["MOBILE BUTTONS"]      = 15,
     ["CONFIGURATION"]       = 16,
-    ["COSMETICS"]           = 17,
+    ["PROFILES"]            = 17,
+    ["COSMETICS"]           = 18,
 }
--- Registry of built rows and sections, used by the search filter and by the
--- collapse toggle on each section heading.
-local _uiRegistry = {}
-local _uiEntryOf = {}
-local _uiCurrentSection = nil
-
 local _uiOrderSeq = 0
 local _uiSectionBase = 0
 local function uiNextOrder()
     _uiOrderSeq = _uiOrderSeq + 1
     return _uiSectionBase + _uiOrderSeq
 end
--- buildGui can run more than once (Reset All Settings rebuilds the menu), so
--- the registry has to start empty or it accumulates destroyed rows.
-local function uiResetRegistry()
-    _uiRegistry = {}
-    _uiEntryOf = {}
-    _uiCurrentSection = nil
-end
-
 local function uiBeginSection(name)
     local ord = UI_SECTION_ORDER[string.upper(tostring(name))]
     if not ord then return nil end
@@ -5650,99 +5518,14 @@ local function uiAutoCanvas(scroll)
     task.delay(0.5, upd)
 end
 
--- Search filter and per-section collapse. A row is visible when it matches the
--- query and its section is not collapsed; a heading hides when nothing under it
--- matches. Rows created hidden stay hidden regardless.
-local _uiQuery = ""
-
-local function uiRowMatches(e, q)
-    if e.hidden then return false end
-    if q == "" then return true end
-    if string.find(string.lower(e.text), q, 1, true) then return true end
-    -- a hit on the section name surfaces everything under it
-    if e.section and string.find(string.lower(e.section.text), q, 1, true) then return true end
-    return false
-end
-
-local function uiRefreshVisibility()
-    local q = _uiQuery
-    for _, e in ipairs(_uiRegistry) do
-        if e.kind == "row" then
-            local show = uiRowMatches(e, q)
-            if show and q == "" and e.section and e.section.collapsed then show = false end
-            e.obj.Visible = show
-        end
-    end
-    for _, e in ipairs(_uiRegistry) do
-        if e.kind == "section" then
-            if q == "" then
-                e.obj.Visible = true
-            else
-                local any = false
-                for _, r in ipairs(e.rows) do
-                    if uiRowMatches(r, q) then any = true break end
-                end
-                e.obj.Visible = any
-            end
-        end
-    end
-end
-
--- Row cards are opaque by default, which hides a background image entirely.
--- This lets the background code lift them just enough to show it through.
-local _uiRowTransparency = 0
-function M.setRowTransparency(t)
-    _uiRowTransparency = math.clamp(tonumber(t) or 0, 0, 1)
-    for _, e in ipairs(_uiRegistry) do
-        if e.card and e.obj then
-            e.obj.BackgroundTransparency = _uiRowTransparency
-        end
-    end
-end
-
-local function uiSetQuery(text)
-    _uiQuery = string.lower(tostring(text or ""))
-    uiRefreshVisibility()
-end
-
 local function uiSectionHeader(parent, text)
     local r = Instance.new("Frame"); r.Size = UDim2.new(1,0,0,42); r.BackgroundTransparency = 1
     local base = uiBeginSection(text)
     r.LayoutOrder = base or uiNextOrder(); r.Parent = parent
-    local entry = {obj = r, kind = "section", text = string.upper(tostring(text)), rows = {}, collapsed = false}
-    table.insert(_uiRegistry, entry)
-    _uiEntryOf[r] = entry
-    _uiCurrentSection = entry
     local l = Instance.new("TextLabel"); l.Position = UDim2.new(0,2,0,0); l.Size = UDim2.new(1,-2,1,-6)
     l.BackgroundTransparency = 1; l.Text = string.upper(tostring(text)); l.TextColor3 = UI_TEXT_SECTION; l.TextSize = 13
     l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left
     l.TextYAlignment = Enum.TextYAlignment.Bottom; l.Parent = r
-
-    -- tap a heading to fold its rows away
-    local caret = Instance.new("TextLabel")
-    caret.Name = "SectionCaret"
-    caret.AnchorPoint = Vector2.new(1, 1)
-    caret.Position = UDim2.new(1, -6, 1, -4)
-    caret.Size = UDim2.new(0, 16, 0, 16)
-    caret.BackgroundTransparency = 1
-    caret.Text = "▾"
-    caret.TextColor3 = UI_TEXT_SECTION
-    caret.TextSize = 12
-    caret.Font = Enum.Font.GothamBold
-    caret.Parent = r
-
-    local hit = Instance.new("TextButton")
-    hit.Size = UDim2.new(1, 0, 1, 0)
-    hit.BackgroundTransparency = 1
-    hit.Text = ""
-    hit.AutoButtonColor = false
-    hit.ZIndex = 3
-    hit.Parent = r
-    hit.MouseButton1Click:Connect(function()
-        entry.collapsed = not entry.collapsed
-        TweenService:Create(caret, UI_TWEEN_FAST, {Rotation = entry.collapsed and -90 or 0}):Play()
-        uiRefreshVisibility()
-    end)
 
     return r
 end
@@ -5759,11 +5542,6 @@ local function uiRowCard(parent, hidden, height)
     r.Parent = parent
     uiCardStyle(r)
 
-    r.BackgroundTransparency = _uiRowTransparency
-    local entry = {obj = r, kind = "row", card = true, text = "", section = _uiCurrentSection, hidden = hidden and true or false}
-    table.insert(_uiRegistry, entry)
-    _uiEntryOf[r] = entry
-    if _uiCurrentSection then table.insert(_uiCurrentSection.rows, entry) end
 
     -- the card lifts a little under the cursor so the row you are about to
     -- hit is obvious; no-op on touch, where there is no hover
@@ -5790,8 +5568,6 @@ local function uiRowLabel(parent, label, rightGap)
     l.TextTruncate = Enum.TextTruncate.AtEnd
     l.ZIndex = 2
     l.Parent = parent
-    local e = _uiEntryOf[parent]
-    if e then e.text = tostring(label) end
     return l
 end
 
@@ -6038,12 +5814,6 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
     container.ClipsDescendants = false
     container.LayoutOrder = uiNextOrder()
     container.Parent = parent
-    do
-        local entry = {obj = container, kind = "row", text = tostring(label), section = _uiCurrentSection, hidden = false}
-        table.insert(_uiRegistry, entry)
-        _uiEntryOf[container] = entry
-        if _uiCurrentSection then table.insert(_uiCurrentSection.rows, entry) end
-    end
 
     local col = Instance.new("UIListLayout")
     col.FillDirection = Enum.FillDirection.Vertical
@@ -6345,311 +6115,6 @@ local function uiMakePage(parent, name, order, vis)
     return p
 end
 
--- Background picker, laid out like the reference: a large preview on the left
--- with the image name and the apply button beneath it, and a scrolling
--- thumbnail library on the right.
-function M.openBackgroundPicker()
-    local pg = player:FindFirstChild("PlayerGui")
-    if not pg then return end
-    local old = pg:FindFirstChild("CrateHubBgPicker")
-    if old then old:Destroy() end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "CrateHubBgPicker"
-    gui.ResetOnSpawn = false
-    gui.IgnoreGuiInset = true
-    gui.DisplayOrder = 140
-    gui.Parent = pg
-
-    local dim = Instance.new("TextButton")
-    dim.Size = UDim2.fromScale(1, 1)
-    dim.BackgroundColor3 = Color3.new(0, 0, 0)
-    dim.BackgroundTransparency = 0.5
-    dim.Text = ""
-    dim.AutoButtonColor = false
-    dim.Parent = gui
-
-    local W, H = 680, 380
-    local panel = Instance.new("Frame")
-    panel.Name = "Panel"
-    panel.AnchorPoint = Vector2.new(0.5, 0.5)
-    panel.Position = UDim2.new(0.5, 0, 0.5, 0)
-    panel.Size = UDim2.new(0, W, 0, H)
-    panel.BackgroundColor3 = UI_BG_DARK
-    panel.BorderSizePixel = 0
-    panel.Parent = gui
-    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 16)
-    do
-        local st = Instance.new("UIStroke")
-        st.Color = UI_ACCENT; st.Thickness = 1.6; st.Transparency = 0.35; st.Parent = panel
-    end
-
-    local title = Instance.new("TextLabel")
-    title.Position = UDim2.new(0, 24, 0, 16)
-    title.Size = UDim2.new(0, 420, 0, 26)
-    title.BackgroundTransparency = 1
-    title.RichText = true
-    title.Text = '<font color="#FFFFFF">CRATE</font> <font color="#FF4DA0">BACKGROUNDS</font>'
-    title.TextColor3 = UI_TEXT_WHITE
-    title.TextSize = 18
-    title.Font = Enum.Font.GothamBlack
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = panel
-
-    local close = Instance.new("TextButton")
-    close.AnchorPoint = Vector2.new(1, 0)
-    close.Position = UDim2.new(1, -18, 0, 14)
-    close.Size = UDim2.new(0, 30, 0, 28)
-    close.BackgroundTransparency = 1
-    close.Text = "✕"
-    close.TextColor3 = UI_TEXT_PRIMARY
-    close.TextSize = 15
-    close.Font = Enum.Font.GothamBold
-    close.AutoButtonColor = false
-    close.Parent = panel
-
-    -- ---------- left: big preview ----------
-    local PV_W = 392
-    local preview = Instance.new("Frame")
-    preview.Name = "Preview"
-    preview.Position = UDim2.new(0, 24, 0, 58)
-    preview.Size = UDim2.new(0, PV_W, 0, 236)
-    preview.BackgroundColor3 = Color3.fromRGB(8, 5, 7)
-    preview.BorderSizePixel = 0
-    preview.ClipsDescendants = true
-    preview.Parent = panel
-    Instance.new("UICorner", preview).CornerRadius = UDim.new(0, 12)
-    do
-        local st = Instance.new("UIStroke")
-        st.Color = UI_CARD_STROKE; st.Thickness = 1; st.Transparency = 0.55; st.Parent = preview
-    end
-
-    local pvImg = Instance.new("Frame")
-    pvImg.Name = "PreviewImage"
-    pvImg.BackgroundTransparency = 1
-    pvImg.Size = UDim2.fromScale(1, 1)
-    pvImg.ClipsDescendants = true
-    pvImg.Parent = preview
-
-    local pvEmpty = Instance.new("TextLabel")
-    pvEmpty.Name = "PreviewEmpty"
-    pvEmpty.Size = UDim2.fromScale(1, 1)
-    pvEmpty.BackgroundTransparency = 1
-    pvEmpty.Text = "NO BACKGROUND"
-    pvEmpty.TextColor3 = UI_TEXT_DIM
-    pvEmpty.TextSize = 13
-    pvEmpty.Font = Enum.Font.GothamBold
-    pvEmpty.Visible = false
-    pvEmpty.Parent = preview
-
-    local nameLbl = Instance.new("TextLabel")
-    nameLbl.Name = "ImageName"
-    nameLbl.Position = UDim2.new(0, 28, 0, 302)
-    nameLbl.Size = UDim2.new(0, 180, 0, 22)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Text = "OFF"
-    nameLbl.TextColor3 = UI_TEXT_WHITE
-    nameLbl.TextSize = 14
-    nameLbl.Font = Enum.Font.GothamBold
-    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-    nameLbl.Parent = panel
-
-    local apply = Instance.new("TextButton")
-    apply.Name = "ApplyButton"
-    apply.Position = UDim2.new(0, 24 + PV_W - 196, 0, 304)
-    apply.Size = UDim2.new(0, 196, 0, 40)
-    apply.BackgroundColor3 = UI_ACCENT
-    apply.BorderSizePixel = 0
-    apply.Text = "APPLY BACKGROUND"
-    apply.TextColor3 = Color3.fromRGB(255, 255, 255)
-    apply.TextSize = 13
-    apply.Font = Enum.Font.GothamBold
-    apply.AutoButtonColor = false
-    apply.Parent = panel
-    Instance.new("UICorner", apply).CornerRadius = UDim.new(0, 10)
-
-    -- ---------- right: thumbnail library ----------
-    local LIB_X = 24 + PV_W + 24
-    local LIB_W = W - LIB_X - 24
-
-    local libTitle = Instance.new("TextLabel")
-    libTitle.Position = UDim2.new(0, LIB_X, 0, 58)
-    libTitle.Size = UDim2.new(0, LIB_W - 40, 0, 18)
-    libTitle.BackgroundTransparency = 1
-    libTitle.Text = "IMAGE LIBRARY"
-    libTitle.TextColor3 = UI_TEXT_WHITE
-    libTitle.TextSize = 12
-    libTitle.Font = Enum.Font.GothamBold
-    libTitle.TextXAlignment = Enum.TextXAlignment.Left
-    libTitle.Parent = panel
-
-    local styleCount = 0
-    for _, b in ipairs(M.BACKGROUNDS) do
-        if b.build then styleCount = styleCount + 1 end
-    end
-    local badge = Instance.new("TextLabel")
-    badge.AnchorPoint = Vector2.new(1, 0)
-    badge.Position = UDim2.new(0, LIB_X + LIB_W, 0, 55)
-    badge.Size = UDim2.new(0, 30, 0, 22)
-    badge.BackgroundColor3 = UI_ACCENT
-    badge.BorderSizePixel = 0
-    badge.Text = tostring(styleCount)
-    badge.TextColor3 = Color3.fromRGB(255, 255, 255)
-    badge.TextSize = 12
-    badge.Font = Enum.Font.GothamBold
-    badge.Parent = panel
-    Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 7)
-
-    local caption = Instance.new("TextLabel")
-    caption.Position = UDim2.new(0, LIB_X, 0, 78)
-    caption.Size = UDim2.new(0, LIB_W, 0, 14)
-    caption.BackgroundTransparency = 1
-    caption.Text = "SCROLL TO PREVIEW STYLES"
-    caption.TextColor3 = UI_TEXT_DIM
-    caption.TextSize = 9
-    caption.Font = Enum.Font.GothamMedium
-    caption.TextXAlignment = Enum.TextXAlignment.Left
-    caption.Parent = panel
-
-    local lib = Instance.new("ScrollingFrame")
-    lib.Name = "Library"
-    lib.Position = UDim2.new(0, LIB_X, 0, 98)
-    lib.Size = UDim2.new(0, LIB_W, 0, H - 98 - 24)
-    lib.BackgroundTransparency = 1
-    lib.BorderSizePixel = 0
-    lib.ScrollBarThickness = 4
-    lib.ScrollBarImageColor3 = UI_ACCENT_LIGHT
-    lib.ScrollingDirection = Enum.ScrollingDirection.Y
-    lib.CanvasSize = UDim2.new(0, 0, 0, 0)
-    lib.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    lib.Parent = panel
-
-    local CELL_W = math.floor((LIB_W - 14) / 2)
-    local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0, CELL_W, 0, 84)
-    grid.CellPadding = UDim2.new(0, 6, 0, 6)
-    grid.SortOrder = Enum.SortOrder.LayoutOrder
-    grid.Parent = lib
-
-    local pending = M.bgIndex or 1
-    local tiles = {}
-
-    local function refresh()
-        local preset = M.BACKGROUNDS[pending]
-        local hasImg = preset and preset.build ~= nil
-        pvImg.Visible = hasImg and true or false
-        pvEmpty.Visible = not hasImg
-        if hasImg then M.renderBackground(pvImg, pending, true) end
-        nameLbl.Text = preset and preset.name or "OFF"
-        for i, t in ipairs(tiles) do
-            local active = (i == pending)
-            local st = t.frame:FindFirstChildOfClass("UIStroke")
-            if st then
-                st.Color = active and UI_ACCENT or UI_CARD_STROKE
-                st.Thickness = active and 2 or 1
-                st.Transparency = active and 0 or 0.6
-            end
-            t.on.Visible = active
-            t.label.TextColor3 = active and UI_TEXT_WHITE or UI_TEXT_DIM
-        end
-    end
-
-    for i, preset in ipairs(M.BACKGROUNDS) do
-        local hasImg = preset.build ~= nil
-
-        local card = Instance.new("Frame")
-        card.Name = "Tile_" .. i
-        card.LayoutOrder = i
-        card.BackgroundColor3 = Color3.fromRGB(8, 5, 7)
-        card.BorderSizePixel = 0
-        card.ClipsDescendants = true
-        card.Parent = lib
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-        local cst = Instance.new("UIStroke")
-        cst.Color = UI_CARD_STROKE; cst.Thickness = 1; cst.Transparency = 0.6; cst.Parent = card
-
-        local thumb = Instance.new("Frame")
-        thumb.Name = "Thumb"
-        thumb.BackgroundColor3 = Color3.fromRGB(14, 9, 12)
-        thumb.BackgroundTransparency = hasImg and 1 or 0
-        thumb.Position = UDim2.new(0, 0, 0, 0)
-        thumb.Size = UDim2.new(1, 0, 1, -22)
-        thumb.BorderSizePixel = 0
-        thumb.ClipsDescendants = true
-        thumb.Parent = card
-        -- thumbnails are static; only the live menu and the big preview animate
-        if hasImg then M.renderBackground(thumb, i, false) end
-
-        local foot = Instance.new("Frame")
-        foot.AnchorPoint = Vector2.new(0, 1)
-        foot.Position = UDim2.new(0, 0, 1, 0)
-        foot.Size = UDim2.new(1, 0, 0, 22)
-        foot.BackgroundColor3 = UI_CHIP_BG
-        foot.BorderSizePixel = 0
-        foot.ZIndex = 2
-        foot.Parent = card
-
-        local lbl = Instance.new("TextLabel")
-        lbl.Position = UDim2.new(0, 7, 0, 0)
-        lbl.Size = UDim2.new(1, -34, 1, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = preset.name
-        lbl.TextColor3 = UI_TEXT_DIM
-        lbl.TextSize = 9
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.ZIndex = 3
-        lbl.Parent = foot
-
-        local on = Instance.new("TextLabel")
-        on.Name = "OnBadge"
-        on.AnchorPoint = Vector2.new(1, 0.5)
-        on.Position = UDim2.new(1, -5, 0.5, 0)
-        on.Size = UDim2.new(0, 24, 0, 14)
-        on.BackgroundColor3 = UI_ACCENT
-        on.BorderSizePixel = 0
-        on.Text = "ON"
-        on.TextColor3 = Color3.fromRGB(255, 255, 255)
-        on.TextSize = 9
-        on.Font = Enum.Font.GothamBold
-        on.Visible = false
-        on.ZIndex = 3
-        on.Parent = foot
-        Instance.new("UICorner", on).CornerRadius = UDim.new(0, 5)
-
-        local hit = Instance.new("TextButton")
-        hit.Size = UDim2.fromScale(1, 1)
-        hit.BackgroundTransparency = 1
-        hit.Text = ""
-        hit.AutoButtonColor = false
-        hit.ZIndex = 4
-        hit.Parent = card
-        hit.MouseButton1Click:Connect(function()
-            pending = i
-            refresh()
-        end)
-
-        tiles[i] = {frame = card, on = on, label = lbl}
-    end
-
-    local function closePicker() gui:Destroy() end
-    local function applyPick()
-        M.bgIndex = pending
-        M.applyMenuBackground(M.mainFrame)
-        if M.bgChip and M.bgChip.Parent then
-            M.bgChip.Text = (M.BACKGROUNDS[M.bgIndex] or {}).name or "OFF"
-        end
-        pcall(saveCherryConfig)
-        closePicker()
-    end
-    apply.MouseButton1Click:Connect(applyPick)
-    close.MouseButton1Click:Connect(closePicker)
-    dim.MouseButton1Click:Connect(closePicker)
-
-    refresh()
-    return gui
-end
-
 -- MAIN BUILD
 -- ============================================================
 -- CUSTOM FONTS (from EXE)
@@ -6730,7 +6195,6 @@ function M.applyCustomFont(name)
 end
 
 function M.buildGui()
-    uiResetRegistry()
     applyAccentFromTheme()
     M.clearPersistentConns()
 
@@ -6759,7 +6223,6 @@ function M.buildGui()
     Frame.Active = true
     Frame.Parent = gui
     M.mainFrame = Frame
-    M.applyMenuBackground(Frame)
 
     local UIScale = Instance.new("UIScale")
     UIScale.Name = "BDUIScale"
@@ -6905,77 +6368,11 @@ function M.buildGui()
         g.Parent=Div
     end
 
-    -- SEARCH: filters the whole list live, which matters with everything on
-    -- one scroll
-    do
-        local sb = Instance.new("Frame")
-        sb.Name = "SearchBar"
-        sb.Position = UDim2.new(0, 14, 0, 78)
-        sb.Size = UDim2.new(1, -28, 0, 32)
-        sb.BackgroundColor3 = UI_CHIP_BG
-        sb.BorderSizePixel = 0
-        sb.Parent = Frame
-        Instance.new("UICorner", sb).CornerRadius = UDim.new(0, 10)
-        local ss = Instance.new("UIStroke")
-        ss.Color = UI_CARD_STROKE
-        ss.Thickness = 1
-        ss.Transparency = 0.8
-        ss.Parent = sb
-
-        local icon = Instance.new("TextLabel")
-        icon.Position = UDim2.new(0, 10, 0, 0)
-        icon.Size = UDim2.new(0, 18, 1, 0)
-        icon.BackgroundTransparency = 1
-        icon.Text = "⌕"
-        icon.TextColor3 = UI_ACCENT_LIGHT
-        icon.TextSize = 17
-        icon.Font = Enum.Font.GothamBold
-        icon.Parent = sb
-
-        local box = Instance.new("TextBox")
-        box.Name = "SearchBox"
-        box.Position = UDim2.new(0, 30, 0, 0)
-        box.Size = UDim2.new(1, -62, 1, 0)
-        box.BackgroundTransparency = 1
-        box.Text = ""
-        box.PlaceholderText = "Search settings..."
-        box.PlaceholderColor3 = UI_TEXT_DIM
-        box.TextColor3 = UI_TEXT_PRIMARY
-        box.TextSize = 13
-        box.Font = Enum.Font.GothamMedium
-        box.TextXAlignment = Enum.TextXAlignment.Left
-        box.ClearTextOnFocus = false
-        box.Parent = sb
-        M.searchBox = box
-
-        local clear = Instance.new("TextButton")
-        clear.AnchorPoint = Vector2.new(1, 0.5)
-        clear.Position = UDim2.new(1, -8, 0.5, 0)
-        clear.Size = UDim2.new(0, 22, 0, 22)
-        clear.BackgroundTransparency = 1
-        clear.Text = "✕"
-        clear.TextColor3 = UI_TEXT_DIM
-        clear.TextSize = 13
-        clear.Font = Enum.Font.GothamBold
-        clear.AutoButtonColor = false
-        clear.Visible = false
-        clear.Parent = sb
-
-        box:GetPropertyChangedSignal("Text"):Connect(function()
-            clear.Visible = box.Text ~= ""
-            uiSetQuery(box.Text)
-        end)
-        clear.MouseButton1Click:Connect(function()
-            box.Text = ""
-            uiSetQuery("")
-        end)
-    end
-
     -- CONTENT: one continuous scroll, no tab bar
     local PagedContent = Instance.new("Frame")
     PagedContent.Name = "Content"
-    PagedContent.Position = UDim2.new(0,8,0,118)
-    PagedContent.Size = UDim2.new(1,-16,1,-130)
+    PagedContent.Position = UDim2.new(0,8,0,78)
+    PagedContent.Size = UDim2.new(1,-16,1,-90)
     PagedContent.BackgroundTransparency = 1
     PagedContent.Parent = Frame
 
@@ -7503,29 +6900,6 @@ function M.buildGui()
     local jumpDefaultIdx = (M.infJumpMode == "hold") and 2 or 1
 
     -- PAGE: VISUALS
-    uiSectionHeader(PVis, "BACKGROUND")
-    do
-        local r = uiRowCard(PVis, false, UI_ROW_H)
-        uiRowLabel(r, "Background Image", 200)
-        local chip = uiValueChip(r, (M.BACKGROUNDS[M.bgIndex or 1] or {}).name or "None",
-            {width = 120, autoWidth = true})
-        M.bgChip = chip
-        local function openIt()
-            chip.BackgroundColor3 = UI_ACCENT
-            TweenService:Create(chip, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG}):Play()
-            M.openBackgroundPicker()
-        end
-        chip.MouseButton1Click:Connect(openIt)
-        local hit = Instance.new("TextButton")
-        hit.Size = UDim2.new(1, 0, 1, 0)
-        hit.BackgroundTransparency = 1
-        hit.Text = ""
-        hit.AutoButtonColor = false
-        hit.ZIndex = 2
-        hit.Parent = r
-        hit.MouseButton1Click:Connect(openIt)
-    end
-
     uiSectionHeader(PVis, "SKYBOX")
     do
         local r = uiRowCard(PVis, false, UI_ROW_H)
@@ -7735,6 +7109,96 @@ function M.buildGui()
     end)
     M.setAutoSaveVisual = setAutoSave
 
+
+    uiSectionHeader(PUtil, "PROFILES")
+    do
+        -- name field
+        local r = uiRowCard(PUtil, false, UI_ROW_H)
+        uiRowLabel(r, "Profile Name", 190)
+        local nameBox = Instance.new("TextBox")
+        nameBox.AnchorPoint = Vector2.new(1, 0.5)
+        nameBox.Position = UDim2.new(1, -12, 0.5, 0)
+        nameBox.Size = UDim2.new(0, 168, 0, 34)
+        nameBox.BackgroundColor3 = UI_CHIP_BG
+        nameBox.BorderSizePixel = 0
+        nameBox.Text = M.activeProfile or ""
+        nameBox.PlaceholderText = "New profile..."
+        nameBox.PlaceholderColor3 = UI_TEXT_DIM
+        nameBox.TextColor3 = UI_ACCENT_LIGHT
+        nameBox.TextSize = 13
+        nameBox.Font = Enum.Font.GothamBold
+        nameBox.ClearTextOnFocus = false
+        nameBox.ZIndex = 3
+        nameBox.Parent = r
+        Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 10)
+
+        -- active profile selector
+        local sr = uiRowCard(PUtil, false, UI_ROW_H)
+        uiRowLabel(sr, "Saved Profile", 250)
+        local nextBtn = uiSmallBtn({Parent=sr, Pos=UDim2.new(1,-46,0.5,-17), Size=UDim2.new(0,34,0,34), Text=">", Col=UI_TEXT_PRIMARY, TS=15, CR=10, Z=3})
+        local prevBtn = uiSmallBtn({Parent=sr, Pos=UDim2.new(1,-88,0.5,-17), Size=UDim2.new(0,34,0,34), Text="<", Col=UI_TEXT_PRIMARY, TS=15, CR=10, Z=3})
+        local sel = Instance.new("TextLabel")
+        sel.AnchorPoint = Vector2.new(1, 0.5)
+        sel.Position = UDim2.new(1, -104, 0.5, 0)
+        sel.Size = UDim2.new(0, 150, 0, 24)
+        sel.BackgroundTransparency = 1
+        sel.TextColor3 = UI_ACCENT_LIGHT
+        sel.TextSize = 14
+        sel.Font = Enum.Font.GothamBold
+        sel.TextTruncate = Enum.TextTruncate.AtEnd
+        sel.ZIndex = 3
+        sel.Parent = sr
+
+        local function refreshSel()
+            if #M.profileOrder == 0 then
+                sel.Text = "none saved"
+                sel.TextColor3 = UI_TEXT_DIM
+            else
+                sel.Text = M.activeProfile or M.profileOrder[1]
+                sel.TextColor3 = UI_ACCENT_LIGHT
+            end
+        end
+        refreshSel()
+        M.refreshProfileSelector = refreshSel
+        prevBtn.MouseButton1Click:Connect(function() M.cycleProfile(-1); refreshSel() end)
+        nextBtn.MouseButton1Click:Connect(function() M.cycleProfile(1); refreshSel() end)
+
+        uiActionRow(PUtil, "Save Current Settings", function()
+            local ok, res = M.saveProfileAs(nameBox.Text)
+            refreshSel()
+            if ok then
+                nameBox.Text = res
+                M.showWarning('Saved as "' .. tostring(res) .. '"', UI_ACCENT, "PROFILES")
+            else
+                M.showWarning("Could not write the profile file", M.WARN_RED, "PROFILES")
+            end
+        end)
+
+        uiActionRow(PUtil, "Load Selected Profile", function()
+            local name = M.activeProfile or M.profileOrder[1]
+            if not name then
+                M.showWarning("No profile saved yet", M.WARN_RED, "PROFILES")
+                return
+            end
+            if M.applyProfile(name) then
+                M.showWarning('Loaded "' .. tostring(name) .. '"', UI_ACCENT, "PROFILES")
+            else
+                M.showWarning('Could not load "' .. tostring(name) .. '"', M.WARN_RED, "PROFILES")
+            end
+        end)
+
+        uiActionRow(PUtil, "Delete Selected Profile", function()
+            local name = M.activeProfile or M.profileOrder[1]
+            if not name or not M.deleteProfile(name) then
+                M.showWarning("Nothing to delete", M.WARN_RED, "PROFILES")
+                refreshSel()
+                return
+            end
+            refreshSel()
+            nameBox.Text = M.activeProfile or ""
+            M.showWarning('Deleted "' .. tostring(name) .. '"', UI_ACCENT, "PROFILES")
+        end)
+    end
 
     uiSectionHeader(PUtil, "COSMETICS")
     local _, setHeadUI = uiChoiceRow(PUtil, "Head", {"Normal", "Headless"},

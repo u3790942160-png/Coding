@@ -17,6 +17,7 @@ local savedConfig = {
     submitAfter = 3,
     retypeInvalid = false,
     riddleSolver = false,
+    geminiApiKey = "",
 }
 pcall(function()
     if type(isfile) == "function" and type(readfile) == "function"
@@ -28,6 +29,7 @@ pcall(function()
             if type(decoded.submitAfter) == "number" then savedConfig.submitAfter = math.max(1, math.floor(decoded.submitAfter)) end
             if type(decoded.retypeInvalid) == "boolean" then savedConfig.retypeInvalid = decoded.retypeInvalid end
             if type(decoded.riddleSolver) == "boolean" then savedConfig.riddleSolver = decoded.riddleSolver end
+            if type(decoded.geminiApiKey) == "string" and #decoded.geminiApiKey > 10 then savedConfig.geminiApiKey = decoded.geminiApiKey end
         end
     end
 end)
@@ -41,6 +43,7 @@ local function saveConfig()
             submitAfter = savedConfig.submitAfter,
             retypeInvalid = savedConfig.retypeInvalid,
             riddleSolver = savedConfig.riddleSolver,
+            geminiApiKey = savedConfig.geminiApiKey,
         }))
     end)
 end
@@ -1125,126 +1128,150 @@ local function aceTokenize(text)
 end
 
 -- RIDDLE SOLVER SYSTEM --
-local RIDDLE_DB = {
-    {
-        keywords = {"when", "game", "release", "created", "come out", "launch", "publish"},
-        answers  = {"2024"},
-    },
-    {
-        keywords = {"who", "created", "made", "creator", "developer", "owner", "founded"},
-        answers  = {"PHI"},
-    },
-    {
-        keywords = {"how many", "brainrot", "total", "characters", "skins"},
-        answers  = {"50"},
-    },
-    {
-        keywords = {"what", "first", "brainrot", "added", "original"},
-        answers  = {"skibidi toilet"},
-    },
-    {
-        keywords = {"what", "rarest", "brainrot", "rare"},
-        answers  = {"godly"},
-    },
-    {
-        keywords = {"discord", "server", "link", "join"},
-        answers  = {"discord.gg/aceduels"},
-    },
-    {
-        keywords = {"what", "max", "level", "highest"},
-        answers  = {"100"},
-    },
-    {
-        keywords = {"what", "currency", "money", "coin", "cash"},
-        answers  = {"coins"},
-    },
-    {
-        keywords = {"how", "steal", "take", "grab"},
-        answers  = {"click"},
-    },
-    {
-        keywords = {"what", "game", "name", "called"},
-        answers  = {"steal a brainrot"},
-    },
-    {
-        keywords = {"what", "group", "roblox group"},
-        answers  = {"ace"},
-    },
-    {
-        keywords = {"favorite", "colour", "color"},
-        answers  = {"blue", "red", "green", "purple"},
-    },
-    {
-        keywords = {"like", "count", "how many likes"},
-        answers  = {"1000"},
-    },
-    {
-        keywords = {"visit", "count", "how many visits", "plays"},
-        answers  = {"1000000"},
-    },
-    {
-        keywords = {"update", "latest", "newest", "last update", "recent"},
-        answers  = {"trading"},
-    },
-    {
-        keywords = {"what", "best", "weapon", "sword", "tool"},
-        answers  = {"katana"},
-    },
-    {
-        keywords = {"code", "first code", "oldest code"},
-        answers  = {"release"},
-    },
-    {
-        keywords = {"map", "world", "location", "where"},
-        answers  = {"lobby"},
-    },
-}
 
+-- API KEY: Set your free Google Gemini API key
+-- Get one free at: https://aistudio.google.com/apikey
+-- Option 1: Save key to file "ace_gemini_key.txt" in your executor's workspace
+-- Option 2: Set it in the config JSON under "geminiApiKey"
+-- Option 3: Run: getgenv().ACE_GEMINI_KEY = "your-key-here" before executing
+local GEMINI_API_KEY = ""
+local GEMINI_API_KEY_FILE = "ace_gemini_key.txt"
+pcall(function()
+    if getgenv and type(getgenv().ACE_GEMINI_KEY) == "string" and #getgenv().ACE_GEMINI_KEY > 10 then
+        GEMINI_API_KEY = getgenv().ACE_GEMINI_KEY
+        return
+    end
+    if savedConfig.geminiApiKey and #savedConfig.geminiApiKey > 10 then
+        GEMINI_API_KEY = savedConfig.geminiApiKey
+        return
+    end
+    if type(isfile) == "function" and type(readfile) == "function" and isfile(GEMINI_API_KEY_FILE) then
+        local key = readfile(GEMINI_API_KEY_FILE):match("^%s*(.-)%s*$") or ""
+        if #key > 10 then GEMINI_API_KEY = key end
+    end
+end)
+
+local aceHttpRequest = (syn and syn.request) or (http and http.request) or request or http_request or (fluxus and fluxus.request)
+
+local _riddleAICache = {}
 local _riddleSeenCache = {}
 local _lastRiddleAnswer = nil
+
+local RIDDLE_AI_PROMPT = [[You are a riddle answer bot for the Roblox game "Steal a Brainrot". You will receive a riddle or trivia question from the game. Your job is to answer it.
+
+RULES:
+- Reply with ONLY the answer, nothing else
+- Keep answers as short as possible (1-3 words max)
+- No punctuation, no explanation, no extra text
+- If it's a number question, just the number
+- If it's a name, just the name
+- If you're unsure, give your best guess anyway — never say "I don't know"
+
+GAME CONTEXT — "Steal a Brainrot" facts:
+- Roblox game where you steal brainrot meme characters from other players
+- Popular brainrot memes: Skibidi Toilet, Baby Gronk, Sigma, Duke Dennis, Kai Cenat, Livvy Dunne, Fanum Tax, Gyatt, Ohio, Rizz, Ice Spice, Grimace Shake, Sussy Baka, Among Us, Speed, Mr Beast
+- The game has rarities: Common, Uncommon, Rare, Epic, Legendary, Mythic, Godly, Secret
+- Players steal characters by clicking on them
+- The game has a trading system
+- There are codes you can redeem for rewards
+- The game has a Discord server
+
+Answer this riddle/question:
+]]
 
 local function riddleNormalize(str)
     return str:lower():gsub("[^%w%s]", ""):gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
 end
 
-local function riddleMatchScore(text, entry)
-    local normalizedText = riddleNormalize(text)
-    local score = 0
-    local matched = 0
-    for _, kw in ipairs(entry.keywords) do
-        if normalizedText:find(kw:lower(), 1, true) then
-            matched += 1
-            score += #kw
-        end
-    end
-    if matched < 2 then return 0 end
-    return score
+local function cleanAIResponse(response)
+    if not response or response == "" then return nil end
+    response = response:gsub("^%s+", ""):gsub("%s+$", "")
+    response = response:gsub("^[\"'`]+", ""):gsub("[\"'`%.!]+$", "")
+    response = response:gsub("\n.*", "")
+    response = response:match("^%s*(.-)%s*$") or response
+    if #response > 100 then response = response:sub(1, 100) end
+    if response == "" then return nil end
+    return response
 end
 
-local function solveRiddle(text)
-    local bestScore = 0
-    local bestEntry = nil
-    for _, entry in ipairs(RIDDLE_DB) do
-        local score = riddleMatchScore(text, entry)
-        if score > bestScore then
-            bestScore = score
-            bestEntry = entry
+local function solveRiddleWithAI(riddleText, callback)
+    if not aceHttpRequest then
+        callback(nil, "no http function")
+        return
+    end
+    if GEMINI_API_KEY == "" then
+        callback(nil, "no API key")
+        return
+    end
+
+    local cacheKey = riddleNormalize(riddleText)
+    if _riddleAICache[cacheKey] then
+        callback(_riddleAICache[cacheKey])
+        return
+    end
+
+    local url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" .. GEMINI_API_KEY
+
+    local body = HttpService:JSONEncode({
+        contents = {{
+            parts = {{
+                text = RIDDLE_AI_PROMPT .. riddleText
+            }}
+        }},
+        generationConfig = {
+            temperature = 0.1,
+            maxOutputTokens = 50,
+        }
+    })
+
+    task.spawn(function()
+        local ok, result = pcall(function()
+            return aceHttpRequest({
+                Url = url,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = body,
+            })
+        end)
+
+        if not ok then
+            callback(nil, "request failed")
+            return
         end
-    end
-    if bestEntry and bestScore >= 4 then
-        return bestEntry.answers[1]
-    end
-    return nil
+
+        local success, decoded = pcall(function()
+            return HttpService:JSONDecode(result.Body or result.body or "")
+        end)
+
+        if not success or not decoded then
+            callback(nil, "decode failed")
+            return
+        end
+
+        local answer = nil
+        pcall(function()
+            answer = decoded.candidates[1].content.parts[1].text
+        end)
+
+        answer = cleanAIResponse(answer)
+        if answer then
+            _riddleAICache[cacheKey] = answer
+            task.delay(300, function() _riddleAICache[cacheKey] = nil end)
+        end
+
+        callback(answer, answer and nil or "empty response")
+    end)
 end
 
 local function isRiddleText(text)
     if not text:find("%s") then return false end
     local lower = text:lower()
     if lower:find("?") then return true end
-    local questionWords = {"what", "when", "where", "who", "how", "which", "name the", "guess"}
+    local questionWords = {"what", "when", "where", "who", "how", "which", "name the", "guess", "can you", "do you", "is the", "are the", "tell", "answer", "solve", "riddle", "hint"}
     for _, qw in ipairs(questionWords) do
         if lower:find(qw, 1, true) then return true end
     end
+    if #lower > 15 then return true end
     return false
 end
 
@@ -1259,17 +1286,32 @@ local function handleRiddle(text)
 
     setStatus("[riddle] " .. text, COLORS.Text)
 
-    local answer = solveRiddle(text)
-    if answer then
-        _lastRiddleAnswer = answer
-        setStatus("[riddle] answer -> " .. answer, COLORS.Green)
-        flashCode(answer, COLORS.Green)
-        appendToBox(answer)
-        return true
-    else
-        setStatus("[riddle] no answer found", COLORS.Red)
+    local cached = _riddleAICache[cacheKey]
+    if cached then
+        _lastRiddleAnswer = cached
+        setStatus("[riddle] answer -> " .. cached .. " (cached)", COLORS.Green)
+        flashCode(cached, COLORS.Green)
+        appendToBox(cached)
         return true
     end
+
+    if GEMINI_API_KEY == "" then
+        setStatus("[riddle] set API key in ace_gemini_key.txt", COLORS.Red)
+        return true
+    end
+
+    setStatus("[riddle] asking AI...", COLORS.Text)
+    solveRiddleWithAI(text, function(answer, err)
+        if answer then
+            _lastRiddleAnswer = answer
+            setStatus("[riddle] AI answer -> " .. answer, COLORS.Green)
+            flashCode(answer, COLORS.Green)
+            appendToBox(answer)
+        else
+            setStatus("[riddle] AI failed: " .. tostring(err), COLORS.Red)
+        end
+    end)
+    return true
 end
 
 local aceCollectBuffer = {}

@@ -4149,11 +4149,8 @@ function M.buildMobileButtons()
     M.mobGuiRef = mobGui
 
     local accent = UI_ACCENT or CHERRY_ACCENT or Color3.fromRGB(255, 255, 255)
-    local BTN_OFF   = UI_BTN_BG or UI_ROW_BG or Color3.new(
-        math.clamp(accent.R * 0.22, 0, 1),
-        math.clamp(accent.G * 0.22, 0, 1),
-        math.clamp(accent.B * 0.22, 0, 1)
-    )
+    -- black while off, accent while active
+    local BTN_OFF   = Color3.fromRGB(10, 10, 12)
     local BTN_ON    = accent
     local TXT_OFF   = Color3.fromRGB(255, 255, 255)
     local TXT_ON    = Color3.fromRGB(255, 255, 255)
@@ -4770,8 +4767,10 @@ M.stealKickWarnEnabled = false
 M.STEAL_SAFE_RADIUS = 90
 M.STEAL_SAFE_MIN_TIME = 0.6
 
--- Wide banner that slides in from off the right edge, holds, then slides back.
-function M.showWarning(text)
+-- Compact two-line alert that slides in from off the right edge. `tone` picks
+-- the accent colour, so the ping alert can come in red while other warnings
+-- stay on the hub accent.
+function M.showWarning(text, tone, title)
     local pg = player:FindFirstChild("PlayerGui")
     if not pg then return end
     local gui = pg:FindFirstChild("CrateHubWarn")
@@ -4784,79 +4783,108 @@ function M.showWarning(text)
         gui.Parent = pg
     end
 
-    local accent = UI_ACCENT or Color3.fromRGB(255,77,160)
-    local lbl = gui:FindFirstChild("WarnLabel")
-    if not lbl then
-        lbl = Instance.new("TextLabel")
-        lbl.Name = "WarnLabel"
-        lbl.AnchorPoint = Vector2.new(1, 0)
-        lbl.Size = UDim2.new(0, 460, 0, 62)
-        lbl.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11,5,8)
-        lbl.BackgroundTransparency = 0.05
-        lbl.BorderSizePixel = 0
-        lbl.TextColor3 = Color3.fromRGB(255,255,255)
-        lbl.TextSize = 19
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextWrapped = true
-        lbl.Visible = false
-        lbl.Parent = gui
-        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 14)
-        local st = Instance.new("UIStroke")
-        st.Name = "WarnStroke"
-        st.Color = accent
-        st.Thickness = 2
-        st.Transparency = 0.05
-        st.Parent = lbl
-        -- accent edge down the left of the banner
-        local edge = Instance.new("Frame")
+    local col = tone or UI_ACCENT or Color3.fromRGB(255,77,160)
+    local card = gui:FindFirstChild("WarnCard")
+    local titleLbl, msgLbl, edge, stroke
+    if not card then
+        card = Instance.new("Frame")
+        card.Name = "WarnCard"
+        card.AnchorPoint = Vector2.new(1, 0)
+        card.Size = UDim2.new(0, 300, 0, 96)
+        card.BackgroundColor3 = Color3.fromRGB(10, 6, 8)
+        card.BackgroundTransparency = 0.03
+        card.BorderSizePixel = 0
+        card.Visible = false
+        card.Parent = gui
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 16)
+
+        stroke = Instance.new("UIStroke")
+        stroke.Name = "WarnStroke"
+        stroke.Thickness = 2.5
+        stroke.Transparency = 0.02
+        stroke.Parent = card
+
+        edge = Instance.new("Frame")
         edge.Name = "WarnEdge"
         edge.AnchorPoint = Vector2.new(0, 0.5)
-        edge.Position = UDim2.new(0, 12, 0.5, 0)
-        edge.Size = UDim2.new(0, 5, 0, 34)
-        edge.BackgroundColor3 = accent
+        edge.Position = UDim2.new(0, 14, 0.5, 0)
+        edge.Size = UDim2.new(0, 6, 0, 58)
         edge.BorderSizePixel = 0
         edge.ZIndex = 2
-        edge.Parent = lbl
+        edge.Parent = card
         Instance.new("UICorner", edge).CornerRadius = UDim.new(0, 3)
-        local pad = Instance.new("UIPadding")
-        pad.PaddingLeft = UDim.new(0, 30)
-        pad.PaddingRight = UDim.new(0, 14)
-        pad.Parent = lbl
+
+        titleLbl = Instance.new("TextLabel")
+        titleLbl.Name = "WarnTitle"
+        titleLbl.Position = UDim2.new(0, 32, 0, 16)
+        titleLbl.Size = UDim2.new(1, -46, 0, 24)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Font = Enum.Font.GothamBlack
+        titleLbl.TextSize = 20
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.ZIndex = 2
+        titleLbl.Parent = card
+
+        msgLbl = Instance.new("TextLabel")
+        msgLbl.Name = "WarnMsg"
+        msgLbl.Position = UDim2.new(0, 32, 0, 44)
+        msgLbl.Size = UDim2.new(1, -46, 0, 40)
+        msgLbl.BackgroundTransparency = 1
+        msgLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        msgLbl.Font = Enum.Font.GothamBold
+        msgLbl.TextSize = 16
+        msgLbl.TextWrapped = true
+        msgLbl.TextXAlignment = Enum.TextXAlignment.Left
+        msgLbl.TextYAlignment = Enum.TextYAlignment.Top
+        msgLbl.ZIndex = 2
+        msgLbl.Parent = card
+    else
+        stroke   = card:FindFirstChild("WarnStroke")
+        edge     = card:FindFirstChild("WarnEdge")
+        titleLbl = card:FindFirstChild("WarnTitle")
+        msgLbl   = card:FindFirstChild("WarnMsg")
     end
 
-    local SHOWN  = UDim2.new(1, -18, 0, 60)
-    local HIDDEN = UDim2.new(1, 480, 0, 60)
+    if stroke then stroke.Color = col end
+    if edge then edge.BackgroundColor3 = col end
+    if titleLbl then
+        titleLbl.TextColor3 = col
+        titleLbl.Text = title or "WARNING"
+    end
+    if msgLbl then msgLbl.Text = text end
+
+    local SHOWN  = UDim2.new(1, -18, 0, 64)
+    local HIDDEN = UDim2.new(1, 330, 0, 64)
     local SLIDE_IN  = TweenInfo.new(0.38, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
     local SLIDE_OUT = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 
-    lbl.Text = text
     M._stealWarnToken = (M._stealWarnToken or 0) + 1
     local token = M._stealWarnToken
 
     if M._warnTween then pcall(function() M._warnTween:Cancel() end) end
-    if not lbl.Visible then
-        lbl.Position = HIDDEN
-        lbl.Visible = true
+    if not card.Visible then
+        card.Position = HIDDEN
+        card.Visible = true
     end
-    M._warnTween = TweenService:Create(lbl, SLIDE_IN, {Position = SHOWN})
+    M._warnTween = TweenService:Create(card, SLIDE_IN, {Position = SHOWN})
     M._warnTween:Play()
 
     task.delay(4, function()
-        if not (lbl and lbl.Parent) then return end
+        if not (card and card.Parent) then return end
         if M._stealWarnToken ~= token then return end
         if M._warnTween then pcall(function() M._warnTween:Cancel() end) end
-        local out = TweenService:Create(lbl, SLIDE_OUT, {Position = HIDDEN})
+        local out = TweenService:Create(card, SLIDE_OUT, {Position = HIDDEN})
         M._warnTween = out
         out:Play()
         out.Completed:Connect(function()
-            if M._stealWarnToken == token then lbl.Visible = false end
+            if M._stealWarnToken == token then card.Visible = false end
         end)
     end)
 end
 
 function M.showStealWarning(text)
     if not M.stealKickWarnEnabled then return end
-    M.showWarning(text)
+    M.showWarning(text, M.WARN_RED, "STEAL RISK")
 end
 
 -- ---------- Ping warning ----------
@@ -4864,6 +4892,7 @@ end
 -- ping crosses the threshold and re-arm when it settles back down.
 M.PING_WARN_MS = 100
 M.pingWarnEnabled = true
+M.WARN_RED = Color3.fromRGB(255, 62, 62)
 
 function M.getPingMs()
     local ok, ms = pcall(function()
@@ -4915,7 +4944,11 @@ function M.startPingWatch()
                     local limit = tonumber(M.PING_WARN_MS) or 100
                     if ms > limit and not M._pingWasHigh then
                         M._pingWasHigh = true
-                        M.showWarning(string.format("Ping %dms - you shouldn't duel", math.floor(ms + 0.5)))
+                        M.showWarning(
+                            string.format("%dms - you shouldn't duel right now", math.floor(ms + 0.5)),
+                            M.WARN_RED,
+                            "HIGH PING"
+                        )
                     elseif ms <= limit * 0.9 then
                         -- small gap below the limit so a jittery ping does not spam
                         M._pingWasHigh = false

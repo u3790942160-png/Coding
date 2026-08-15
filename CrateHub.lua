@@ -5067,45 +5067,228 @@ end
 -- ---------- Menu background image ----------
 -- Six presets plus an off state. The image sits behind the content at ZIndex
 -- 0 and is dimmed so rows stay readable.
+-- Backgrounds are drawn in-script from UI primitives rather than loaded as
+-- images, so nothing depends on an asset id staying valid and every style is
+-- built from the hub's own accent. Everything is scale-based, which means the
+-- same builder fills the menu, the big preview and a thumbnail.
+local function bgRand(seed)
+    local st = seed
+    return function(a, b)
+        st = (st * 1103515245 + 12345) % 2147483648
+        local r = st / 2147483648
+        if not a then return r end
+        return a + r * (b - a)
+    end
+end
+
+-- A frame whose colour comes from its gradient must be white underneath,
+-- because UIGradient multiplies rather than replaces.
+local function bgPiece(parent, pos, size, z)
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    f.BorderSizePixel = 0
+    f.Position = pos
+    f.Size = size
+    f.ZIndex = z or 1
+    f.Parent = parent
+    return f
+end
+
+local function bgGradient(f, c1, c2, rot, t1, tMid, t2)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, c1),
+        ColorSequenceKeypoint.new(1, c2),
+    })
+    g.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, t1 or 0),
+        NumberSequenceKeypoint.new(0.5, tMid or ((t1 or 0) + (t2 or 0)) / 2),
+        NumberSequenceKeypoint.new(1, t2 or 0),
+    })
+    g.Rotation = rot or 0
+    g.Parent = f
+    return g
+end
+
+local function bgRound(f, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = r or UDim.new(1, 0)
+    c.Parent = f
+end
+
 M.BACKGROUNDS = {
-    {name = "OFF",      id = 0},
-    {name = "STYLE 01", id = 108236541541009},
-    {name = "STYLE 02", id = 79737099962715},
-    {name = "STYLE 03", id = 71211662493854},
-    {name = "STYLE 04", id = 109592813321691},
-    {name = "STYLE 05", id = 83661129801187},
-    {name = "STYLE 06", id = 94353803110527},
-    {name = "STYLE 07", id = 109100201685955},
+    {name = "OFF"},
+
+    {name = "AURORA", build = function(p, accent, animate)
+        local rnd = bgRand(41)
+        local deep = accent:Lerp(Color3.fromRGB(90, 30, 200), 0.55)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, deep, accent, 90, 0.82, 0.9, 0.62)
+        for i = 1, 6 do
+            local y = rnd(-0.05, 0.9)
+            local bar = bgPiece(p, UDim2.fromScale(-0.3, y), UDim2.fromScale(1.6, rnd(0.08, 0.2)), 2)
+            bar.Rotation = rnd(-22, -8)
+            bgGradient(bar, accent, deep, rnd(0, 180), 1, rnd(0.45, 0.72), 1)
+            if animate then
+                TweenService:Create(bar,
+                    TweenInfo.new(rnd(9, 16), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                    {Position = UDim2.fromScale(-0.3, y + rnd(-0.09, 0.09))}):Play()
+            end
+        end
+    end},
+
+    {name = "GRID", build = function(p, accent, animate)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, Color3.fromRGB(20, 8, 16), accent, 90, 0.9, 0.86, 0.55)
+        for i = 1, 13 do
+            local t = i / 13
+            local y = 0.42 + (t * t) * 0.62
+            local ln = bgPiece(p, UDim2.fromScale(0, y), UDim2.new(1, 0, 0, 1 + math.floor(t * 2)), 2)
+            bgGradient(ln, accent, accent, 0, 1, 0.5 - t * 0.3, 1)
+        end
+        for i = 0, 12 do
+            local x = i / 12
+            local ln = bgPiece(p, UDim2.fromScale(x, 0.42), UDim2.new(0, 1, 1, 0), 2)
+            ln.Rotation = (x - 0.5) * 26
+            bgGradient(ln, accent, accent, 90, 1, 0.72, 0.4)
+        end
+    end},
+
+    {name = "BOKEH", build = function(p, accent, animate)
+        local rnd = bgRand(7)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, accent:Lerp(Color3.new(0,0,0), 0.6), Color3.fromRGB(14, 6, 11), 135, 0.6, 0.78, 0.92)
+        local light = accent:Lerp(Color3.fromRGB(255,255,255), 0.35)
+        for i = 1, 26 do
+            local d = rnd(0.03, 0.17)
+            local dot = bgPiece(p, UDim2.fromScale(rnd(-0.05, 1), rnd(-0.05, 1)), UDim2.fromScale(d, d), 2)
+            bgRound(dot)
+            bgGradient(dot, light, accent, 45, rnd(0.68, 0.86), nil, 0.97)
+        end
+    end},
+
+    {name = "WAVES", build = function(p, accent, animate)
+        local rnd = bgRand(913)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, Color3.fromRGB(16, 6, 12), accent, 90, 0.88, 0.8, 0.5)
+        for i = 1, 9 do
+            local y = i / 10
+            local bar = bgPiece(p, UDim2.fromScale(-0.2, y), UDim2.fromScale(1.4, 0.055), 2)
+            bar.Rotation = math.sin(i * 1.1) * 9
+            bgRound(bar, UDim.new(1, 0))
+            bgGradient(bar, accent, accent:Lerp(Color3.fromRGB(120,40,220), 0.7), 0, 1, rnd(0.42, 0.68), 1)
+            if animate then
+                TweenService:Create(bar,
+                    TweenInfo.new(rnd(7, 13), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                    {Rotation = -bar.Rotation}):Play()
+            end
+        end
+    end},
+
+    {name = "NEBULA", build = function(p, accent, animate)
+        local rnd = bgRand(2024)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, Color3.fromRGB(30, 8, 26), Color3.fromRGB(8, 4, 10), 120, 0.5, 0.7, 0.9)
+        for i = 1, 5 do
+            local d = rnd(0.35, 0.8)
+            local blob = bgPiece(p, UDim2.fromScale(rnd(-0.2, 0.8), rnd(-0.2, 0.8)), UDim2.fromScale(d, d), 2)
+            bgRound(blob)
+            bgGradient(blob, accent, accent:Lerp(Color3.fromRGB(80, 30, 220), 0.8), rnd(0, 360), 0.72, 0.86, 1)
+            if animate then
+                TweenService:Create(blob,
+                    TweenInfo.new(rnd(14, 22), Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                    {Size = UDim2.fromScale(d * 1.18, d * 1.18)}):Play()
+            end
+        end
+        for i = 1, 46 do
+            local sz = rnd(0.004, 0.011)
+            local star = bgPiece(p, UDim2.fromScale(rnd(0, 1), rnd(0, 1)), UDim2.fromScale(sz, sz), 3)
+            bgRound(star)
+            star.BackgroundTransparency = rnd(0.15, 0.7)
+        end
+    end},
+
+    {name = "CARBON", build = function(p, accent, animate)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, Color3.fromRGB(18, 8, 14), Color3.fromRGB(8, 4, 8), 90, 0.55, 0.7, 0.86)
+        for i = -6, 26 do
+            local x = i / 20
+            local ln = bgPiece(p, UDim2.fromScale(x, -0.3), UDim2.new(0, 2, 1.6, 0), 2)
+            ln.Rotation = 32
+            bgGradient(ln, accent, accent, 90, 1, (i % 3 == 0) and 0.72 or 0.88, 1)
+        end
+    end},
+
+    {name = "EMBER", build = function(p, accent, animate)
+        local rnd = bgRand(555)
+        local base = bgPiece(p, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), 1)
+        bgGradient(base, Color3.fromRGB(10, 4, 8), accent, 90, 0.95, 0.82, 0.42)
+        for i = 1, 34 do
+            local sz = rnd(0.006, 0.022)
+            local x, y = rnd(0, 1), rnd(0.1, 1.05)
+            local dot = bgPiece(p, UDim2.fromScale(x, y), UDim2.fromScale(sz, sz), 2)
+            bgRound(dot)
+            bgGradient(dot, accent:Lerp(Color3.fromRGB(255,255,255), 0.4), accent, 90, rnd(0.2, 0.6), nil, 0.95)
+            if animate then
+                TweenService:Create(dot,
+                    TweenInfo.new(rnd(6, 14), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false),
+                    {Position = UDim2.fromScale(x + rnd(-0.06, 0.06), -0.1)}):Play()
+            end
+        end
+    end},
 }
 M.bgIndex = 1
 M.bgOpacity = 0.35
+
+-- Shared by the menu, the picker preview and every thumbnail, so what you see
+-- in the library is exactly what you get.
+function M.renderBackground(container, index, animate)
+    if not container then return end
+    for _, c in ipairs(container:GetChildren()) do
+        if c:IsA("GuiObject") then c:Destroy() end
+    end
+    local style = M.BACKGROUNDS[index or 1]
+    if not style or not style.build then return false end
+    local accent = UI_ACCENT or Color3.fromRGB(255, 77, 160)
+    local ok = pcall(function() style.build(container, accent, animate and true or false) end)
+    return ok
+end
 
 function M.applyMenuBackground(frame)
     frame = frame or M.mainFrame
     if not frame then return end
     local old = frame:FindFirstChild("MenuBgImage")
     if old then old:Destroy() end
-    local preset = M.BACKGROUNDS[M.bgIndex or 1]
-    if not preset or (tonumber(preset.id) or 0) <= 0 then
-        -- no image: put the cards back to fully opaque
+
+    local style = M.BACKGROUNDS[M.bgIndex or 1]
+    if not style or not style.build then
         if M.setRowTransparency then M.setRowTransparency(0) end
         return
     end
-    -- lift the cards so the image is actually visible behind them
     if M.setRowTransparency then M.setRowTransparency(0.28) end
-    local img = Instance.new("ImageLabel")
-    img.Name = "MenuBgImage"
-    img.BackgroundTransparency = 1
-    img.Image = "rbxassetid://" .. tostring(preset.id)
-    img.ScaleType = Enum.ScaleType.Crop
-    img.Size = UDim2.fromScale(1, 1)
-    img.Position = UDim2.fromScale(0, 0)
-    img.ZIndex = 0
-    img.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.35, 0, 1)
-    img.Parent = frame
+
+    local holder = Instance.new("Frame")
+    holder.Name = "MenuBgImage"
+    holder.BackgroundTransparency = 1
+    holder.Size = UDim2.fromScale(1, 1)
+    holder.Position = UDim2.fromScale(0, 0)
+    holder.ZIndex = 0
+    holder.ClipsDescendants = true
+    holder.Parent = frame
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 16)
-    c.Parent = img
+    c.Parent = holder
+
+    -- one extra veil so text stays readable over busier styles
+    M.renderBackground(holder, M.bgIndex or 1, true)
+    local veil = Instance.new("Frame")
+    veil.Name = "Veil"
+    veil.BackgroundColor3 = UI_BG_DARK or Color3.fromRGB(11, 5, 8)
+    veil.BackgroundTransparency = math.clamp(1 - (tonumber(M.bgOpacity) or 0.35), 0, 1)
+    veil.BorderSizePixel = 0
+    veil.Size = UDim2.fromScale(1, 1)
+    veil.ZIndex = 9
+    veil.Parent = holder
 end
 
 -- ---------- Mobile buttons lock ----------
@@ -6241,12 +6424,11 @@ function M.openBackgroundPicker()
         st.Color = UI_CARD_STROKE; st.Thickness = 1; st.Transparency = 0.55; st.Parent = preview
     end
 
-    local pvImg = Instance.new("ImageLabel")
+    local pvImg = Instance.new("Frame")
     pvImg.Name = "PreviewImage"
     pvImg.BackgroundTransparency = 1
     pvImg.Size = UDim2.fromScale(1, 1)
-    pvImg.ScaleType = Enum.ScaleType.Crop
-    pvImg.Image = ""
+    pvImg.ClipsDescendants = true
     pvImg.Parent = preview
 
     local pvEmpty = Instance.new("TextLabel")
@@ -6303,7 +6485,7 @@ function M.openBackgroundPicker()
 
     local styleCount = 0
     for _, b in ipairs(M.BACKGROUNDS) do
-        if (tonumber(b.id) or 0) > 0 then styleCount = styleCount + 1 end
+        if b.build then styleCount = styleCount + 1 end
     end
     local badge = Instance.new("TextLabel")
     badge.AnchorPoint = Vector2.new(1, 0)
@@ -6354,10 +6536,10 @@ function M.openBackgroundPicker()
 
     local function refresh()
         local preset = M.BACKGROUNDS[pending]
-        local hasImg = preset and (tonumber(preset.id) or 0) > 0
-        pvImg.Image = hasImg and ("rbxassetid://" .. tostring(preset.id)) or ""
+        local hasImg = preset and preset.build ~= nil
         pvImg.Visible = hasImg and true or false
         pvEmpty.Visible = not hasImg
+        if hasImg then M.renderBackground(pvImg, pending, true) end
         nameLbl.Text = preset and preset.name or "OFF"
         for i, t in ipairs(tiles) do
             local active = (i == pending)
@@ -6373,7 +6555,7 @@ function M.openBackgroundPicker()
     end
 
     for i, preset in ipairs(M.BACKGROUNDS) do
-        local hasImg = (tonumber(preset.id) or 0) > 0
+        local hasImg = preset.build ~= nil
 
         local card = Instance.new("Frame")
         card.Name = "Tile_" .. i
@@ -6386,15 +6568,17 @@ function M.openBackgroundPicker()
         local cst = Instance.new("UIStroke")
         cst.Color = UI_CARD_STROKE; cst.Thickness = 1; cst.Transparency = 0.6; cst.Parent = card
 
-        local thumb = Instance.new("ImageLabel")
+        local thumb = Instance.new("Frame")
+        thumb.Name = "Thumb"
         thumb.BackgroundColor3 = Color3.fromRGB(14, 9, 12)
         thumb.BackgroundTransparency = hasImg and 1 or 0
         thumb.Position = UDim2.new(0, 0, 0, 0)
         thumb.Size = UDim2.new(1, 0, 1, -22)
-        thumb.ScaleType = Enum.ScaleType.Crop
-        thumb.Image = hasImg and ("rbxassetid://" .. tostring(preset.id)) or ""
         thumb.BorderSizePixel = 0
+        thumb.ClipsDescendants = true
         thumb.Parent = card
+        -- thumbnails are static; only the live menu and the big preview animate
+        if hasImg then M.renderBackground(thumb, i, false) end
 
         local foot = Instance.new("Frame")
         foot.AnchorPoint = Vector2.new(0, 1)

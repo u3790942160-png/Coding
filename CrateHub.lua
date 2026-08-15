@@ -5077,7 +5077,7 @@ M.BACKGROUNDS = {
     {name = "Aurora",   id = 108236541541009},
 }
 M.bgIndex = 1
-M.bgOpacity = 0.72
+M.bgOpacity = 0.35
 
 function M.applyMenuBackground(frame)
     frame = frame or M.mainFrame
@@ -5085,7 +5085,13 @@ function M.applyMenuBackground(frame)
     local old = frame:FindFirstChild("MenuBgImage")
     if old then old:Destroy() end
     local preset = M.BACKGROUNDS[M.bgIndex or 1]
-    if not preset or (tonumber(preset.id) or 0) <= 0 then return end
+    if not preset or (tonumber(preset.id) or 0) <= 0 then
+        -- no image: put the cards back to fully opaque
+        if M.setRowTransparency then M.setRowTransparency(0) end
+        return
+    end
+    -- lift the cards so the image is actually visible behind them
+    if M.setRowTransparency then M.setRowTransparency(0.28) end
     local img = Instance.new("ImageLabel")
     img.Name = "MenuBgImage"
     img.BackgroundTransparency = 1
@@ -5094,7 +5100,7 @@ function M.applyMenuBackground(frame)
     img.Size = UDim2.fromScale(1, 1)
     img.Position = UDim2.fromScale(0, 0)
     img.ZIndex = 0
-    img.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.72, 0, 1)
+    img.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.35, 0, 1)
     img.Parent = frame
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, 16)
@@ -5498,6 +5504,18 @@ local function uiRefreshVisibility()
     end
 end
 
+-- Row cards are opaque by default, which hides a background image entirely.
+-- This lets the background code lift them just enough to show it through.
+local _uiRowTransparency = 0
+function M.setRowTransparency(t)
+    _uiRowTransparency = math.clamp(tonumber(t) or 0, 0, 1)
+    for _, e in ipairs(_uiRegistry) do
+        if e.card and e.obj then
+            e.obj.BackgroundTransparency = _uiRowTransparency
+        end
+    end
+end
+
 local function uiSetQuery(text)
     _uiQuery = string.lower(tostring(text or ""))
     uiRefreshVisibility()
@@ -5557,7 +5575,8 @@ local function uiRowCard(parent, hidden, height)
     r.Parent = parent
     uiCardStyle(r)
 
-    local entry = {obj = r, kind = "row", text = "", section = _uiCurrentSection, hidden = hidden and true or false}
+    r.BackgroundTransparency = _uiRowTransparency
+    local entry = {obj = r, kind = "row", card = true, text = "", section = _uiCurrentSection, hidden = hidden and true or false}
     table.insert(_uiRegistry, entry)
     _uiEntryOf[r] = entry
     if _uiCurrentSection then table.insert(_uiCurrentSection.rows, entry) end
@@ -6246,11 +6265,12 @@ function M.openBackgroundPicker()
     pvImg.Parent = preview
 
     -- a couple of mock rows so the preview shows real contrast
-    local function mockRow(y, w, on)
+    local function mockRow(y, name, on)
         local r = Instance.new("Frame")
         r.Position = UDim2.new(0, 12, 0, y)
         r.Size = UDim2.new(1, -24, 0, 26)
         r.BackgroundColor3 = UI_ROW_BG
+        r.BackgroundTransparency = 0.28
         r.BorderSizePixel = 0
         r.ZIndex = 2
         r.Parent = preview
@@ -6259,7 +6279,7 @@ function M.openBackgroundPicker()
         t.Position = UDim2.new(0, 10, 0, 0)
         t.Size = UDim2.new(1, -50, 1, 0)
         t.BackgroundTransparency = 1
-        t.Text = ("Setting %d"):format(y)
+        t.Text = name
         t.TextColor3 = UI_TEXT_PRIMARY
         t.TextSize = 11
         t.Font = Enum.Font.GothamMedium
@@ -6289,10 +6309,11 @@ function M.openBackgroundPicker()
         hdr.TextXAlignment = Enum.TextXAlignment.Left
         hdr.ZIndex = 3
         hdr.Parent = preview
-        mockRow(32, 0, true); mockRow(66, 0, false); mockRow(100, 0, false)
+        mockRow(32, "Auto Carry Mode", true); mockRow(66, "Bat Aimbot", false); mockRow(100, "Auto Steal", false)
     end
 
     local pending = M.bgIndex or 1
+    local pendingFade = math.clamp(tonumber(M.bgOpacity) or 0.35, 0, 0.95)
     local rowBtns = {}
     local function refresh()
         for i, b in ipairs(rowBtns) do
@@ -6306,7 +6327,7 @@ function M.openBackgroundPicker()
         local preset = M.BACKGROUNDS[pending]
         if preset and (tonumber(preset.id) or 0) > 0 then
             pvImg.Image = "rbxassetid://" .. tostring(preset.id)
-            pvImg.ImageTransparency = math.clamp(tonumber(M.bgOpacity) or 0.72, 0, 1)
+            pvImg.ImageTransparency = pendingFade
         else
             pvImg.Image = ""
         end
@@ -6345,7 +6366,7 @@ function M.openBackgroundPicker()
     opacityLbl.Position = UDim2.new(0, 268, 1, -54)
     opacityLbl.Size = UDim2.new(0, 120, 0, 18)
     opacityLbl.BackgroundTransparency = 1
-    opacityLbl.Text = string.format("Fade  %d%%", math.floor((M.bgOpacity or 0.72) * 100 + 0.5))
+    opacityLbl.Text = string.format("Fade  %d%%", math.floor(pendingFade * 100 + 0.5))
     opacityLbl.TextColor3 = UI_TEXT_DIM
     opacityLbl.TextSize = 11
     opacityLbl.Font = Enum.Font.GothamMedium
@@ -6354,8 +6375,8 @@ function M.openBackgroundPicker()
     local less = uiSmallBtn({Parent=panel, Pos=UDim2.new(1, -104, 1, -56), Size=UDim2.new(0,28,0,24), Text="-", Col=UI_TEXT_PRIMARY, TS=14, CR=8})
     local more = uiSmallBtn({Parent=panel, Pos=UDim2.new(1, -70, 1, -56), Size=UDim2.new(0,28,0,24), Text="+", Col=UI_TEXT_PRIMARY, TS=14, CR=8})
     local function bumpOpacity(d)
-        M.bgOpacity = math.clamp((tonumber(M.bgOpacity) or 0.72) + d, 0, 0.95)
-        opacityLbl.Text = string.format("Fade  %d%%", math.floor(M.bgOpacity * 100 + 0.5))
+        pendingFade = math.clamp(pendingFade + d, 0, 0.95)
+        opacityLbl.Text = string.format("Fade  %d%%", math.floor(pendingFade * 100 + 0.5))
         refresh()
     end
     less.MouseButton1Click:Connect(function() bumpOpacity(-0.06) end)
@@ -6379,6 +6400,7 @@ function M.openBackgroundPicker()
     local function closePicker() gui:Destroy() end
     local function applyPick()
         M.bgIndex = pending
+        M.bgOpacity = pendingFade
         M.applyMenuBackground(M.mainFrame)
         if M.bgChip and M.bgChip.Parent then
             M.bgChip.Text = (M.BACKGROUNDS[M.bgIndex] or {}).name or "None"

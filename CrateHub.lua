@@ -4467,7 +4467,7 @@ local function loadCherryConfig()
         if type(d.stealDuration)=="number" then M.Steal.StealDuration=d.stealDuration end
         if type(d.stealStopTime)=="number" then M.Steal.StopTime=d.stealStopTime end
         if type(d.stealMode)=="string" then
-            if d.stealMode == "Semi" or d.stealMode == "Normal" or d.stealMode == "V1" or d.stealMode == "V2" or d.stealMode == "V3" then
+            if d.stealMode == "Semi" or d.stealMode == "Normal" or d.stealMode == "V1" or d.stealMode == "V2" then
                 M.stealMode=d.stealMode
             end
         end
@@ -5496,8 +5496,14 @@ local function uiChoiceRow(parent, label, options, defaultIndex, callback)
         if callback then callback(options[idx]) end
         saveCherryConfig()
     end
-    la.MouseButton1Click:Connect(function() idx=idx-1; if idx<1 then idx=#options end; upd() end)
-    ra.MouseButton1Click:Connect(function() idx=idx+1; if idx>#options then idx=1 end; upd() end)
+    -- brief accent flash so a press registers visually
+    local function pulse(btn)
+        btn.BackgroundColor3 = UI_ACCENT
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        TweenService:Create(btn, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG, TextColor3 = UI_TEXT_PRIMARY}):Play()
+    end
+    la.MouseButton1Click:Connect(function() pulse(la); idx=idx-1; if idx<1 then idx=#options end; upd() end)
+    ra.MouseButton1Click:Connect(function() pulse(ra); idx=idx+1; if idx>#options then idx=1 end; upd() end)
     local function setVal(v)
         for i,o in ipairs(options) do if o==v then idx=i; vl.Text=o; break end end
     end
@@ -5512,13 +5518,13 @@ local ARROW_GLOW_TRANSPARENCY = NumberSequence.new({
 })
 
 local function styleArrowButton(arrow)
-    -- AdaptHub-style glowing outline for ARROWS ONLY
+    -- Accent outline + soft glow on the expand arrows
     local border = Instance.new("UIStroke")
     border.Name = "AnimatedArrowBorder"
-    border.Color = Color3.fromRGB(255, 255, 255)
-    border.Thickness = 1.8
+    border.Color = UI_ACCENT
+    border.Thickness = 1.4
     border.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    border.Transparency = 0.05
+    border.Transparency = 0.25
     border.Parent = arrow
     local bg = Instance.new("UIGradient")
     bg.Rotation = 135
@@ -5527,10 +5533,10 @@ local function styleArrowButton(arrow)
 
     local glow = Instance.new("UIStroke")
     glow.Name = "AnimatedArrowGlow"
-    glow.Color = Color3.fromRGB(255, 255, 255)
-    glow.Thickness = 3.6
+    glow.Color = UI_ACCENT
+    glow.Thickness = 3
     glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    glow.Transparency = 0.58
+    glow.Transparency = 0.7
     glow.Parent = arrow
     local gg = Instance.new("UIGradient")
     gg.Name = "GlowGradient"
@@ -5539,23 +5545,32 @@ local function styleArrowButton(arrow)
     gg.Parent = glow
 end
 
-local function styleOptionChip(btn, active)
-    -- Black text + white outline so V1/V2/V3 stay readable
-    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
-    btn.BackgroundColor3 = active and UI_ACCENT or Color3.fromRGB(220, 220, 225)
+-- Mode chips (V1 / V2, jump modes, animation packs). Selected chip takes the
+-- accent, the rest sit on the same dark chip fill as every other control, so
+-- they read as part of the panel instead of white buttons pasted on top.
+local function styleOptionChip(btn, active, instant)
+    local bg   = active and UI_ACCENT or UI_CHIP_BG
+    local fg   = active and Color3.fromRGB(255, 255, 255) or UI_TEXT_DIM
     local stroke = btn:FindFirstChildOfClass("UIStroke")
     if not stroke then
         stroke = Instance.new("UIStroke")
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         stroke.Parent = btn
     end
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Thickness = active and 2 or 1.4
-    stroke.Transparency = 0
-    local ts = btn:FindFirstChildOfClass("UIStroke")
-    -- text outline via second stroke on a label is hard; use TextStroke
-    btn.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextStrokeTransparency = 0
+    stroke.Color = active and UI_ACCENT or UI_CARD_STROKE
+    btn.TextStrokeTransparency = 1
+    if instant then
+        btn.BackgroundColor3 = bg
+        btn.TextColor3 = fg
+        stroke.Thickness = active and 1.5 or 1
+        stroke.Transparency = active and 0.25 or 0.8
+        return
+    end
+    TweenService:Create(btn, UI_TWEEN_FAST, {BackgroundColor3 = bg, TextColor3 = fg}):Play()
+    TweenService:Create(stroke, UI_TWEEN_FAST, {
+        Thickness = active and 1.5 or 1,
+        Transparency = active and 0.25 or 0.8,
+    }):Play()
 end
 
 local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onToggle, onOption)
@@ -5595,15 +5610,26 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
     arrow.Size = UDim2.new(0, 40, 0, 30)
     arrow.BackgroundColor3 = UI_CHIP_BG
     arrow.BorderSizePixel = 0
-    arrow.Text = "▼"
-    arrow.TextColor3 = UI_ACCENT_LIGHT
-    arrow.TextSize = 13
-    arrow.Font = Enum.Font.GothamBlack
+    arrow.Text = ""
     arrow.AutoButtonColor = false
     arrow.ZIndex = 3
     arrow.Parent = r
     Instance.new("UICorner", arrow).CornerRadius = UDim.new(0, 9)
     styleArrowButton(arrow)
+
+    -- the glyph rotates on its own so the chip itself never spins
+    local arrowGlyph = Instance.new("TextLabel")
+    arrowGlyph.Name = "ArrowGlyph"
+    arrowGlyph.AnchorPoint = Vector2.new(0.5, 0.5)
+    arrowGlyph.Position = UDim2.new(0.5, 0, 0.5, 0)
+    arrowGlyph.Size = UDim2.new(1, 0, 1, 0)
+    arrowGlyph.BackgroundTransparency = 1
+    arrowGlyph.Text = "▼"
+    arrowGlyph.TextColor3 = UI_ACCENT_LIGHT
+    arrowGlyph.TextSize = 13
+    arrowGlyph.Font = Enum.Font.GothamBlack
+    arrowGlyph.ZIndex = 4
+    arrowGlyph.Parent = arrow
 
     local tb = Instance.new("TextButton")
     tb.AnchorPoint = Vector2.new(1, 0.5)
@@ -5630,7 +5656,8 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
     local useScroll = #options > 4
     local optFrame = Instance.new("Frame")
     optFrame.LayoutOrder = 2
-    optFrame.Size = UDim2.new(1, 0, 0, useScroll and 140 or 40)
+    local optHeight = useScroll and 140 or 40
+    optFrame.Size = UDim2.new(1, 0, 0, 0)
     optFrame.BackgroundColor3 = UI_ROW_BG
     optFrame.BackgroundTransparency = 0.12
     optFrame.BorderSizePixel = 0
@@ -5740,7 +5767,7 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
             p.PaddingLeft = UDim.new(0, 10)
             p.Parent = b
         end
-        styleOptionChip(b, i == idx)
+        styleOptionChip(b, i == idx, true)
         b.MouseButton1Click:Connect(function()
             idx = i
             refreshOptionVisuals()
@@ -5751,11 +5778,41 @@ local function uiExpandToggleRow(parent, label, on, options, defaultIndex, onTog
         optionBtns[i] = b
     end
 
-    local function setExpanded(v)
+    -- The panel slides open from zero height and the arrow rotates with it,
+    -- rather than the whole block popping in and out.
+    local EXPAND_TWEEN = TweenInfo.new(0.26, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local expandTween = nil
+    arrowGlyph.Rotation = 0
+
+    local function setExpanded(v, instant)
         expanded = v
-        optFrame.Visible = v
-        arrow.Text = v and "▲" or "▼"
-        refreshModeSettings()
+        if expandTween then pcall(function() expandTween:Cancel() end); expandTween = nil end
+
+        if instant then
+            optFrame.Visible = v
+            optFrame.Size = UDim2.new(1, 0, 0, v and optHeight or 0)
+            arrowGlyph.Rotation = v and 180 or 0
+            refreshModeSettings()
+            return
+        end
+
+        TweenService:Create(arrowGlyph, EXPAND_TWEEN, {Rotation = v and 180 or 0}):Play()
+
+        if v then
+            optFrame.Visible = true
+            optFrame.Size = UDim2.new(1, 0, 0, 0)
+            expandTween = TweenService:Create(optFrame, EXPAND_TWEEN, {Size = UDim2.new(1, 0, 0, optHeight)})
+            expandTween:Play()
+            refreshModeSettings()
+        else
+            -- hide the settings immediately so they do not overhang the collapse
+            refreshModeSettings()
+            expandTween = TweenService:Create(optFrame, EXPAND_TWEEN, {Size = UDim2.new(1, 0, 0, 0)})
+            expandTween:Play()
+            expandTween.Completed:Connect(function()
+                if not expanded then optFrame.Visible = false end
+            end)
+        end
     end
 
     arrow.MouseButton1Click:Connect(function()
@@ -6469,15 +6526,13 @@ function M.buildGui()
 
 
     uiSectionHeader(PMech, "AUTO STEAL")
-    local stealModeLabels = {"V1", "V2", "V3"}
+    local stealModeLabels = {"V1", "V2"}
     local function stealLabelToMode(lab)
         if lab == "V2" then return "V2" end
-        if lab == "V3" then return "V3" end
         return "V1"
     end
     local function stealModeToLabel(mode)
         if mode == "Semi" or mode == "V2" then return "V2" end
-        if mode == "V3" then return "V3" end
         return "V1"
     end
     local stealDefaultIdx = 1
@@ -6538,87 +6593,6 @@ function M.buildGui()
     local _, semiHoldMax = uiNumberRow(v2Box, "Hold Max", M.Semi.holdMax or 2.6, 0.1, 8, function(v) M.Semi.holdMax = v end)
     regStealSettings("V2", v2Box)
 
-    -- V3 settings
-    local v3Box = Instance.new("Frame"); v3Box.BackgroundTransparency=1; v3Box.Size=UDim2.new(1,0,0,0); v3Box.AutomaticSize=Enum.AutomaticSize.Y
-    local v3Lay = Instance.new("UIListLayout"); v3Lay.Padding=UDim.new(0,9); v3Lay.SortOrder=Enum.SortOrder.LayoutOrder; v3Lay.Parent=v3Box
-    local _, v3Rad = uiNumberRow(v3Box, "Grab Radius", M.Steal.StealRadius, 0.5, 300, function(v)
-        M.Steal.StealRadius = v; M.setStealRadius(v); M.updateStatusRadius()
-    end)
-    local _, v3Dur = uiNumberRow(v3Box, "Fill Duration", M.Steal.StealDuration, 0.1, 10, function(v)
-        M.Steal.StealDuration = v
-    end)
-    -- Stop Time in seconds (how long after leaving range before fill cancels)
-    do
-        local r = Instance.new("Frame")
-        r.ClipsDescendants = true
-        r.Size = UDim2.new(1, 0, 0, 46)
-        r.BackgroundColor3 = UI_ROW_BG
-        r.BackgroundTransparency = 0.1
-        r.BorderSizePixel = 0
-        r.Parent = v3Box
-        uiCardStyle(r)
-        local l = Instance.new("TextLabel")
-        l.Position = UDim2.new(0, 14, 0, 0)
-        l.Size = UDim2.new(0.42, 0, 1, 0)
-        l.BackgroundTransparency = 1
-        l.Text = "Stop Time (s)"
-        l.TextColor3 = UI_TEXT_PRIMARY
-        l.TextSize = 13
-        l.Font = Enum.Font.GothamMedium
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Parent = r
-
-        local function clampStop(n)
-            n = tonumber(n) or 0.35
-            return math.clamp(n, 0.1, 30)
-        end
-
-        local box = Instance.new("TextBox")
-        box.Name = "StopTimeBox"
-        box.Position = UDim2.new(1, -118, 0.5, -13)
-        box.Size = UDim2.new(0, 52, 0, 26)
-        box.BackgroundColor3 = UI_BTN_BG
-        box.BorderSizePixel = 0
-        box.Text = string.format("%.2f", clampStop(M.Steal.StopTime))
-        box.TextColor3 = UI_TEXT_PRIMARY
-        box.TextSize = 12
-        box.Font = Enum.Font.GothamBold
-        box.ClearTextOnFocus = false
-        box.Parent = r
-        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 7)
-
-        local function applyStop(n)
-            n = clampStop(n)
-            M.Steal.StopTime = n
-            box.Text = string.format("%.2f", n)
-            saveCherryConfig()
-        end
-
-        box.FocusLost:Connect(function()
-            applyStop(box.Text)
-        end)
-
-        local minus = uiSmallBtn({
-            Parent = r, Pos = UDim2.new(1, -158, 0.5, -13), Size = UDim2.new(0, 28, 0, 26),
-            Text = "-", Col = UI_TEXT_PRIMARY, TS = 14, CR = 7
-        })
-        local plus = uiSmallBtn({
-            Parent = r, Pos = UDim2.new(1, -54, 0.5, -13), Size = UDim2.new(0, 28, 0, 26),
-            Text = "+", Col = UI_TEXT_PRIMARY, TS = 14, CR = 7
-        })
-        minus.MouseButton1Click:Connect(function()
-            applyStop((tonumber(M.Steal.StopTime) or 0.35) - 0.25)
-        end)
-        plus.MouseButton1Click:Connect(function()
-            applyStop((tonumber(M.Steal.StopTime) or 0.35) + 0.25)
-        end)
-
-        M.stopTimeBox = box
-    end
-    local _, setAutoRadius3 = uiToggleRow(v3Box, "Auto Radius", M.autoRadiusEnabled, function(on)
-        M.autoRadiusEnabled = on; M.updateStatusRadius()
-    end)
-    regStealSettings("V3", v3Box)
 
     uiSectionHeader(PMech, "MEDUSA")
     local _, setMedusa = uiToggleRow(PMech, "Medusa Counter", M.medusaCounterEnabled, function(on)
@@ -6831,6 +6805,8 @@ function M.buildGui()
             idx = idx % #modes + 1
             M.instantResetMode = modes[idx]
             modeChip.Text = modes[idx]
+            modeChip.BackgroundColor3 = UI_ACCENT
+            TweenService:Create(modeChip, UI_TWEEN_FAST, {BackgroundColor3 = UI_CHIP_BG}):Play()
             saveCherryConfig()
         end)
         M.setInstantResetUI = function(v)
@@ -6945,8 +6921,7 @@ if M.setCircleBtnsVisual then M.setCircleBtnsVisual(M.circleButtonsEnabled) end
     if M.korbloxEnabled then M.applyKorbloxToChar(player.Character, true) end
     if M.setStealModeUI then
         local lab = "V1"
-        if M.stealMode == "Semi" or M.stealMode == "V2" then lab = "V2"
-        elseif M.stealMode == "V3" then lab = "V3" end
+        if M.stealMode == "Semi" or M.stealMode == "V2" then lab = "V2" end
         M.setStealModeUI(lab)
     end
     if M.setJumpModeUI then M.setJumpModeUI(M.infJumpMode == "hold" and "Hold" or "Manual") end
@@ -7104,6 +7079,7 @@ end
 applyAccentFromTheme()
 -- Skip Intro mirrors the intro toggles, which the early config pass already read
 if M.skipIntroEnabled == nil then M.skipIntroEnabled = (M.introGUIEnabled == false) end
+if M.stealMode == "V3" then M.stealMode = "V1" end
 -- Features dropped to match the reference script: force them off so an older
 -- saved config cannot re-enable something with no row to turn it back off.
 M.antiKickEnabled = false

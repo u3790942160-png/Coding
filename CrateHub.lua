@@ -4730,8 +4730,10 @@ local UI_CHIP_BG      = Color3.fromRGB(52, 29, 40)
 local UI_TOGGLE_OFF   = Color3.fromRGB(49, 30, 38)
 local UI_TOGGLE_KNOB  = Color3.fromRGB(156, 139, 146)
 local UI_KNOB_ON      = Color3.fromRGB(255, 255, 255)
-local UI_GRAD_TOP     = Color3.fromRGB(44, 25, 34)
-local UI_GRAD_BOT     = Color3.fromRGB(32, 17, 24)
+-- Gradient stops are multipliers over BackgroundColor3, not colours in their
+-- own right: keep them near white or the surface they sit on goes black.
+local UI_GRAD_TOP     = Color3.fromRGB(255, 255, 255)
+local UI_GRAD_BOT     = Color3.fromRGB(226, 226, 232)
 
 -- ============================================================
 -- CRATE HUB FEATURES
@@ -5003,8 +5005,9 @@ local function applyAccentFromTheme()
     local row = themeSurfaceFromAccent(accent, 0.100, 0.055) -- rows / cards
     local btn = themeSurfaceFromAccent(accent, 0.130, 0.075) -- chips / buttons
     local tog = themeSurfaceFromAccent(accent, 0.090, 0.075) -- toggle off track
-    local gradTop = themeSurfaceFromAccent(accent, 0.125, 0.062)
-    local gradBot = themeSurfaceFromAccent(accent, 0.080, 0.045)
+    -- Shade multipliers, applied over the surface colour (see UI_GRAD_TOP)
+    local gradTop = Color3.fromRGB(255, 255, 255)
+    local gradBot = Color3.fromRGB(226, 226, 232)
 
     CHERRY_ACCENT = accent
     UI_ACCENT = accent
@@ -5070,8 +5073,8 @@ function M.recolorBlacksToTheme(root)
             if obj.Name ~= "MainGradient" and obj.Name ~= "DividerGradient" then
                 pcall(function()
                     obj.Color = ColorSequence.new({
-                        ColorSequenceKeypoint.new(0, UI_GRAD_TOP or row),
-                        ColorSequenceKeypoint.new(1, UI_GRAD_BOT or bg),
+                        ColorSequenceKeypoint.new(0, UI_GRAD_TOP or Color3.fromRGB(255,255,255)),
+                        ColorSequenceKeypoint.new(1, UI_GRAD_BOT or Color3.fromRGB(226,226,232)),
                     })
                 end)
             end
@@ -5157,19 +5160,46 @@ local UI_TWEEN_FAST = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDire
 local UI_TWEEN_MED  = TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 -- UI STYLE HELPERS
--- Rows are laid out in one continuous scroll, so every card gets an
--- incrementing LayoutOrder to keep creation order stable.
+-- Rows are laid out in one continuous scroll. Sections are placed by this
+-- table rather than by where they happen to be built, and rows take an
+-- incrementing slot inside their section.
+local UI_SECTION_ORDER = {
+    ["SPEED CONFIGURATION"] = 1,
+    ["MODE"]                = 2,
+    ["BAT CONTROLS"]        = 3,
+    ["AUTO STEAL"]          = 4,
+    ["MEDUSA"]              = 5,
+    ["RAGDOLL TELEPORT"]    = 6,
+    ["UTILITIES"]           = 7,
+    ["TELEPORT"]            = 8,
+    ["AUTO"]                = 9,
+    ["ANIMATIONS"]          = 10,
+    ["SKYBOX"]              = 11,
+    ["PERFORMANCE"]         = 12,
+    ["INTERFACE"]           = 13,
+    ["MOBILE BUTTONS"]      = 14,
+    ["CONFIGURATION"]       = 15,
+    ["COSMETICS"]           = 16,
+}
 local _uiOrderSeq = 0
+local _uiSectionBase = 0
 local function uiNextOrder()
     _uiOrderSeq = _uiOrderSeq + 1
-    return _uiOrderSeq
+    return _uiSectionBase + _uiOrderSeq
+end
+local function uiBeginSection(name)
+    local ord = UI_SECTION_ORDER[string.upper(tostring(name))]
+    if not ord then return nil end
+    _uiSectionBase = ord * 1000
+    _uiOrderSeq = 0
+    return _uiSectionBase
 end
 
 local UI_ROW_H   = 56   -- standard card height
 local UI_ROW_PAD = 22   -- label inset, clears the active accent bar
 
 local function uiCardStyle(f, radius)
-    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 15); c.Parent = f
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, radius or 13); c.Parent = f
     local s = Instance.new("UIStroke")
     s.Thickness = 1
     s.Color = UI_CARD_STROKE or Color3.fromRGB(40, 92, 175)
@@ -5177,8 +5207,8 @@ local function uiCardStyle(f, radius)
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = f
     local g = Instance.new("UIGradient"); g.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, UI_GRAD_TOP or Color3.fromRGB(22, 29, 44)),
-        ColorSequenceKeypoint.new(1, UI_GRAD_BOT or Color3.fromRGB(15, 20, 32))
+        ColorSequenceKeypoint.new(0, UI_GRAD_TOP or Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, UI_GRAD_BOT or Color3.fromRGB(226, 226, 232))
     }); g.Rotation = 90; g.Parent = f
 end
 
@@ -5277,7 +5307,8 @@ end
 
 local function uiSectionHeader(parent, text)
     local r = Instance.new("Frame"); r.Size = UDim2.new(1,0,0,34); r.BackgroundTransparency = 1
-    r.LayoutOrder = uiNextOrder(); r.Parent = parent
+    local base = uiBeginSection(text)
+    r.LayoutOrder = base or uiNextOrder(); r.Parent = parent
     local l = Instance.new("TextLabel"); l.Position = UDim2.new(0,2,0,0); l.Size = UDim2.new(1,-2,1,0)
     l.BackgroundTransparency = 1; l.Text = string.upper(tostring(text)); l.TextColor3 = UI_TEXT_SECTION; l.TextSize = 13
     l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left
@@ -5784,7 +5815,7 @@ local function uiMakePage(parent, name, order, vis)
     p.AutomaticCanvasSize=Enum.AutomaticSize.Y
     p.CanvasSize=UDim2.new(0,0,0,0)
     p.Parent=parent
-    local l = Instance.new("UIListLayout"); l.Padding=UDim.new(0,9); l.SortOrder=Enum.SortOrder.LayoutOrder; l.Parent=p
+    local l = Instance.new("UIListLayout"); l.Padding=UDim.new(0,7); l.SortOrder=Enum.SortOrder.LayoutOrder; l.Parent=p
     local pd = Instance.new("UIPadding")
     pd.PaddingTop=UDim.new(0,4)
     pd.PaddingBottom=UDim.new(0,44)
@@ -5912,17 +5943,18 @@ function M.buildGui()
 
     local frameCorner = Instance.new("UICorner")
     frameCorner.Name = "MainCorner"
-    frameCorner.CornerRadius = UDim.new(0, 22)
+    frameCorner.CornerRadius = UDim.new(0, 16)
     frameCorner.Parent = Frame
     do
         local g = Instance.new("UIGradient")
         g.Name = "MainGradient"
         local accent = UI_ACCENT or Color3.fromRGB(255,255,255)
         local bg = UI_BG_DARK or Color3.fromRGB(0,0,0)
+        -- multiplier, not a colour: white leaves the window at UI_BG_DARK
         g.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, bg:Lerp(accent, 0.05)),
-            ColorSequenceKeypoint.new(0.5, bg),
-            ColorSequenceKeypoint.new(1, bg:Lerp(accent, 0.03)),
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(242, 242, 246)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
         })
         g.Rotation = 120
         g.Parent = Frame
@@ -5948,12 +5980,12 @@ function M.buildGui()
         badge.Name = "LogoBadge"
         badge.ZIndex = 3
         badge.AnchorPoint = Vector2.new(0.5, 0.5)
-        badge.Position = UDim2.new(0, 40, 0, 34)
-        badge.Size = UDim2.new(0, 40, 0, 40)
+        badge.Position = UDim2.new(0, 38, 0, 34)
+        badge.Size = UDim2.new(0, 36, 0, 36)
         badge.BackgroundColor3 = UI_BG_DARK
         badge.BorderSizePixel = 0
         badge.Parent = Header
-        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 13)
+        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 12)
         local bs = Instance.new("UIStroke")
         bs.Color = UI_ACCENT
         bs.Thickness = 2.5
@@ -5963,7 +5995,7 @@ function M.buildGui()
         local dot = Instance.new("Frame")
         dot.AnchorPoint = Vector2.new(0.5, 0.5)
         dot.Position = UDim2.new(0.5, 0, 0.5, 0)
-        dot.Size = UDim2.new(0, 13, 0, 13)
+        dot.Size = UDim2.new(0, 12, 0, 12)
         dot.BackgroundColor3 = UI_TEXT_WHITE
         dot.BorderSizePixel = 0
         dot.ZIndex = 4
@@ -5981,11 +6013,11 @@ function M.buildGui()
         end)
 
         local t = Instance.new("TextLabel"); t.ZIndex=3
-        t.Position = UDim2.new(0,72,0,16); t.Size = UDim2.new(1,-136,0,34)
+        t.Position = UDim2.new(0,66,0,18); t.Size = UDim2.new(1,-130,0,32)
         t.BackgroundTransparency = 1
         t.Text = "CRATE HUB"
         t.TextColor3 = UI_TEXT_WHITE
-        t.TextSize = 27; t.Font = Enum.Font.GothamBlack
+        t.TextSize = 20; t.Font = Enum.Font.GothamBlack
         t.TextXAlignment = Enum.TextXAlignment.Left
         t.Parent = Header
     end
@@ -5993,12 +6025,12 @@ function M.buildGui()
     local MinBtn = Instance.new("TextButton")
     MinBtn.ZIndex=3
     MinBtn.AnchorPoint = Vector2.new(1, 0.5)
-    MinBtn.Position=UDim2.new(1,-16,0,34); MinBtn.Size=UDim2.new(0,54,0,42)
+    MinBtn.Position=UDim2.new(1,-16,0,34); MinBtn.Size=UDim2.new(0,48,0,32)
     MinBtn.BackgroundColor3=UI_BG_DARK; MinBtn.BackgroundTransparency=0.25
     MinBtn.BorderSizePixel=0; MinBtn.Text="-"
-    MinBtn.TextColor3=UI_TEXT_PRIMARY; MinBtn.TextSize=17; MinBtn.Font=Enum.Font.GothamBold
+    MinBtn.TextColor3=UI_TEXT_PRIMARY; MinBtn.TextSize=15; MinBtn.Font=Enum.Font.GothamBold
     MinBtn.AutoButtonColor=false; MinBtn.Parent=Header
-    Instance.new("UICorner",MinBtn).CornerRadius = UDim.new(0,12)
+    Instance.new("UICorner",MinBtn).CornerRadius = UDim.new(0,10)
     do
         local ms = Instance.new("UIStroke")
         ms.Color = UI_ACCENT
@@ -6385,6 +6417,17 @@ function M.buildGui()
     end)
     M.autoBatSpeedBox = autoBatSpeedBox
 
+    local _, setAutoSwing = uiToggleRow(PMech, "Auto Swing", M.autoSwingEnabled, function(on)
+        M.autoSwingEnabled = on
+    end)
+    M.setAutoSwingVisual = setAutoSwing
+
+    local _, setMirrorTP = uiToggleRow(PMech, "Mirror TP Down", M.mirrorTPDownEnabled, function(on)
+        M.setMirrorTPDown(on)
+        saveCherryConfig()
+    end)
+    M.setMirrorTPVisual = setMirrorTP
+
     local _, setPerfectHit = uiToggleRow(PMech, "Perfect Hit", M.perfectHitEnabled, function(on)
         M.perfectHitEnabled = on
     end)
@@ -6423,23 +6466,6 @@ function M.buildGui()
         saveCherryConfig()
     end, {kb = M.KB.BypassAimbot})
     M.setBypassVisual = setBypassVis
-
-    local _, setAntiRag = uiToggleRow(PMech, "Anti Ragdoll", M.antiRagdollEnabled, function(on)
-        M.antiRagdollEnabled = on
-        if on then M.startAntiRagdoll() else M.stopAntiRagdoll() end
-    end)
-    M.setAntiRagVisual = setAntiRag
-
-    local _, setMedusa = uiToggleRow(PMech, "Medusa Counter", M.medusaCounterEnabled, function(on)
-        M.medusaCounterEnabled = on
-        if on then M.setupMedusa(player.Character) else M.stopMedusaCounter() end
-    end)
-    M.setMedusaVisual = setMedusa
-
-    local _, setAutoSwing = uiToggleRow(PMech, "Auto Swing", M.autoSwingEnabled, function(on)
-        M.autoSwingEnabled = on
-    end)
-    M.setAutoSwingVisual = setAutoSwing
 
 
     uiSectionHeader(PMech, "AUTO STEAL")
@@ -6594,6 +6620,13 @@ function M.buildGui()
     end)
     regStealSettings("V3", v3Box)
 
+    uiSectionHeader(PMech, "MEDUSA")
+    local _, setMedusa = uiToggleRow(PMech, "Medusa Counter", M.medusaCounterEnabled, function(on)
+        M.medusaCounterEnabled = on
+        if on then M.setupMedusa(player.Character) else M.stopMedusaCounter() end
+    end)
+    M.setMedusaVisual = setMedusa
+
     uiSectionHeader(PMech, "RAGDOLL TELEPORT")
     local _, setRagdollTimer = uiToggleRow(PMech, "Ragdoll Timer", M.ragdollTimerEnabled, function(on)
         M.ragdollTimerEnabled = on
@@ -6602,6 +6635,25 @@ function M.buildGui()
     M.setRagdollTimerVisual = setRagdollTimer
 
     local jumpDefaultIdx = (M.infJumpMode == "hold") and 2 or 1
+
+    -- PAGE: VISUALS
+    uiSectionHeader(PVis, "SKYBOX")
+    do
+        local r = uiRowCard(PVis, false, UI_ROW_H)
+        uiRowLabel(r, "Skybox", 170)
+        local skyLbl = uiValueChip(r, M.currentSkyTheme, {width = 118, autoWidth = true})
+        local skyIdx = 1
+        for i,t in ipairs(M.SkyOrder) do if t == M.currentSkyTheme then skyIdx = i; break end end
+        local btn = Instance.new("TextButton",r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=6; btn.AutoButtonColor=false
+        btn.Activated:Connect(function()
+            skyIdx = skyIdx % #M.SkyOrder + 1
+            local t = M.SkyOrder[skyIdx]
+            skyLbl.Text = t; M.currentSkyTheme = t; M.CandyApplyCustomSky(t); saveCherryConfig()
+        end)
+    end
+
+    -- PAGE: UTILITY
+    uiSectionHeader(PUtil, "UTILITIES")
     local _, setInfJump, setJumpModeUI = uiExpandToggleRow(
         PMech,
         "Infinite Jump",
@@ -6627,13 +6679,38 @@ function M.buildGui()
     M.setInfJumpVisual = setInfJump
     M.setJumpModeUI = setJumpModeUI
 
-
-    local _, setMirrorTP = uiToggleRow(PMech, "Mirror TP Down", M.mirrorTPDownEnabled, function(on)
-        M.setMirrorTPDown(on)
-        saveCherryConfig()
+    local _, setAntiRag = uiToggleRow(PMech, "Anti Ragdoll", M.antiRagdollEnabled, function(on)
+        M.antiRagdollEnabled = on
+        if on then M.startAntiRagdoll() else M.stopAntiRagdoll() end
     end)
-    M.setMirrorTPVisual = setMirrorTP
+    M.setAntiRagVisual = setAntiRag
 
+    local _, setStealKickWarn = uiToggleRow(PUtil, "Steal Kick Warning", M.stealKickWarnEnabled, function(on)
+        M.stealKickWarnEnabled = on
+        if on then M.warnIfStealRisky() end
+    end)
+    M.setStealKickWarnVisual = setStealKickWarn
+
+    local _, setUnwalk = uiToggleRow(PUtil, "Unwalk", M.unwalkEnabled, function(on)
+        M.unwalkEnabled = on
+        if on then M.startUnwalk() else M.stopUnwalk() end
+    end)
+    M.setUnwalkVisual = setUnwalk
+
+
+    local _, setLineESP = uiToggleRow(PVis, "Enemy ESP", M.lineESPEnabled, function(on)
+        M.lineESPEnabled = on; cherryESPState.LineESP = on
+    end)
+    local _, setSpeedESP = uiToggleRow(PVis, "Velocity ESP", M.speedESPEnabled, function(on)
+        M.speedESPEnabled = on; cherryESPState.SpeedESP = on
+    end)
+
+
+    uiSectionHeader(PKB, "TELEPORT")
+    uiKeybindRow(PKB, "TP Down",        M.KB.TPFloor)
+    uiKeybindRow(PKB, "TP Down (Second)", M.KB.TPFloor2)
+    uiKeybindRow(PKB, "Drop Brainrot",  M.KB.DropBrainrot)
+    uiSectionHeader(PMech, "AUTO")
     local _, setAL = uiToggleRow(PMech, "Auto Left", M.autoLeftEnabled, function(on)
         if on then
             if M.autoRightEnabled then M.autoRightEnabled=false; M.stopAutoRight(); if M.autoRightSetVisual then M.autoRightSetVisual(false) end end
@@ -6654,6 +6731,13 @@ function M.buildGui()
     end, {kb = M.KB.AutoRight})
     M.autoRightSetVisual = setAR
 
+    local _, setSafeMode = uiToggleRow(PUtil, "Safe Mode", M.safeModeEnabled, function(on)
+        M.safeModeEnabled = on
+        if on then M.enableSafeMode() else M.disableSafeMode() end
+        saveCherryConfig()
+    end)
+    M.setSafeModeVisual = setSafeMode
+
     local _, setATP = uiToggleRow(PMech, "Auto TP Down", M.autoTPEnabled, function(on)
         M.autoTPEnabled = on
         if on then M.startAutoTP() else M.stopAutoTP() end
@@ -6663,51 +6747,32 @@ function M.buildGui()
     local _, tpHBox = uiNumberRow(PMech, "TP Down Height", M.autoTPHeight, 1, 100, function(v) M.autoTPHeight = v end)
     M.autoTPHeightBox = tpHBox
 
-    -- PAGE: VISUALS
-    uiSectionHeader(PVis, "SKYBOX")
-    do
-        local r = uiRowCard(PVis, false, UI_ROW_H)
-        uiRowLabel(r, "Skybox", 170)
-        local skyLbl = uiValueChip(r, M.currentSkyTheme, {width = 118, autoWidth = true})
-        local skyIdx = 1
-        for i,t in ipairs(M.SkyOrder) do if t == M.currentSkyTheme then skyIdx = i; break end end
-        local btn = Instance.new("TextButton",r); btn.Size=UDim2.new(1,0,1,0); btn.BackgroundTransparency=1; btn.Text=""; btn.ZIndex=6; btn.AutoButtonColor=false
-        btn.Activated:Connect(function()
-            skyIdx = skyIdx % #M.SkyOrder + 1
-            local t = M.SkyOrder[skyIdx]
-            skyLbl.Text = t; M.currentSkyTheme = t; M.CandyApplyCustomSky(t); saveCherryConfig()
-        end)
-    end
+    uiSectionHeader(PVis, "ANIMATIONS")
+    local packNames = {}
+    for name in pairs(M.PACKS) do table.insert(packNames, name) end
+    table.sort(packNames)
 
-    uiSectionHeader(PVis, "ESP")
-    local _, setLineESP = uiToggleRow(PVis, "Enemy ESP", M.lineESPEnabled, function(on)
-        M.lineESPEnabled = on; cherryESPState.LineESP = on
-    end)
-    local _, setSpeedESP = uiToggleRow(PVis, "Velocity ESP", M.speedESPEnabled, function(on)
-        M.speedESPEnabled = on; cherryESPState.SpeedESP = on
-    end)
-
-    -- PAGE: UTILITY
-    uiSectionHeader(PUtil, "UTILITIES")
-    local _, setStealKickWarn = uiToggleRow(PUtil, "Steal Kick Warning", M.stealKickWarnEnabled, function(on)
-        M.stealKickWarnEnabled = on
-        if on then M.warnIfStealRisky() end
-    end)
-    M.setStealKickWarnVisual = setStealKickWarn
-
-    local _, setUnwalk = uiToggleRow(PUtil, "Unwalk", M.unwalkEnabled, function(on)
-        M.unwalkEnabled = on
-        if on then M.startUnwalk() else M.stopUnwalk() end
-    end)
-    M.setUnwalkVisual = setUnwalk
-
-    local _, setSafeMode = uiToggleRow(PUtil, "Safe Mode", M.safeModeEnabled, function(on)
-        M.safeModeEnabled = on
-        if on then M.enableSafeMode() else M.disableSafeMode() end
-        saveCherryConfig()
-    end)
-    M.setSafeModeVisual = setSafeMode
-
+    local packDefaultIdx = 1
+    for i,v in ipairs(packNames) do if v == M.animPack then packDefaultIdx = i break end end
+    local _, setAnimPackToggle, setPackUI = uiExpandToggleRow(
+        PUtil,
+        "Animation Pack",
+        M.animPackEnabled,
+        packNames,
+        packDefaultIdx,
+        function(on)
+            M.animPackEnabled = on
+            if on then M.applyAnimPack(M.animPack)
+            else local char=player.Character; if char then M.resetAnimations(char) end end
+            saveCherryConfig()
+        end,
+        function(v)
+            M.animPack = v
+            if M.animPackEnabled then M.applyAnimPack(v) end
+            saveCherryConfig()
+        end
+    )
+    M.setPackModeUI = setPackUI
 
     uiSectionHeader(PUtil, "PERFORMANCE")
     local _, setAntiLag = uiToggleRow(PUtil, "Anti Lag", M.antiLagEnabled, function(on)
@@ -6781,32 +6846,6 @@ function M.buildGui()
 
 
     uiSectionHeader(PUtil, "COSMETICS")
-    local packNames = {}
-    for name in pairs(M.PACKS) do table.insert(packNames, name) end
-    table.sort(packNames)
-
-    local packDefaultIdx = 1
-    for i,v in ipairs(packNames) do if v == M.animPack then packDefaultIdx = i break end end
-    local _, setAnimPackToggle, setPackUI = uiExpandToggleRow(
-        PUtil,
-        "Animation Pack",
-        M.animPackEnabled,
-        packNames,
-        packDefaultIdx,
-        function(on)
-            M.animPackEnabled = on
-            if on then M.applyAnimPack(M.animPack)
-            else local char=player.Character; if char then M.resetAnimations(char) end end
-            saveCherryConfig()
-        end,
-        function(v)
-            M.animPack = v
-            if M.animPackEnabled then M.applyAnimPack(v) end
-            saveCherryConfig()
-        end
-    )
-    M.setPackModeUI = setPackUI
-
     local _, setHeadUI = uiChoiceRow(PUtil, "Head", {"Normal", "Headless"},
         M.headlessEnabled and 2 or 1,
         function(v)
@@ -6828,7 +6867,6 @@ function M.buildGui()
     local setKorblox = function(on) if setKorbloxUI then setKorbloxUI(on and "Korblox" or "Normal") end end
 
     uiSectionHeader(PUtil, "INTERFACE")
-    -- Lock GUI moved out of the header into its own row
     local _, menuScaleBox = uiNumberRow(PUtil, "GUI Scale (%)", math.floor((M.uiScale or 0.8) * 100 + 0.5), 50, 200, function(v)
         M.uiScale = v / 100
         if M.uiScaleRef then M.uiScaleRef.Scale = M.uiScale end
@@ -6842,14 +6880,10 @@ function M.buildGui()
         M.setSkipIntro(on)
     end)
     M.setSkipIntroVisual = setSkipIntro
+    uiKeybindRow(PKB, "Hide / Show GUI", M.KB.GuiHide)
 
     -- TELEPORT: the binds with no feature row of their own. Every other keybind
     -- now lives as an inline chip on the row it controls.
-    uiSectionHeader(PKB, "TELEPORT")
-    uiKeybindRow(PKB, "TP Down",        M.KB.TPFloor)
-    uiKeybindRow(PKB, "TP Down (Second)", M.KB.TPFloor2)
-    uiKeybindRow(PKB, "Drop Brainrot",  M.KB.DropBrainrot)
-    uiKeybindRow(PKB, "Hide / Show GUI", M.KB.GuiHide)
 
 
     -- Restore menu open/closed from config

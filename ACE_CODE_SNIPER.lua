@@ -17,7 +17,7 @@ local savedConfig = {
     submitAfter = 3,
     retypeInvalid = false,
     riddleSolver = false,
-    geminiApiKey = "",
+    cerebrasApiKey = "",
 }
 pcall(function()
     if type(isfile) == "function" and type(readfile) == "function"
@@ -29,7 +29,7 @@ pcall(function()
             if type(decoded.submitAfter) == "number" then savedConfig.submitAfter = math.max(1, math.floor(decoded.submitAfter)) end
             if type(decoded.retypeInvalid) == "boolean" then savedConfig.retypeInvalid = decoded.retypeInvalid end
             if type(decoded.riddleSolver) == "boolean" then savedConfig.riddleSolver = decoded.riddleSolver end
-            if type(decoded.geminiApiKey) == "string" and #decoded.geminiApiKey > 10 then savedConfig.geminiApiKey = decoded.geminiApiKey end
+            if type(decoded.cerebrasApiKey) == "string" and #decoded.cerebrasApiKey > 10 then savedConfig.cerebrasApiKey = decoded.cerebrasApiKey end
         end
     end
 end)
@@ -43,7 +43,7 @@ local function saveConfig()
             submitAfter = savedConfig.submitAfter,
             retypeInvalid = savedConfig.retypeInvalid,
             riddleSolver = savedConfig.riddleSolver,
-            geminiApiKey = savedConfig.geminiApiKey,
+            cerebrasApiKey = savedConfig.cerebrasApiKey,
         }))
     end)
 end
@@ -525,7 +525,7 @@ addCorner(BrandImage, 15)
 
 makeLabel(Header, "Title", "ACE CODE SNIPER", UDim2.fromOffset(180, 25), UDim2.fromOffset(56, 17), 15, COLORS.White, Enum.Font.GothamBold)
 
--- TOP RIGHT TOGGLE BUTTON (UPDATED FOR MOBILE & PC) --
+-- TOP RIGHT TOGGLE BUTTON --
 local AutoWriteButton = Instance.new("TextButton")
 AutoWriteButton.Name = "AutoWrite"
 AutoWriteButton.Size = UDim2.fromOffset(47, 24)
@@ -586,7 +586,6 @@ local function toggleAutoWrite()
     end
 end
 
--- MULTI-EVENT BINDING FOR MOBILE TOUCH STABILITY --
 AutoWriteButton.Activated:Connect(toggleAutoWrite)
 AutoWriteButton.MouseButton1Click:Connect(toggleAutoWrite)
 AutoWriteButton.InputBegan:Connect(function(input)
@@ -821,7 +820,7 @@ DiscordFooter.TextStrokeColor3 = COLORS.Window
 DiscordFooter.TextStrokeTransparency = 0.45
 DiscordFooter.ZIndex = 3
 
--- WINDOW DRAGGING SYSTEM WITH TOUCH INTEGRATION --
+-- WINDOW DRAGGING SYSTEM --
 do
     local dragging = false
     local activeDragInput
@@ -1127,27 +1126,22 @@ local function aceTokenize(text)
     return words
 end
 
--- RIDDLE SOLVER SYSTEM --
+-- RIDDLE SOLVER SYSTEM (CEREBRAS INFERENCE ENGINE) --
+local CEREBRAS_API_KEY = ""
+local CEREBRAS_API_KEY_FILE = "ace_cerebras_key.txt"
 
--- API KEY: Set your free Google Gemini API key
--- Get one free at: https://aistudio.google.com/apikey
--- Option 1: Save key to file "ace_gemini_key.txt" in your executor's workspace
--- Option 2: Set it in the config JSON under "geminiApiKey"
--- Option 3: Run: getgenv().ACE_GEMINI_KEY = "your-key-here" before executing
-local GEMINI_API_KEY = ""
-local GEMINI_API_KEY_FILE = "ace_gemini_key.txt"
 pcall(function()
-    if getgenv and type(getgenv().ACE_GEMINI_KEY) == "string" and #getgenv().ACE_GEMINI_KEY > 10 then
-        GEMINI_API_KEY = getgenv().ACE_GEMINI_KEY
+    if getgenv and type(getgenv().ACE_CEREBRAS_KEY) == "string" and #getgenv().ACE_CEREBRAS_KEY > 10 then
+        CEREBRAS_API_KEY = getgenv().ACE_CEREBRAS_KEY
         return
     end
-    if savedConfig.geminiApiKey and #savedConfig.geminiApiKey > 10 then
-        GEMINI_API_KEY = savedConfig.geminiApiKey
+    if savedConfig.cerebrasApiKey and #savedConfig.cerebrasApiKey > 10 then
+        CEREBRAS_API_KEY = savedConfig.cerebrasApiKey
         return
     end
-    if type(isfile) == "function" and type(readfile) == "function" and isfile(GEMINI_API_KEY_FILE) then
-        local key = readfile(GEMINI_API_KEY_FILE):match("^%s*(.-)%s*$") or ""
-        if #key > 10 then GEMINI_API_KEY = key end
+    if type(isfile) == "function" and type(readfile) == "function" and isfile(CEREBRAS_API_KEY_FILE) then
+        local key = readfile(CEREBRAS_API_KEY_FILE):match("^%s*(.-)%s*$") or ""
+        if #key > 10 then CEREBRAS_API_KEY = key end
     end
 end)
 
@@ -1157,27 +1151,7 @@ local _riddleAICache = {}
 local _riddleSeenCache = {}
 local _lastRiddleAnswer = nil
 
-local RIDDLE_AI_PROMPT = [[You are a riddle answer bot for the Roblox game "Steal a Brainrot". You will receive a riddle or trivia question from the game. Your job is to answer it.
-
-RULES:
-- Reply with ONLY the answer, nothing else
-- Keep answers as short as possible (1-3 words max)
-- No punctuation, no explanation, no extra text
-- If it's a number question, just the number
-- If it's a name, just the name
-- If you're unsure, give your best guess anyway — never say "I don't know"
-
-GAME CONTEXT — "Steal a Brainrot" facts:
-- Roblox game where you steal brainrot meme characters from other players
-- Popular brainrot memes: Skibidi Toilet, Baby Gronk, Sigma, Duke Dennis, Kai Cenat, Livvy Dunne, Fanum Tax, Gyatt, Ohio, Rizz, Ice Spice, Grimace Shake, Sussy Baka, Among Us, Speed, Mr Beast
-- The game has rarities: Common, Uncommon, Rare, Epic, Legendary, Mythic, Godly, Secret
-- Players steal characters by clicking on them
-- The game has a trading system
-- There are codes you can redeem for rewards
-- The game has a Discord server
-
-Answer this riddle/question:
-]]
+local RIDDLE_AI_PROMPT = [[You are a riddle answer bot for a Roblox game. Answer the question/riddle as short as possible (1-3 words max). No explanations, no markdown, no punctuation. Just the concise answer.]]
 
 local function riddleNormalize(str)
     return str:lower():gsub("[^%w%s]", ""):gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
@@ -1196,10 +1170,14 @@ end
 
 local function solveRiddleWithAI(riddleText, callback)
     if not aceHttpRequest then
+        aceHttpRequest = (syn and syn.request) or (http and http.request) or request or http_request or (fluxus and fluxus.request)
+    end
+    
+    if not aceHttpRequest then
         callback(nil, "no http function")
         return
     end
-    if GEMINI_API_KEY == "" then
+    if CEREBRAS_API_KEY == "" then
         callback(nil, "no API key")
         return
     end
@@ -1210,56 +1188,78 @@ local function solveRiddleWithAI(riddleText, callback)
         return
     end
 
-    local url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" .. GEMINI_API_KEY
+    -- OpenAI-Compatible Chat Completions via Cerebras Wafer-Scale Engine
+    local url = "https://api.cerebras.ai/v1/chat/completions"
 
     local body = HttpService:JSONEncode({
-        contents = {{
-            parts = {{
-                text = RIDDLE_AI_PROMPT .. riddleText
-            }}
-        }},
-        generationConfig = {
-            temperature = 0.1,
-            maxOutputTokens = 50,
-        }
+        model = "llama-3.3-70b",
+        messages = {
+            { role = "system", content = RIDDLE_AI_PROMPT },
+            { role = "user", content = riddleText }
+        },
+        temperature = 0.1,
+        max_tokens = 30
     })
 
     task.spawn(function()
+        local startClock = os.clock()
         local ok, result = pcall(function()
             return aceHttpRequest({
                 Url = url,
                 Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
+                Headers = {
+                    ["Content-Type"] = "application/json",
+                    ["Authorization"] = "Bearer " .. CEREBRAS_API_KEY
+                },
                 Body = body,
             })
         end)
 
-        if not ok then
-            callback(nil, "request failed")
+        local elapsed = math.floor((os.clock() - startClock) * 1000)
+
+        if not ok or type(result) ~= "table" then
+            callback(nil, "http call threw: " .. tostring(result), elapsed)
             return
         end
 
-        local success, decoded = pcall(function()
-            return HttpService:JSONDecode(result.Body or result.body or "")
+        local status  = tonumber(result.StatusCode or result.status_code) or 0
+        local rawBody = result.Body or result.body or ""
+
+        local decodedOk, decoded = pcall(function()
+            return HttpService:JSONDecode(rawBody)
         end)
 
-        if not success or not decoded then
-            callback(nil, "decode failed")
+        if decodedOk and type(decoded) == "table" and decoded.error then
+            local msg = tostring(decoded.error.message or decoded.error.type or "unknown")
+            callback(nil, "HTTP " .. status .. ": " .. msg, elapsed)
+            return
+        end
+
+        if status ~= 0 and (status < 200 or status >= 300) then
+            callback(nil, "HTTP " .. status .. ": " .. rawBody:sub(1, 120), elapsed)
+            return
+        end
+
+        if not decodedOk or type(decoded) ~= "table" then
+            callback(nil, "bad JSON: " .. rawBody:sub(1, 120), elapsed)
             return
         end
 
         local answer = nil
         pcall(function()
-            answer = decoded.candidates[1].content.parts[1].text
+            answer = decoded.choices[1].message.content
         end)
 
         answer = cleanAIResponse(answer)
-        if answer then
-            _riddleAICache[cacheKey] = answer
-            task.delay(300, function() _riddleAICache[cacheKey] = nil end)
+
+        if not answer then
+            callback(nil, "empty response from model", elapsed)
+            return
         end
 
-        callback(answer, answer and nil or "empty response")
+        _riddleAICache[cacheKey] = answer
+        task.delay(300, function() _riddleAICache[cacheKey] = nil end)
+        callback(answer, nil, elapsed)
     end)
 end
 
@@ -1295,20 +1295,22 @@ local function handleRiddle(text)
         return true
     end
 
-    if GEMINI_API_KEY == "" then
-        setStatus("[riddle] set API key in ace_gemini_key.txt", COLORS.Red)
+    if CEREBRAS_API_KEY == "" then
+        setStatus("[riddle] set API key in ace_cerebras_key.txt", COLORS.Red)
         return true
     end
 
-    setStatus("[riddle] asking AI...", COLORS.Text)
-    solveRiddleWithAI(text, function(answer, err)
+    setStatus("[riddle] asking Cerebras AI...", COLORS.Text)
+    solveRiddleWithAI(text, function(answer, err, elapsed)
+        local ms = elapsed and (" [" .. tostring(elapsed) .. "ms]") or ""
         if answer then
             _lastRiddleAnswer = answer
-            setStatus("[riddle] AI answer -> " .. answer, COLORS.Green)
+            setStatus("[riddle] AI answer -> " .. answer .. ms, COLORS.Green)
             flashCode(answer, COLORS.Green)
             appendToBox(answer)
         else
-            setStatus("[riddle] AI failed: " .. tostring(err), COLORS.Red)
+            _riddleSeenCache[cacheKey] = nil
+            setStatus("[riddle] AI failed: " .. tostring(err) .. ms, COLORS.Red)
         end
     end)
     return true

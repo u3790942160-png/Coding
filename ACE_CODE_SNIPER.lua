@@ -1168,6 +1168,12 @@ local function cleanAIResponse(response)
     return response
 end
 
+local CEREBRAS_MODELS = {
+    "llama-4-scout-17b-16e-instruct",
+    "llama3.1-8b",
+}
+local _cerebrasModelIndex = 1
+
 local function solveRiddleWithAI(riddleText, callback)
     if not aceHttpRequest then
         aceHttpRequest = (syn and syn.request) or (http and http.request) or request or http_request or (fluxus and fluxus.request)
@@ -1190,9 +1196,10 @@ local function solveRiddleWithAI(riddleText, callback)
 
     -- OpenAI-Compatible Chat Completions via Cerebras Wafer-Scale Engine
     local url = "https://api.cerebras.ai/v1/chat/completions"
+    local model = CEREBRAS_MODELS[_cerebrasModelIndex] or CEREBRAS_MODELS[1]
 
     local body = HttpService:JSONEncode({
-        model = "llama-3.3-70b",
+        model = model,
         messages = {
             { role = "system", content = RIDDLE_AI_PROMPT },
             { role = "user", content = riddleText }
@@ -1231,6 +1238,12 @@ local function solveRiddleWithAI(riddleText, callback)
 
         if decodedOk and type(decoded) == "table" and decoded.error then
             local msg = tostring(decoded.error.message or decoded.error.type or "unknown")
+            if status == 404 and _cerebrasModelIndex < #CEREBRAS_MODELS then
+                _cerebrasModelIndex += 1
+                callback(nil, "model retired, switching to "
+                    .. CEREBRAS_MODELS[_cerebrasModelIndex], elapsed)
+                return
+            end
             callback(nil, "HTTP " .. status .. ": " .. msg, elapsed)
             return
         end

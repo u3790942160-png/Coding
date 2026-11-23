@@ -10,6 +10,7 @@ local Env    = _R("env")
 local R      = _R("resolve")
 local BE     = _R("backend")
 local Calib  = _R("calib")
+local Learn  = _R("learn")
 local Reach  = _R("reach")
 local Skills = _R("skills")
 local Aim    = _R("aimbot")
@@ -417,6 +418,31 @@ local function tabConfig(w)
 		Notify.Info("calibration", "cleared")
 	end}
 
+	local kr = t:Section("Kick remote")
+	kr:Label("Watch is the one that produces a real value: arm it, then kick the ball yourself. It matches the remote send against the velocity jump and reads the argument shape off the call the game actually made.", "dim")
+	kr:Button{text = "Watch: arm, then kick the ball", callback = function() Learn.Arm() end}
+	kr:Button{text = "Cancel watch", callback = function()
+		R.spyOn = false
+		Learn.Disarm("cancelled")
+	end}
+	kr:Label("Probe fires candidates at the server and keeps one only if the ball actually moves. It sweeps every remote named like kick, shoot or ball.", "dim")
+	kr:Button{text = "Probe candidates", callback = function() Learn.Probe() end}
+	kr:Button{text = "Verify current remote", callback = function() Learn.Verify() end}
+	kr:TextBox{text = "Candidate names", placeholder = "KickBall,GoalEvent",
+		get = get(Cfg.target, "kickCandidates"), set = str(Cfg.target, "kickCandidates")}
+	readouts.learn    = kr:Readout{text = "Learner"}
+	readouts.verified = kr:Readout{text = "Verified"}
+	readouts.ksource  = kr:Readout{text = "Source"}
+
+	local dg = t:Section("Why a feature does nothing")
+	dg:Button{text = "Test physics writes (ball must be still)", callback = function() Learn.OwnershipProbe() end}
+	readouts.diag = {}
+	local diagLabels = {"ball", "touch backend (reach)", "physics writes (sneaky, juggle)", "kick remote", "remote verified"}
+	for i = 1, 5 do
+		readouts.diag[i] = dg:Readout{text = diagLabels[i]}
+	end
+	readouts.verdict = dg:Label("", "dim")
+
 	local d = t:Section("Remote spy")
 	d:Toggle{text = "Arm spy", get = function() return R.spyOn end, set = function(v)
 		R.spyOn = v
@@ -433,7 +459,7 @@ local function tabConfig(w)
 	local e = t:Section("Target values")
 	e:Label("Nothing here ships with a value. Fill from the spy log above; a feature with an empty box stays off and says so once.", "dim")
 	e:TextBox{text = "Kick remote", placeholder = "unset", get = get(Cfg.target, "kickRemote"), set = str(Cfg.target, "kickRemote")}
-	e:Dropdown{text = "Kick arg shape", options = {"", "dir_power", "vector", "cframe"},
+	e:Dropdown{text = "Kick arg shape", options = {"", "dir_power", "vector", "cframe", "bare"},
 		get = get(Cfg.target, "kickArgShape"), set = set(Cfg.target, "kickArgShape")}
 	e:TextBox{text = "Quest remote", placeholder = "unset", get = get(Cfg.target, "questRemote"), set = str(Cfg.target, "questRemote")}
 	e:TextBox{text = "Deny remotes", placeholder = "nameA,nameB", get = get(Cfg.target, "denyRemotes"), set = str(Cfg.target, "denyRemotes")}
@@ -560,6 +586,30 @@ function M.Tick()
 	if readouts.configs then
 		local list = Util.ListConfigs()
 		readouts.configs:Set(#list > 0 and table.concat(list, ", ") or "none", "dim")
+	end
+
+	if readouts.learn then
+		local line, tone = Learn.Status()
+		readouts.learn:Set(line, tone)
+	end
+	if readouts.verified then
+		readouts.verified:Set(Learn.verified,
+			string.find(Learn.verified, "moved", 1, true) and "good" or "dim")
+	end
+	if readouts.ksource then
+		readouts.ksource:Set(Cfg.target.kickSource ~= "" and Cfg.target.kickSource or "unset",
+			Cfg.target.kickSource ~= "" and "gold" or "dim")
+	end
+	if readouts.diag then
+		local rows, verdict = Learn.Diagnose()
+		for i = 1, 5 do
+			local ro = readouts.diag[i]
+			local row = rows[i]
+			if ro and row then
+				ro:Set(row[2], row[3] and "good" or "bad")
+			end
+		end
+		if readouts.verdict then readouts.verdict:Set(verdict) end
 	end
 
 	local lines = R.SpyLines(6)

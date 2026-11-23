@@ -408,10 +408,10 @@ local autoSignals = {
 }
 
 InstMt.__index = function(self, key)
-	local m = instanceMethods[key]
-	if m then return m end
 	local props = rawget(self, "props")
 	if props[key] ~= nil then return props[key] end
+	local m = instanceMethods[key]
+	if m then return m end
 	if autoSignals[key] then
 		local sigs = rawget(self, "signals")
 		sigs[key] = sigs[key] or newSignal(key)
@@ -486,6 +486,32 @@ task = {
 	defer = function(fn, ...) return task.spawn(fn, ...) end,
 }
 wait = function(t) return t or 0 end
+
+-- executor side globals, enough to drive the hook and touch paths
+M.hooks = {}
+M.namecallMethod = "FireServer"
+M.selfcall = false
+M.touches = 0
+
+function hookmetamethod(_, name, fn)
+	M.hooks[name] = fn
+	return function() return nil end
+end
+function getnamecallmethod() return M.namecallMethod end
+function checkcaller() return M.selfcall end
+function firetouchinterest() M.touches = M.touches + 1 end
+function getgenv() return _G end
+
+-- Pretend the game fired a remote from its own code.
+function M.FireFromGame(remote, ...)
+	local hook = M.hooks["__namecall"]
+	if not hook then return false end
+	local was = M.selfcall
+	M.selfcall = false
+	local ok = pcall(hook, remote, ...)
+	M.selfcall = was
+	return ok
+end
 
 if math.atan2 == nil then
 	math.atan2 = function(y, x) return math.atan(y, x) end

@@ -45,6 +45,21 @@ Cfg.target = {
 	--   ""           unset -> remote backend stays off
 	kickArgShape = "",
 
+	-- [remote-name | build unset | source third-party page | UNVERIFIED]
+	-- Names to try when you press Probe on the CONFIG tab. These are
+	-- candidates, not values: each one is fired at the server with a probe
+	-- vector and kept only if the ball actually moves. KickBall and
+	-- GoalEvent come from a public Touch Football script dump of unknown
+	-- date (scriptrb.com post 2279), not from a dump of your build, so
+	-- neither is trusted until the probe proves it here.
+	-- The prober also sweeps every RemoteEvent in the place whose name
+	-- contains kick, shoot or ball, which is discovery rather than guesswork.
+	kickCandidates = "KickBall,GoalEvent",
+
+	-- [string | build unset | source resolver | unset]
+	-- Written by the learner: how kickRemote was obtained.
+	kickSource = "",
+
 	-- [remote-name | build unset | source unset | unset]
 	-- Fired to claim / complete a quest. Needed by Auto Complete Quest.
 	questRemote = "",

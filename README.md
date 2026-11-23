@@ -51,15 +51,37 @@ orients each mouth toward the other goal. If the pitch does not name them
 that way: stand in the mouth, face the pitch, CONFIG tab → **Capture Own
 Goal** / **Capture Enemy Goal**. A capture outranks anything scanned.
 
-**Kick remote** — CONFIG tab → arm **Remote spy** → kick the ball once →
-the log shows the call with its argument types. Put the name in **Kick
-remote** and pick the matching **Kick arg shape**:
+**Kick remote** — CONFIG tab → **Kick remote** section. Two ways, both
+automatic:
+
+*Watch* is the one that produces a confirmed value. Press **Watch: arm,
+then kick the ball** and kick it yourself. It correlates the remote send
+against the ball's velocity jump, reads the argument signature off the
+call the game actually made, and fills both the name and the shape. Calls
+made by this tool are skipped, so it cannot train on its own output. It
+gives up after 25 seconds.
+
+*Probe* fires candidates at the server and keeps one only if the ball
+actually moves. It tries the names in **Candidate names** and sweeps every
+RemoteEvent in the place whose name contains kick, shoot, ball or strike,
+up to twelve, each with four argument shapes, restoring the ball between
+attempts.
+
+**Verify current remote** fires the configured one and reports the studs
+per second the ball picked up.
+
+The shipped candidate list is `KickBall,GoalEvent`. Those two names come
+from a public Touch Football script dump of unknown date
+([scriptrb.com post 2279](https://scriptrb.com/post.php?id=2279)), not
+from a dump of your build, so neither is trusted until the probe proves it
+in your session. Nothing uses them unless the ball moves.
 
 | shape | call the game makes |
 |---|---|
 | `dir_power` | `FireServer(Vector3 unitDirection, number power)` |
 | `vector` | `FireServer(Vector3 velocity)` |
 | `cframe` | `FireServer(CFrame aim, number power)` |
+| `bare` | `FireServer()` with the server deciding the vector |
 
 **Quest remote** — same spy, hand in one quest, copy the name.
 
@@ -70,6 +92,20 @@ remotes**. Block Kick Deny Events swallows those calls.
 gravity, the velocity decay this build applies to the ball, and how many
 studs per second one power unit buys. Until it runs, the power sliders are
 raw studs per second and the readout says `uncalibrated`.
+
+## When a feature does nothing
+
+Reach, Sneaky and Auto Juggle do not need the kick remote. Reach is
+`firetouchinterest`. Sneaky and Juggle write the ball's velocity directly.
+The remote is preferred when it is set, not required. So when one of them
+is dead, the cause is one of three things, and the CONFIG tab names which:
+
+**Why a feature does nothing** shows five rows — ball, touch backend,
+physics writes, kick remote, remote verified — and a verdict line.
+**Test physics writes** puts a known velocity on a still ball, waits, and
+reads it back: if the server reverted it you have no network ownership and
+Sneaky and Juggle need the remote. If your executor has no
+`firetouchinterest`, Reach has no touch path and also needs the remote.
 
 ## Backends
 
@@ -160,9 +196,11 @@ python3 tools/test.py      # boots the bundle in a mock Roblox runtime
 a fake pitch (ball, two goals, four players, two teams), boots the real
 bundle against it, and asserts on the solvers and the drivers: ballistic
 round trip, both arcs, out-of-range, parabola/plane crossing, top-corner
-geometry, shot direction, pass selection, keeper prediction, 240 frames
-with every feature enabled, ball destroyed mid-match, and a full mobile
-pass. Needs `pip install lupa`.
+geometry, shot direction, pass selection, keeper prediction, argument
+shape inference, the watch correlating a simulated game send with a
+velocity jump, self-call suppression, probe and verify, the ownership
+test, 240 frames with every feature enabled, ball destroyed mid-match,
+and a full mobile pass. 62 checks. Needs `pip install lupa`.
 
 ## Layout
 
@@ -179,16 +217,17 @@ src/09_binds.lua     keyboard + gamepad
 src/10_touchui.lua   on-screen buttons
 src/11_resolve.lua   ball / goal / team / remote discovery, remote spy
 src/12_backend.lua   remote, physics and touch ball control
-src/13_calib.lua     gravity, drag and power measurement
-src/14_reach.lua     reach
-src/15_skills.lua    sneaky, pokers, juggle, ground shots
-src/16_aimbot.lua    shot solving
-src/17_aimpass.lua   passing
-src/18_keeper.lua    goalkeeping
-src/19_special.lua   phase, frames, farms, ball handling, tricks
-src/20_visuals.lua   esp, trails, rgb, clock, spoof marker
-src/21_charmod.lua   local R6 rig and appearance
-src/22_settings.lua  anti-afk, servers, staff, quests, panic
-src/23_menu.lua      every tab
-src/24_main.lua      boot, drivers, teardown
+src/13_learn.lua     kick remote watch, probe, verify and diagnosis
+src/14_calib.lua     gravity, drag and power measurement
+src/15_reach.lua     reach
+src/16_skills.lua    sneaky, pokers, juggle, ground shots
+src/17_aimbot.lua    shot solving
+src/18_aimpass.lua   passing
+src/19_keeper.lua    goalkeeping
+src/20_special.lua   phase, frames, farms, ball handling, tricks
+src/21_visuals.lua   esp, trails, rgb, clock, spoof marker
+src/22_charmod.lua   local R6 rig and appearance
+src/23_settings.lua  anti-afk, servers, staff, quests, panic
+src/24_menu.lua      every tab
+src/25_main.lua      boot, drivers, teardown
 ```

@@ -444,12 +444,39 @@ local function summarise(value)
 	return t
 end
 
+-- Structured record for the learner, plus the readable line for the UI.
+R.spyEvents = {}
+R.SPY_EVENTS_MAX = 120
+
 local function record(name, method, args)
 	local parts = {}
-	for i = 1, #args do parts[#parts + 1] = summarise(args[i]) end
+	local types = {}
+	local firstVector, firstCFrame, firstNumber = nil, nil, nil
+	for i = 1, args.n or #args do
+		local v = args[i]
+		parts[#parts + 1] = summarise(v)
+		local t = typeof(v)
+		types[#types + 1] = t
+		if t == "Vector3" and firstVector == nil then firstVector = v end
+		if t == "CFrame" and firstCFrame == nil then firstCFrame = v end
+		if t == "number" and firstNumber == nil then firstNumber = v end
+	end
 	local line = method .. " " .. name .. "(" .. table.concat(parts, ", ") .. ")"
 	table.insert(R.spyLog, 1, {t = Util.Stamp(), name = name, text = line})
 	while #R.spyLog > R.SPY_MAX do table.remove(R.spyLog) end
+
+	table.insert(R.spyEvents, 1, {
+		clock = Util.Now(),
+		name = name,
+		method = method,
+		types = types,
+		argc = args.n or #args,
+		vector = firstVector,
+		cframe = firstCFrame,
+		number = firstNumber,
+		text = line,
+	})
+	while #R.spyEvents > R.SPY_EVENTS_MAX do table.remove(R.spyEvents) end
 end
 
 local function denied(name)
@@ -460,6 +487,28 @@ local function denied(name)
 	return false
 end
 
+-- A namecall is a remote send when the method says so, or when the method
+-- cannot be read on this executor and the receiver is a remote anyway.
+function R.IsRemoteCall(self, method)
+	if typeof(self) ~= "Instance" then return false end
+	if method == "FireServer" or method == "InvokeServer" then return true end
+	if method == "" or method == nil then
+		local ok, isRemote = pcall(function()
+			return self:IsA("RemoteEvent") or self:IsA("RemoteFunction")
+		end)
+		return ok and isRemote
+	end
+	return false
+end
+
+-- True when the call came from our own thread, so the learner does not
+-- train on its own probes.
+function R.SelfCall()
+	if not Env.checkcaller then return false end
+	local ok, mine = pcall(Env.checkcaller)
+	return ok and mine == true
+end
+
 function R.InstallHook()
 	if hookInstalled then return true end
 	if not Env.canHook then return false end
@@ -468,9 +517,8 @@ function R.InstallHook()
 		if Env.hookmetamethod then
 			oldNamecall = Env.hookmetamethod(game, "__namecall", function(self, ...)
 				local method = Env.getnamecallmethod and Env.getnamecallmethod() or ""
-				if (method == "FireServer" or method == "InvokeServer")
-					and typeof(self) == "Instance" then
-					if R.spyOn then
+				if R.IsRemoteCall(self, method) then
+					if R.spyOn and not R.SelfCall() then
 						local args = table.pack(...)
 						pcall(record, self.Name, method, args)
 					end
@@ -486,9 +534,8 @@ function R.InstallHook()
 			oldNamecall = mt.__namecall
 			mt.__namecall = function(self, ...)
 				local method = Env.getnamecallmethod and Env.getnamecallmethod() or ""
-				if (method == "FireServer" or method == "InvokeServer")
-					and typeof(self) == "Instance" then
-					if R.spyOn then
+				if R.IsRemoteCall(self, method) then
+					if R.spyOn and not R.SelfCall() then
 						local args = table.pack(...)
 						pcall(record, self.Name, method, args)
 					end
@@ -506,7 +553,20 @@ end
 
 function R.HookInstalled() return hookInstalled end
 
-function R.ClearSpy() R.spyLog = {} end
+function R.ClearSpy()
+	R.spyLog = {}
+	R.spyEvents = {}
+end
+
+-- Remote sends seen in the last `seconds`, newest first.
+function R.RecentSends(seconds)
+	local cutoff = Util.Now() - (seconds or 0.5)
+	local out = {}
+	for _, ev in ipairs(R.spyEvents) do
+		if ev.clock >= cutoff then out[#out + 1] = ev else break end
+	end
+	return out
+end
 
 function R.SpyLines(count)
 	local out = {}

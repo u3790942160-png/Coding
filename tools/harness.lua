@@ -365,6 +365,76 @@ function H.Run(bundleSource)
 			threat and string.format("t = %.2f s", threat.t) or "no threat")
 	end
 
+	-- kick remote learner
+	do
+		local Learn = _R("learn")
+
+		local function ev(types, argc)
+			return {types = types, argc = argc or #types,
+				vector = nil, cframe = nil, number = nil, name = "X"}
+		end
+		local sh1 = Learn.ShapeOf(ev({"Vector3", "number"}))
+		local sh2 = Learn.ShapeOf(ev({"Vector3"}))
+		local sh3 = Learn.ShapeOf(ev({"CFrame", "number"}))
+		local sh4 = Learn.ShapeOf(ev({}, 0))
+		local sh5 = Learn.ShapeOf(ev({"string", "boolean"}))
+		check("shape inference reads dir_power", sh1 == "dir_power", sh1)
+		check("shape inference reads vector", sh2 == "vector", sh2)
+		check("shape inference reads cframe", sh3 == "cframe", sh3)
+		check("shape inference reads bare", sh4 == "bare", sh4)
+		check("shape inference refuses to guess", sh5 == "", "'" .. sh5 .. "'")
+
+		-- the game fires its kick remote, then the ball jumps
+		check("hook installs", Res.InstallHook())
+		BE.lastLaunchClock = -1e9
+		local armed = Learn.Arm()
+		check("watch arms", armed, Learn.result)
+
+		_MOCK.FireFromGame(kickRemote, v3(0, 0, -1), 70)
+		check("spy recorded the send", #Res.spyEvents >= 1, tostring(#Res.spyEvents))
+
+		ball.AssemblyLinearVelocity = v3(0, 0, -150)
+		RunService.Heartbeat:Fire(1 / 60)
+		check("watch adopted the remote", Cfg.target.kickRemote == "KickBall", Cfg.target.kickRemote)
+		check("watch read the arg shape", Cfg.target.kickArgShape == "dir_power", Cfg.target.kickArgShape)
+		check("watch recorded its source", Cfg.target.kickSource == "watch", Cfg.target.kickSource)
+		check("watch disarms itself", Learn.state == "idle", Learn.state)
+
+		-- our own probes must not train it
+		Res.spyOn = true
+		local beforeSelf = #Res.spyEvents
+		_MOCK.selfcall = true
+		local hook = _MOCK.hooks["__namecall"]
+		pcall(hook, kickRemote, v3(0, 0, -1), 70)
+		_MOCK.selfcall = false
+		check("own calls are not recorded", #Res.spyEvents == beforeSelf,
+			tostring(#Res.spyEvents - beforeSelf) .. " extra")
+		Res.spyOn = false
+
+		-- probe: a remote that actually moves the ball gets kept
+		Cfg.target.kickRemote = ""
+		Cfg.target.kickArgShape = ""
+		Cfg.target.kickSource = ""
+		kickRemote.FireServer = function(_, ...)
+			local b = Res.Ball()
+			if b then b.AssemblyLinearVelocity = v3(0, 0, -95) end
+		end
+		Learn.Probe()
+		check("probe found a working remote", Cfg.target.kickRemote == "KickBall", Cfg.target.kickRemote)
+		check("probe recorded its source", Cfg.target.kickSource == "probe", Cfg.target.kickSource)
+
+		Learn.Verify()
+		check("verify sees the ball move", string.find(Learn.verified, "moved", 1, true) ~= nil, Learn.verified)
+
+		ball.AssemblyLinearVelocity = v3(0, 0, 0)
+		Learn.OwnershipProbe()
+		check("ownership probe reports a result", Learn.ownership ~= "not tested", Learn.ownership)
+
+		local rows, verdict = Learn.Diagnose()
+		check("diagnosis returns five rows", #rows == 5, tostring(#rows))
+		check("diagnosis gives a verdict", type(verdict) == "string" and #verdict > 20, verdict)
+	end
+
 	-- menu
 	check("menu window built", Menu.window ~= nil)
 	if Menu.window then

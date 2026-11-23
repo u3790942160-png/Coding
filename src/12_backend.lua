@@ -20,6 +20,7 @@ local BE = {}
 
 local activeShots = {}
 local lastTouchPulse = 0
+BE.lastLaunchClock = -1e9
 local simRadiusApplied = false
 
 -- ── availability ─────────────────────────────────────────────────────
@@ -140,24 +141,34 @@ function BE.TouchPulseRate(rate, now, fromPart)
 end
 
 -- ── remote kick ──────────────────────────────────────────────────────
-local function fireRemote(velocity, power)
-	local rem = R.FindRemote(Cfg.target.kickRemote)
-	if not rem then return false end
-	local shape = Cfg.target.kickArgShape
+-- Fire one named remote with one explicit shape. The learner uses this to
+-- probe candidates; the normal path goes through fireRemote below.
+function BE.FireRemoteNamed(name, shape, velocity, power)
+	if type(name) ~= "string" or name == "" then return false, "no name" end
+	local rem = R.FindRemote(name)
+	if not rem then return false, "not in this place" end
 	local dir = AM.SafeUnit(velocity)
-	local ok = pcall(function()
+	local ok, err = pcall(function()
 		if shape == "dir_power" then
 			rem:FireServer(dir, power)
 		elseif shape == "vector" then
 			rem:FireServer(velocity)
 		elseif shape == "cframe" then
 			local b = R.Ball()
-			local origin = b and b.Position or Svc.HRP().Position
+			local origin = b and b.Position or (Svc.HRP() and Svc.HRP().Position) or AM.ZERO
 			rem:FireServer(CFrame.lookAt(origin, origin + dir), power)
+		elseif shape == "bare" then
+			rem:FireServer()
 		else
-			error("unsupported kickArgShape")
+			error("unsupported kickArgShape '" .. tostring(shape) .. "'")
 		end
 	end)
+	if not ok then return false, tostring(err) end
+	return true, "sent"
+end
+
+local function fireRemote(velocity, power)
+	local ok = BE.FireRemoteNamed(Cfg.target.kickRemote, Cfg.target.kickArgShape, velocity, power)
 	return ok
 end
 
@@ -166,6 +177,7 @@ end
 -- scalar for the remote path. Returns ok, backendName.
 function BE.Launch(velocity, power)
 	if not AM.Finite(velocity) then return false, "bad velocity" end
+	BE.lastLaunchClock = Util.Now()
 
 	local remoteOk = BE.RemoteReady()
 	if remoteOk then

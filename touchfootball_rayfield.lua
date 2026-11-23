@@ -204,6 +204,9 @@ local S = {
     Err = {}, Disabled = {}, Notices = {}, Binding = nil,
     LastQuest = 0, PokeLast = 0, ChargeStart = 0, RgbWasOn = false,
     TouchHz = 20, TouchLast = 0, FlickLast = 0, PressLast = 0, TackleLast = 0,
+    -- performance
+    ActionHz = 60, EspHz = 30, LiteMode = false, AdaptiveFps = true,
+    BallHoldSec = 2.0, RescanSec = 0.6, GoalScanSec = 15.0, ScanCost = 0,
 }
 
 local KEYS = {
@@ -230,7 +233,9 @@ local Conns = {}
 local Trails = {}
 local PhaseSaved = {}
 local CollideSaved = {}
-local BallCache = { part = nil, tier = "unknown", stamp = -1 }
+local BallCache = { part = nil, tier = "unknown", stamp = -1, at = 0, try = 0 }
+local GoalScan = { list = nil, at = 0 }
+local Rate = {}
 local GoalCache = { own = nil, enemy = nil, tier = "unknown", stamp = -1 }
 local Hitbox = { part = nil, weld = nil }
 local MarkerSaved = {}
@@ -309,6 +314,20 @@ function Fn.guard(name, fn)
         S.Disabled[name] = true
         Fn.report(("[TF] %s auto-disabled after %d errors. Last: %s"):format(name, e.n, e.last))
     end
+end
+
+-- Every repeating job asks this before it runs. Lite Mode halves each
+-- rate, and the adaptive guard halves them again once the frame rate
+-- falls under 30, so the script gets cheaper exactly when it needs to.
+function Fn.due(key, hz)
+    local now = os.clock()
+    local mult = S.LiteMode and 0.5 or 1
+    if S.AdaptiveFps and S.Fps > 0 and S.Fps < 30 then mult = mult * 0.5 end
+    local iv = 1 / math.clamp(hz * mult, 0.5, 240)
+    local last = Rate[key]
+    if last and (now - last) < iv then return false end
+    Rate[key] = now
+    return true
 end
 
 function Fn.readPing()
@@ -580,10 +599,23 @@ function Fn.findLoose(root)
     return best
 end
 
+-- The pattern and loose strategies walk every descendant of Workspace.
+-- On a populated map that is tens of thousands of instances, and running
+-- it per frame is what makes the game crawl. A live cached part is reused
+-- with no search at all, and a failed search is rate limited.
 function Fn.getBall()
-    if BallCache.stamp == S.FrameId and BallCache.part and BallCache.part.Parent then
-        return BallCache.part, BallCache.tier
+    local c = BallCache
+    if c.stamp == S.FrameId then return c.part, c.tier end
+    local now = os.clock()
+    if c.part and c.part.Parent and (now - c.at) < S.BallHoldSec then
+        c.stamp = S.FrameId
+        return c.part, c.tier
     end
+    if not (c.part and c.part.Parent) and (now - c.try) < S.RescanSec then
+        c.stamp, c.part = S.FrameId, nil
+        return nil, c.tier
+    end
+    c.try = now
     local root = Fn.searchRoot()
     local part, tier = nil, "unknown"
     if HAS.ball_name then
@@ -607,6 +639,7 @@ function Fn.getBall()
         if part then tier = "loose" end
     end
     BallCache.part, BallCache.tier, BallCache.stamp = part, tier, S.FrameId
+    BallCache.at = now
     S.BallTier = tier
     return part, tier
 end
@@ -655,7 +688,12 @@ end
 -- GOAL RESOLVER
 ----------------------------------------------------------------------
 
+-- Goals do not move, so this sweep is cached for GoalScanSec and kept up
+-- to date incrementally by the DescendantAdded hook below.
 function Fn.goalCandidates()
+    local now = os.clock()
+    if GoalScan.list and (now - GoalScan.at) < S.GoalScanSec then return GoalScan.list end
+    GoalScan.at = now
     local out = {}
     for _, inst in ipairs(Workspace:GetDescendants()) do
         if inst:IsA("BasePart") and Fn.isPlausibleVector(inst.Position) then
@@ -665,6 +703,7 @@ function Fn.goalCandidates()
             end
         end
     end
+    GoalScan.list = out
     return out
 end
 
@@ -2578,52 +2617,55 @@ function Fn.frame(dt)
         FpsAcc, FpsN = 0, 0
     end
 
-    Fn.guard("ownership", Fn.pushSimulationRadius)
-    Fn.guard("hitbox", Fn.ensureHitbox)
+    if Fn.due("own", 5) then Fn.guard("ownership", Fn.pushSimulationRadius) end
+    if Fn.due("hitbox", 4) then Fn.guard("hitbox", Fn.ensureHitbox) end
 
-    Fn.guard("panic_reach", Fn.panicReachStep)
-    Fn.guard("goal_farm", Fn.goalFarmStep)
-    Fn.guard("save_farm", Fn.saveFarmStep)
-    Fn.guard("dunk", Fn.dunkStep)
-    Fn.guard("gk", Fn.autoGkStep)
-    Fn.guard("keeper_rush", Fn.keeperRushStep)
-    Fn.guard("tackle", Fn.autoTackleStep)
-    Fn.guard("intercept", Fn.autoInterceptStep)
-    Fn.guard("aimbot", Fn.aimbotStep)
-    Fn.guard("ground_shot", Fn.groundShotStep)
-    Fn.guard("nero", Fn.autoNeroStep)
-    Fn.guard("header", Fn.autoHeaderStep)
-    Fn.guard("aimpass", Fn.aimPassStep)
-    Fn.guard("pressure_pass", Fn.pressurePassStep)
-    Fn.guard("flick", Fn.spinFlickStep)
-    Fn.guard("poke", Fn.pokersStep)
-    Fn.guard("sneaky", Fn.sneakyStep)
-    Fn.guard("trick", Fn.trickOmsStep)
-    Fn.guard("hold", Fn.ballHoldStep)
-    Fn.guard("reach", Fn.reachStep)
-    Fn.guard("juggle", Fn.juggleStep)
-    Fn.guard("frame_player", Fn.framePlayerStep)
-    Fn.guard("ball_time", Fn.ballTimeStep)
-    Fn.flushBall()
+    -- The ball writers. One pass, one winner, at the action rate.
+    if Fn.due("act", S.ActionHz) then
+        Fn.guard("panic_reach", Fn.panicReachStep)
+        Fn.guard("goal_farm", Fn.goalFarmStep)
+        Fn.guard("save_farm", Fn.saveFarmStep)
+        Fn.guard("dunk", Fn.dunkStep)
+        Fn.guard("gk", Fn.autoGkStep)
+        Fn.guard("keeper_rush", Fn.keeperRushStep)
+        Fn.guard("tackle", Fn.autoTackleStep)
+        Fn.guard("intercept", Fn.autoInterceptStep)
+        Fn.guard("aimbot", Fn.aimbotStep)
+        Fn.guard("ground_shot", Fn.groundShotStep)
+        Fn.guard("nero", Fn.autoNeroStep)
+        Fn.guard("header", Fn.autoHeaderStep)
+        Fn.guard("aimpass", Fn.aimPassStep)
+        Fn.guard("pressure_pass", Fn.pressurePassStep)
+        Fn.guard("flick", Fn.spinFlickStep)
+        Fn.guard("poke", Fn.pokersStep)
+        Fn.guard("sneaky", Fn.sneakyStep)
+        Fn.guard("trick", Fn.trickOmsStep)
+        Fn.guard("hold", Fn.ballHoldStep)
+        Fn.guard("reach", Fn.reachStep)
+        Fn.guard("juggle", Fn.juggleStep)
+        Fn.guard("frame_player", Fn.framePlayerStep)
+        Fn.guard("ball_time", Fn.ballTimeStep)
+        Fn.flushBall()
+    end
 
-    Fn.guard("position", Fn.autoPositionStep)
-    Fn.guard("stats", Fn.statsStep)
-    Fn.guard("noclip", Fn.noclipStep)
-    Fn.guard("aimlock", function() Fn.aimlockStep(dt) end)
-    Fn.guard("phase", Fn.phaseStep)
-    Fn.guard("anti_phase", Fn.antiPhaseStep)
-    Fn.guard("ball_esp", Fn.ballEspStep)
-    Fn.guard("predict", Fn.predictLineStep)
-    Fn.guard("ball_trail", Fn.ballTrailStep)
-    Fn.guard("rgb", Fn.rgbCharStep)
-    Fn.guard("boot_trail", Fn.bootTrailStep)
-    Fn.guard("tod", Fn.timeOfDayStep)
+    -- Character-wide loops. None of these need to run at frame rate.
+    if Fn.due("position", 15) then Fn.guard("position", Fn.autoPositionStep) end
+    if Fn.due("stats", 10) then Fn.guard("stats", Fn.statsStep) end
+    if Fn.due("noclip", 5) then Fn.guard("noclip", Fn.noclipStep) end
+    if Fn.due("phase", 8) then
+        Fn.guard("phase", Fn.phaseStep)
+        Fn.guard("anti_phase", Fn.antiPhaseStep)
+    end
+    if Fn.due("trail", 8) then
+        Fn.guard("ball_trail", Fn.ballTrailStep)
+        Fn.guard("boot_trail", Fn.bootTrailStep)
+    end
+    if Fn.due("rgb", 12) then Fn.guard("rgb", Fn.rgbCharStep) end
+    if Fn.due("pesp", 15) then Fn.guard("player_esp", Fn.playerEspStep) end
+    if Fn.due("tod", 2) then Fn.guard("tod", Fn.timeOfDayStep) end
 
-    local now = os.clock()
-    if now - SlowLast > 0.4 then
-        SlowLast = now
+    if Fn.due("slow", 2.5) then
         Fn.guard("ping", Fn.readPing)
-        Fn.guard("player_esp", Fn.playerEspStep)
         Fn.guard("hud", Fn.hudRefresh)
         Fn.guard("panic_staff", Fn.panicStaffStep)
         Fn.guard("auto_quest", Fn.autoQuestStep)
@@ -2632,7 +2674,21 @@ function Fn.frame(dt)
     end
 end
 
-Conns[#Conns + 1] = RunService.RenderStepped:Connect(Fn.frame)
+-- Only the camera and the two screen markers belong on the render step.
+function Fn.render(dt)
+    if S.Aimlock then
+        Fn.guard("aimlock", function() Fn.aimlockStep(dt) end)
+    end
+    if Fn.due("esp", S.EspHz) then
+        Fn.guard("ball_esp", Fn.ballEspStep)
+        Fn.guard("predict", Fn.predictLineStep)
+    end
+end
+
+-- Heartbeat, not RenderStepped: this work is physics and state, and
+-- running it before every frame is drawn is what stalls rendering.
+Conns[#Conns + 1] = RunService.Heartbeat:Connect(Fn.frame)
+Conns[#Conns + 1] = RunService.RenderStepped:Connect(Fn.render)
 
 Conns[#Conns + 1] = UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe and not S.Binding then return end
@@ -2668,6 +2724,18 @@ Conns[#Conns + 1] = Players.PlayerRemoving:Connect(function(plr)
     if l then
         pcall(function() l:Destroy() end)
         EspPool["p_" .. plr.Name] = nil
+    end
+end)
+
+-- Keeps the goal cache fresh without re-sweeping Workspace, and lets a
+-- newly spawned ball cancel the rescan cooldown.
+Conns[#Conns + 1] = Workspace.DescendantAdded:Connect(function(inst)
+    if not inst:IsA("BasePart") then return end
+    if GoalScan.list and Fn.nameMatches(inst.Name, CFG.GoalPatterns) then
+        GoalScan.list[#GoalScan.list + 1] = inst
+    end
+    if not (BallCache.part and BallCache.part.Parent) and Fn.nameLooksLikeBall(inst.Name) then
+        BallCache.try = 0
     end
 end)
 
@@ -2798,6 +2866,29 @@ Fn.build(TabMain, {
     { kind = "b", name = "Learn your goal (stand in it)", run = function() Fn.learnGoal("own") end },
     { kind = "b", name = "Diagnostics", run = function() Fn.diagnostics() end },
     { kind = "b", name = "Panic Eject", run = Fn.panicEject },
+})
+
+local TabPerf = Window:CreateTab("PERFORMANCE", 0)
+Fn.build(TabPerf, {
+    { kind = "t", name = "Lite Mode (halve every rate)", key = "LiteMode" },
+    { kind = "t", name = "Auto-reduce under 30 fps", key = "AdaptiveFps" },
+    { kind = "s", name = "Action rate", key = "ActionHz", range = { 10, 60 }, step = 5, suffix = " /s", current = 60 },
+    { kind = "s", name = "ESP rate", key = "EspHz", range = { 5, 60 }, step = 5, suffix = " /s", current = 30 },
+    { kind = "s", name = "Touch rate", key = "TouchHz", range = { 2, 60 }, step = 1, suffix = " /s", current = 20 },
+    { kind = "s", name = "Ball re-check", key = "BallHoldSec", range = { 0.5, 10 }, step = 0.5, suffix = " s", current = 2.0 },
+    { kind = "s", name = "Rescan cooldown", key = "RescanSec", range = { 0.2, 5 }, step = 0.1, suffix = " s", current = 0.6 },
+    { kind = "s", name = "Goal scan interval", key = "GoalScanSec", range = { 2, 60 }, step = 1, suffix = " s", current = 15 },
+    { kind = "t", name = "FPS Boost", key = "FpsBoost", after = function(v) if v then Fn.applyFpsBoost() end end },
+    { kind = "b", name = "Measure workspace scan cost", run = function()
+        local t0 = os.clock()
+        local n = #Workspace:GetDescendants()
+        local ms = (os.clock() - t0) * 1000
+        S.ScanCost = ms
+        local msg = ("%d instances, one sweep = %.1f ms"):format(n, ms)
+        print("[TF] " .. msg)
+        Fn.notify("Scan cost", msg, 8)
+    end },
+    { kind = "b", name = "Panic Eject (kill every assist)", run = Fn.panicEject },
 })
 
 local TabReach = Window:CreateTab("REACH", 0)

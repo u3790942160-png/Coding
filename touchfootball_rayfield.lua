@@ -206,6 +206,7 @@ local S = {
     TouchHz = 20, TouchLast = 0, FlickLast = 0, PressLast = 0, TackleLast = 0,
     -- performance
     ActionHz = 60, EspHz = 30, LiteMode = false, AdaptiveFps = true,
+    BringUntil = 0, BringSec = 0.75,
     BallHoldSec = 2.0, RescanSec = 0.6, GoalScanSec = 15.0, ScanCost = 0,
 }
 
@@ -603,15 +604,18 @@ end
 -- On a populated map that is tens of thousands of instances, and running
 -- it per frame is what makes the game crawl. A live cached part is reused
 -- with no search at all, and a failed search is rate limited.
-function Fn.getBall()
+-- force=true skips both the frame cache and the rescan cooldown. Every
+-- one-shot the user triggers by hand passes it: a button press landing
+-- inside the cooldown window must still find the ball.
+function Fn.getBall(force)
     local c = BallCache
-    if c.stamp == S.FrameId then return c.part, c.tier end
+    if not force and c.stamp == S.FrameId then return c.part, c.tier end
     local now = os.clock()
-    if c.part and c.part.Parent and (now - c.at) < S.BallHoldSec then
+    if c.part and c.part.Parent and not force and (now - c.at) < S.BallHoldSec then
         c.stamp = S.FrameId
         return c.part, c.tier
     end
-    if not (c.part and c.part.Parent) and (now - c.try) < S.RescanSec then
+    if not force and not (c.part and c.part.Parent) and (now - c.try) < S.RescanSec then
         c.stamp, c.part = S.FrameId, nil
         return nil, c.tier
     end
@@ -1302,6 +1306,7 @@ function Fn.neroWindow()
 end
 
 function Fn.fireNero()
+    Fn.getBall(true)
     local ball = Fn.neroWindow()
     if not ball then return false end
     local target = Fn.shotTarget()
@@ -1705,21 +1710,49 @@ function Fn.antiPhaseStep()
     end
 end
 
+-- A single CFrame write is reverted before it ever replicates if the
+-- server still owns the part, so Bring holds the pull for BringSec and
+-- re-asserts it every action tick instead of firing once.
 function Fn.bringBall()
+    local ch, hum, root = Fn.myChar()
+    if not root then
+        Fn.notify("Bring", "No character.", 2)
+        return false
+    end
+    local ball = Fn.getBall(true)
+    if not ball then
+        Fn.notify("Bring", "No ball found. Stand on it and press Learn ball.", 4)
+        return false
+    end
+    -- A ball we froze earlier cannot be moved, so release it first.
+    if S.BallFrozen and ball.Anchored then
+        pcall(function() ball.Anchored = false end)
+        S.BallFrozen = false
+    end
+    Fn.pushSimulationRadius()
+    S.BringUntil = os.clock() + S.BringSec
+    return true
+end
+
+function Fn.bringStep()
+    if os.clock() > S.BringUntil then return end
     local ch, hum, root = Fn.myChar()
     if not root then return end
     local ball = Fn.getBall()
-    if not ball then return end
+    if not ball or not ball.Parent then return end
     local foot = Fn.footPosition(ch) or root.Position
+    local target = foot + Vector3.new(0, 1, 0)
     Fn.touchBallWithBody(ch, ball)
+    Fn.fireCatchRemote(ball)
     Fn.requestBall("Bring", function()
         Fn.setBallVelocity(ball, Vector3.new(0, 0, 0))
-        Fn.setBallCFrame(ball, foot + Vector3.new(0, 1, 0))
+        Fn.setBallSpin(ball, Vector3.new(0, 0, 0))
+        Fn.setBallCFrame(ball, target)
     end)
 end
 
 function Fn.deleteBall()
-    local ball = Fn.getBall()
+    local ball = Fn.getBall(true)
     if not ball then return end
     pcall(function() ball:Destroy() end)
     BallCache.stamp = -1
@@ -1727,8 +1760,11 @@ function Fn.deleteBall()
 end
 
 function Fn.toggleFreeze()
-    local ball = Fn.getBall()
-    if not ball then return end
+    local ball = Fn.getBall(true)
+    if not ball then
+        Fn.notify("Ball", "No ball found.", 3)
+        return
+    end
     S.BallFrozen = not S.BallFrozen
     pcall(function()
         ball.Anchored = S.BallFrozen
@@ -2622,6 +2658,7 @@ function Fn.frame(dt)
 
     -- The ball writers. One pass, one winner, at the action rate.
     if Fn.due("act", S.ActionHz) then
+        Fn.guard("bring", Fn.bringStep)
         Fn.guard("panic_reach", Fn.panicReachStep)
         Fn.guard("goal_farm", Fn.goalFarmStep)
         Fn.guard("save_farm", Fn.saveFarmStep)
@@ -3023,7 +3060,8 @@ Fn.build(TabSpecial, {
     { kind = "t", name = "Frame Player", key = "FramePlayer" },
     { kind = "i", name = "Frame target", hint = "player name", flag = "frame_target",
       run = function(t) S.FrameTargetName = t or "" end },
-    { kind = "b", name = "Bring Ball", run = Fn.bringBall },
+    { kind = "b", name = "Bring Ball", run = function() Fn.bringBall() end },
+    { kind = "s", name = "Bring hold time", key = "BringSec", range = { 0.1, 3 }, step = 0.05, suffix = " s", current = 0.75 },
     { kind = "b", name = "Delete Ball", run = Fn.deleteBall },
     { kind = "b", name = "Freeze / Unfreeze Ball", run = Fn.toggleFreeze },
 })

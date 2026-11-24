@@ -17,7 +17,6 @@ I.tier = "unknown"
 I.hopAttempts = 0
 I.Hopper = nil          -- set by session so island can ask for a hop
 
-local tpDone = false
 local accum = 0
 
 local ISLAND_HINTS = {"mirage", "illusion", "mystic"}
@@ -67,31 +66,8 @@ function I.Check(force)
 	else
 		I.present = false
 		I.tier = "nothing found"
-		tpDone = false
 	end
 	return I.present
-end
-
-function I.Target()
-	local dealerPos = R.DealerPos()
-	if dealerPos then return dealerPos, "dealer" end
-	local model, pos = I.ScanModel()
-	if pos then return pos, "island" end
-	return nil, "nothing to go to"
-end
-
-function I.Goto()
-	local pos, what = I.Target()
-	if not pos then
-		Notify.Warn("island", what)
-		return false
-	end
-	if Svc.Teleport(pos) then
-		Notify.Good("island", "moved to the " .. what)
-		return true
-	end
-	Notify.Bad("island", "teleport refused")
-	return false
 end
 
 function I.Step(dt, now)
@@ -106,10 +82,6 @@ function I.Step(dt, now)
 
 	if here then
 		I.hopAttempts = 0
-		if s.tpToDealer and not tpDone then
-			tpDone = true
-			I.Goto()
-		end
 		return
 	end
 

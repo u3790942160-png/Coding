@@ -216,6 +216,12 @@ Cfg.target = {
 
 Cfg.s = {
 	stock = {
+		-- The tool never moves your character. It opens the dealer's menu
+		-- where you stand and reads it.
+		autoOpen      = true,
+		reopenDelay   = 1.5,     -- seconds between attempts while shut
+		keepOpen      = true,    -- reopen if the game closes it
+		boostPrompt   = true,    -- raise the prompt's reach locally first
 		autoRefresh   = true,
 		refreshRate   = 2.0,     -- seconds between stock reads
 		showNormal    = true,    -- also list the normal dealer when readable
@@ -239,8 +245,7 @@ Cfg.s = {
 	},
 
 	island = {
-		autoFind      = false,
-		tpToDealer    = false,
+		autoFind      = true,    -- detection only; nothing is moved
 		hopUntilFound = false,
 		hopDelay      = 4,
 		hopMaxPing    = 200,
@@ -264,7 +269,7 @@ Cfg.s = {
 		refresh = {key = "R",      pad = "ButtonY"},
 		buytop  = {key = "B",      pad = "ButtonA"},
 		auto    = {key = "O",      pad = "ButtonX"},
-		island  = {key = "M",      pad = "ButtonB"},
+		open    = {key = "M",      pad = "ButtonB"},
 		hop     = {key = "H",      pad = "DPadRight"},
 		panic   = {key = "End",    pad = ""},
 	},
@@ -2299,7 +2304,7 @@ TB.layout = {
 	{id = "refresh", caption = "RD",  lit = function() return Cfg.s.stock.autoRefresh end},
 	{id = "buytop",  caption = "BUY", lit = function() return false end},
 	{id = "auto",    caption = "AUT", lit = function() return Cfg.s.auto.enabled end},
-	{id = "island",  caption = "ISL", lit = function() return Cfg.s.island.autoFind end},
+	{id = "open",    caption = "OPN", lit = function() return Cfg.s.stock.autoOpen end},
 	{id = "hop",     caption = "HOP", lit = function() return Cfg.s.island.hopUntilFound end},
 	{id = "menu",    caption = "MS",  lit = function() return true end},
 }
@@ -2587,19 +2592,116 @@ function R.PinDealer(model)
 	return false
 end
 
+-- Local writes that make a prompt reachable from where you are standing.
+-- The server still decides whether the trigger counts, so this helps a
+-- build that checks the prompt and does nothing for one that checks the
+-- player's position.
+function R.BoostPrompts(model)
+	local touched = 0
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("ProximityPrompt") then
+			pcall(function()
+				if p.MaxActivationDistance < 500 then p.MaxActivationDistance = 500 end
+				p.RequiresLineOfSight = false
+				p.HoldDuration = 0
+			end)
+			touched = touched + 1
+		end
+	end
+	return touched
+end
+
 function R.OpenDealer()
 	local d = R.ScanDealer(false)
 	if not d then return false, "no dealer found" end
-	if not Env.fireproximity then return false, "executor has no fireproximityprompt" end
+
+	if Cfg.s.stock.boostPrompt then pcall(R.BoostPrompts, d) end
+
 	local fired = 0
-	for _, p in ipairs(d:GetDescendants()) do
-		if p:IsA("ProximityPrompt") then
-			pcall(function() Env.fireproximity(p, 0) end)
-			fired = fired + 1
+	if Env.fireproximity then
+		for _, p in ipairs(d:GetDescendants()) do
+			if p:IsA("ProximityPrompt") then
+				pcall(function() Env.fireproximity(p, 0) end)
+				fired = fired + 1
+			end
 		end
 	end
-	if fired == 0 then return false, "dealer has no proximity prompt" end
-	return true, fired .. " prompt(s) fired"
+	if Env.fireclickdetector then
+		for _, c in ipairs(d:GetDescendants()) do
+			if c:IsA("ClickDetector") then
+				pcall(function() Env.fireclickdetector(c) end)
+				fired = fired + 1
+			end
+		end
+	end
+
+	if fired == 0 then
+		if not Env.fireproximity and not Env.fireclickdetector then
+			return false, "executor has no fireproximityprompt or fireclickdetector"
+		end
+		return false, "dealer has no prompt or click detector"
+	end
+	return true, fired .. " trigger(s) fired"
+end
+
+-- ── auto open ────────────────────────────────────────────────────────
+-- Opens the dealer's menu where you stand. Nothing here moves you.
+R.openState = "idle"
+R.openTries = 0
+local lastOpenTry = -1e9
+
+function R.StepAutoOpen(dt, now)
+	if not Cfg.s.stock.autoOpen then
+		R.openState = "off"
+		return
+	end
+
+	if R.ShopOpen() then
+		if R.openTries > 0 then
+			Notify.Good("dealer", "menu open after " .. R.openTries .. " attempt(s)")
+		end
+		R.openTries = 0
+		R.openState = "open"
+		return
+	end
+
+	-- it was open and the game shut it
+	if R.openState == "open" and not Cfg.s.stock.keepOpen then
+		R.openState = "closed, not reopening"
+		return
+	end
+
+	local dealer = R.ScanDealer(false)
+	if not dealer then
+		R.openState = "no dealer in this server"
+		return
+	end
+
+	-- back off rather than hammering a prompt the server is refusing
+	local delay = math.max(Cfg.s.stock.reopenDelay, 0.25)
+	if R.openTries >= 8 then delay = delay * 4 end
+	if now - lastOpenTry < delay then return end
+	lastOpenTry = now
+	R.openTries = R.openTries + 1
+
+	local ok, why = R.OpenDealer()
+	if not ok then
+		R.openState = why
+		Notify.Once("open_nopath", "dealer", why, "warn")
+		return
+	end
+
+	R.openState = "firing the prompt (" .. R.openTries .. ")"
+	if R.openTries == 8 then
+		Notify.Once("open_slow", "dealer",
+			"eight tries and the menu has not opened. This build checks your distance server side, so walk to the dealer once; the reader and the instant buy work the same from there.", "warn")
+	end
+end
+
+function R.OpenStatus()
+	if R.openState == "open" then return "menu open", "good" end
+	if R.openState == "off" then return "auto open off", "dim" end
+	return R.openState, "bad"
 end
 
 -- ── shop GUI ─────────────────────────────────────────────────────────
@@ -3890,7 +3992,6 @@ I.tier = "unknown"
 I.hopAttempts = 0
 I.Hopper = nil          -- set by session so island can ask for a hop
 
-local tpDone = false
 local accum = 0
 
 local ISLAND_HINTS = {"mirage", "illusion", "mystic"}
@@ -3940,31 +4041,8 @@ function I.Check(force)
 	else
 		I.present = false
 		I.tier = "nothing found"
-		tpDone = false
 	end
 	return I.present
-end
-
-function I.Target()
-	local dealerPos = R.DealerPos()
-	if dealerPos then return dealerPos, "dealer" end
-	local model, pos = I.ScanModel()
-	if pos then return pos, "island" end
-	return nil, "nothing to go to"
-end
-
-function I.Goto()
-	local pos, what = I.Target()
-	if not pos then
-		Notify.Warn("island", what)
-		return false
-	end
-	if Svc.Teleport(pos) then
-		Notify.Good("island", "moved to the " .. what)
-		return true
-	end
-	Notify.Bad("island", "teleport refused")
-	return false
 end
 
 function I.Step(dt, now)
@@ -3979,10 +4057,6 @@ function I.Step(dt, now)
 
 	if here then
 		I.hopAttempts = 0
-		if s.tpToDealer and not tpDone then
-			tpDone = true
-			I.Goto()
-		end
 		return
 	end
 
@@ -4264,7 +4338,16 @@ local function tabStock(w)
 			Notify.Warn("stock", why)
 		end
 	end}
-	a:Button{text = "Open the dealer's shop", callback = function()
+	readouts.opener = a:Readout{text = "Menu"}
+	a:Toggle{text = "Open the dealer menu automatically", get = get(Cfg.s.stock, "autoOpen"),
+		set = set(Cfg.s.stock, "autoOpen", function() TB.Repaint() end)}
+	a:Toggle{text = "Reopen it if the game closes it", get = get(Cfg.s.stock, "keepOpen"),
+		set = set(Cfg.s.stock, "keepOpen")}
+	a:Toggle{text = "Raise the prompt reach locally first", get = get(Cfg.s.stock, "boostPrompt"),
+		set = set(Cfg.s.stock, "boostPrompt")}
+	a:Slider{text = "Retry every", min = 0.25, max = 10, step = 0.25, suffix = " s",
+		get = get(Cfg.s.stock, "reopenDelay"), set = set(Cfg.s.stock, "reopenDelay")}
+	a:Button{text = "Open it now", callback = function()
 		local ok, why = R.OpenDealer()
 		if ok then Notify.Info("dealer", why) else Notify.Warn("dealer", why) end
 	end}
@@ -4409,15 +4492,13 @@ local function tabIsland(w)
 	local s = Cfg.s.island
 
 	local a = t:Section("Mirage Island")
-	a:Label("The stock is the same on every server, so hopping never changes what is for sale. It only finds a server where the island, and the dealer on it, exist.", "dim")
+	a:Label("Detection only: nothing here moves your character. The stock is the same on every server, so a hop never changes what is for sale. It only finds a server where the island, and the dealer on it, exist.", "dim")
 	readouts.island = a:Readout{text = "Island"}
 	a:Button{text = "Check this server", callback = function()
 		local here = Island.Check(true)
 		if here then Notify.Good("island", Island.tier) else Notify.Warn("island", "not in this server") end
 	end}
-	a:Button{text = "Go to the dealer", callback = function() Island.Goto() end}
 	a:Toggle{text = "Keep checking", get = get(s, "autoFind"), set = set(s, "autoFind", function() TB.Repaint() end)}
-	a:Toggle{text = "Teleport to the dealer on arrival", get = get(s, "tpToDealer"), set = set(s, "tpToDealer")}
 
 	local b = t:Section("Hopping")
 	b:Toggle{text = "Hop until the island is found", get = get(s, "hopUntilFound"),
@@ -4608,6 +4689,10 @@ function M.Tick()
 		local line, tone = Buy.StatusLine()
 		readouts.autoTop:Set(line, tone)
 	end
+	if readouts.opener then
+		local line, tone = R.OpenStatus()
+		readouts.opener:Set(line, tone)
+	end
 	if readouts.armed then
 		local list = Cfg.s.auto.watchlist
 		local waiting = {}
@@ -4723,9 +4808,16 @@ local function registerBinds()
 		Buy.ToggleAuto()
 		TB.Repaint()
 	end)
-	Binds.Register("island", "Island check", function()
-		local here = Island.Check(true)
-		Notify.Info("island", here and Island.tier or "not in this server")
+	Binds.Register("open", "Auto open the dealer menu", function()
+		Cfg.s.stock.autoOpen = not Cfg.s.stock.autoOpen
+		TB.Repaint()
+		if Cfg.s.stock.autoOpen then
+			R.openTries = 0
+			local ok, why = R.OpenDealer()
+			Notify.Info("dealer", ok and why or why)
+		else
+			Notify.Info("dealer", "auto open off")
+		end
 	end)
 	Binds.Register("hop", "Hop", function() Session.Hop() end)
 	Binds.Register("panic", "Panic eject", function() Main.Unload() end)
@@ -4739,6 +4831,7 @@ local function heartbeat(dt)
 	local now = Util.Now()
 
 	local ok, err = pcall(function()
+		R.StepAutoOpen(dt, now)
 		S.Step(dt, now)
 		Learn.Step(dt, now)
 		Buy.Step(dt, now)
@@ -4818,8 +4911,8 @@ function Main.Start()
 	maid:Give(Svc.RunService.Heartbeat:Connect(heartbeat))
 
 	Notify.Good("mirage stock", Island.present
-		and ("dealer side: " .. Island.tier)
-		or "Mirage Island is not in this server. ISLAND tab can hop until it is.")
+		and ("dealer found: " .. Island.tier .. ". opening its menu.")
+		or "the dealer is not in this server. ISLAND tab can hop until one has it.")
 
 	if #S.entries == 0 then
 		Notify.Warn("stock", "nothing read yet. Open the dealer's shop, then press Read stock.")

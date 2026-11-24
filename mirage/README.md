@@ -15,11 +15,15 @@ lets a hop or a rejoin re-execute the script after the teleport.
 
 ## The flow
 
-1. **ISLAND** tab — check whether Mirage Island is in this server. It is
-   not usually. Turn on *Hop until the island is found* and leave it.
-2. **STOCK** tab — once the dealer is there, press *Open the dealer's
-   shop*, then *Read stock now*. The seven slots list with their Beli
-   prices and a BUY button each.
+The tool never moves your character. It opens the dealer's menu where you
+stand and reads it.
+
+1. **ISLAND** tab — check whether the dealer is in this server. Usually
+   not. Turn on *Hop until the island is found* and leave it.
+2. **STOCK** tab — once the dealer exists, the menu opens on its own:
+   the opener raises the prompt's reach locally, fires it, and keeps
+   firing on a backing-off retry until the shop is up. Then the seven
+   slots list with their Beli prices and a BUY button each.
 3. **PICK** tab — tap a fruit to watch it, or type a name. The list is
    learned from what the shop actually prints, so it is never out of date
    with the game.
@@ -28,6 +32,20 @@ lets a hop or a rejoin re-execute the script after the teleport.
    not on a later tick.
 
 Pick Kitsune, arm it, walk away.
+
+## Opening the menu
+
+*Open the dealer menu automatically* is on by default. Each attempt sets
+the prompt's `MaxActivationDistance` to 500, clears its line-of-sight and
+hold requirements locally, then fires it, and fires any ClickDetector on
+the model too. It stops the moment the shop is up, reopens it if the game
+closes it, and after eight failed tries it slows down and says so once.
+
+Those are client-side writes to the prompt. They work on a build that
+checks the prompt, and do nothing on one that checks your position server
+side. If the eight-try notice appears, that is which case you are in:
+walk to the dealer once, and the reader and the instant buy work exactly
+the same from there.
 
 ## Beli only
 
@@ -86,10 +104,10 @@ one you are missing.
 
 ## Hopping
 
-The stock is the same on every server, so hopping never changes what is
-for sale. It only finds a server where Mirage Island, and the dealer on
-it, exist. That is the only thing the hop is for, and the ISLAND tab says
-so on the tab itself.
+The ISLAND tab detects; it does not travel. There is no teleport in this
+tool and a test asserts the character never moves. The stock is the same
+on every server, so hopping never changes what is for sale: it only finds
+a server where Mirage Island, and the dealer on it, exist.
 
 ## Mobile
 
@@ -107,13 +125,15 @@ python3 tools/test.py     # boots the bundle in a mock Roblox runtime
 
 `tools/test.py` builds a fake Mirage dealer with a seven slot shop GUI, a
 buy RemoteEvent, a stock RemoteFunction, leaderstats and a decoy NPC, then
-boots the real bundle against it. 70 checks: price parsing, dealer and
+boots the real bundle against it: price parsing, dealer and
 shop resolution, GUI and remote stock reads, slot ordering, catalogue
 learning, both buy paths, the learner adopting a simulated purchase and
 capturing its token, affordability, restock detection, the instant buy
 firing inside the read that sees the fruit land, no double buy, poll
 tightening while armed, 240 frames with everything on, the shop closing
-mid-run, and a full mobile pass. Needs `pip install lupa`.
+mid-run, the auto-opener firing the prompt and standing down once the
+menu is up, its retry rate limit, a guard that the character never moves,
+and a full mobile pass. 79 checks. Needs `pip install lupa`.
 
 ## Layout
 
@@ -132,7 +152,7 @@ src/11_stock.lua     stock readers, price parsing, restock diffing
 src/12_catalog.lua   the learned fruit list
 src/13_learn.lua     purchase watch, stock probe, diagnosis
 src/14_buy.lua       buying and the instant engine
-src/15_island.lua    Mirage Island detection and travel
+src/15_island.lua    Mirage Island detection, no travel
 src/16_session.lua   anti-afk, servers, rejoin, panic
 src/17_menu.lua      the five tabs
 src/18_main.lua      boot, driver, teardown

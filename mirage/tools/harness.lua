@@ -319,6 +319,49 @@ function H.Run(bundleSource)
 	check("finds the shop frame", Res.ScanShop(true) == shopFrame,
 		Res.shopRoot and Res.shopRoot.Name or "nil")
 
+	-- auto open: the tool opens the dealer menu where you stand
+	do
+		_MOCK.onPrompt = function() shopGui.Enabled = true end
+		_MOCK.prompts = 0
+		shopGui.Enabled = false
+		Res.ScanShop(true)
+		check("shop reads as shut", not Res.ShopOpen())
+
+		prompt.MaxActivationDistance = 8
+		Cfg.s.stock.autoOpen = true
+		Cfg.s.stock.boostPrompt = true
+		Cfg.s.stock.reopenDelay = 0.25
+
+		Res.StepAutoOpen(1 / 60, 1000)
+		check("opener fired the prompt", (_MOCK.prompts or 0) >= 1, tostring(_MOCK.prompts))
+		check("prompt reach raised locally", prompt.MaxActivationDistance >= 500,
+			tostring(prompt.MaxActivationDistance))
+
+		Res.ScanShop(true)
+		check("menu is open after one attempt", Res.ShopOpen())
+
+		local firedBefore = _MOCK.prompts
+		for i = 1, 20 do Res.StepAutoOpen(1 / 60, 1000 + i) end
+		check("stops firing once the menu is open", _MOCK.prompts == firedBefore,
+			tostring(_MOCK.prompts - firedBefore) .. " extra")
+		check("opener reports open", select(1, Res.OpenStatus()) == "menu open", Res.openState)
+
+		-- backs off rather than hammering when there is nothing to open
+		_MOCK.onPrompt = nil
+		shopGui.Enabled = false
+		Res.ScanShop(true)
+		_MOCK.prompts = 0
+		Res.openTries = 0
+		for i = 1, 30 do Res.StepAutoOpen(1 / 60, 2000 + i * 0.05) end
+		check("retries are rate limited", (_MOCK.prompts or 0) <= 8, tostring(_MOCK.prompts))
+
+		_MOCK.onPrompt = function() shopGui.Enabled = true end
+		Res.openTries = 0
+		Res.StepAutoOpen(1 / 60, 3000)
+		Res.ScanShop(true)
+		check("recovers and opens again", Res.ShopOpen())
+	end
+
 	-- stock read from the GUI
 	Cfg.target.stockRemote = ""
 	local readOk, source = S.Read(true)
@@ -486,6 +529,8 @@ function H.Run(bundleSource)
 
 	-- drive
 	do
+		local hrp = lp.Character:FindFirstChild("HumanoidRootPart")
+		local startedAt = hrp.CFrame.Position
 		local before = #(_MOCK.warnings or {})
 		Cfg.s.stock.autoRefresh = true
 		Cfg.s.island.autoFind = true
@@ -498,6 +543,9 @@ function H.Run(bundleSource)
 			if string.find(_MOCK.warnings[i], "heartbeat", 1, true) then errs = errs + 1 end
 		end
 		check("240 frames with everything on", errs == 0, tostring(errs) .. " driver errors")
+		check("the tool never moved the character",
+			(hrp.CFrame.Position - startedAt).Magnitude < 0.001,
+			string.format("%.3f studs", (hrp.CFrame.Position - startedAt).Magnitude))
 	end
 
 	-- shop closes: the reader must not throw or blank wrongly

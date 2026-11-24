@@ -50,9 +50,16 @@ local function registerBinds()
 		Buy.ToggleAuto()
 		TB.Repaint()
 	end)
-	Binds.Register("island", "Island check", function()
-		local here = Island.Check(true)
-		Notify.Info("island", here and Island.tier or "not in this server")
+	Binds.Register("open", "Auto open the dealer menu", function()
+		Cfg.s.stock.autoOpen = not Cfg.s.stock.autoOpen
+		TB.Repaint()
+		if Cfg.s.stock.autoOpen then
+			R.openTries = 0
+			local ok, why = R.OpenDealer()
+			Notify.Info("dealer", ok and why or why)
+		else
+			Notify.Info("dealer", "auto open off")
+		end
 	end)
 	Binds.Register("hop", "Hop", function() Session.Hop() end)
 	Binds.Register("panic", "Panic eject", function() Main.Unload() end)
@@ -66,6 +73,7 @@ local function heartbeat(dt)
 	local now = Util.Now()
 
 	local ok, err = pcall(function()
+		R.StepAutoOpen(dt, now)
 		S.Step(dt, now)
 		Learn.Step(dt, now)
 		Buy.Step(dt, now)
@@ -145,8 +153,8 @@ function Main.Start()
 	maid:Give(Svc.RunService.Heartbeat:Connect(heartbeat))
 
 	Notify.Good("mirage stock", Island.present
-		and ("dealer side: " .. Island.tier)
-		or "Mirage Island is not in this server. ISLAND tab can hop until it is.")
+		and ("dealer found: " .. Island.tier .. ". opening its menu.")
+		or "the dealer is not in this server. ISLAND tab can hop until one has it.")
 
 	if #S.entries == 0 then
 		Notify.Warn("stock", "nothing read yet. Open the dealer's shop, then press Read stock.")

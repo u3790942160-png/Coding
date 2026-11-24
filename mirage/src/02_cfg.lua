@@ -78,6 +78,12 @@ Cfg.target = {
 
 Cfg.s = {
 	stock = {
+		-- The tool never moves your character. It opens the dealer's menu
+		-- where you stand and reads it.
+		autoOpen      = true,
+		reopenDelay   = 1.5,     -- seconds between attempts while shut
+		keepOpen      = true,    -- reopen if the game closes it
+		boostPrompt   = true,    -- raise the prompt's reach locally first
 		autoRefresh   = true,
 		refreshRate   = 2.0,     -- seconds between stock reads
 		showNormal    = true,    -- also list the normal dealer when readable
@@ -101,8 +107,7 @@ Cfg.s = {
 	},
 
 	island = {
-		autoFind      = false,
-		tpToDealer    = false,
+		autoFind      = true,    -- detection only; nothing is moved
 		hopUntilFound = false,
 		hopDelay      = 4,
 		hopMaxPing    = 200,
@@ -126,7 +131,7 @@ Cfg.s = {
 		refresh = {key = "R",      pad = "ButtonY"},
 		buytop  = {key = "B",      pad = "ButtonA"},
 		auto    = {key = "O",      pad = "ButtonX"},
-		island  = {key = "M",      pad = "ButtonB"},
+		open    = {key = "M",      pad = "ButtonB"},
 		hop     = {key = "H",      pad = "DPadRight"},
 		panic   = {key = "End",    pad = ""},
 	},

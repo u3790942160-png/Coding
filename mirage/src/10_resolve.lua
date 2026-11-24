@@ -96,19 +96,116 @@ function R.PinDealer(model)
 	return false
 end
 
+-- Local writes that make a prompt reachable from where you are standing.
+-- The server still decides whether the trigger counts, so this helps a
+-- build that checks the prompt and does nothing for one that checks the
+-- player's position.
+function R.BoostPrompts(model)
+	local touched = 0
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("ProximityPrompt") then
+			pcall(function()
+				if p.MaxActivationDistance < 500 then p.MaxActivationDistance = 500 end
+				p.RequiresLineOfSight = false
+				p.HoldDuration = 0
+			end)
+			touched = touched + 1
+		end
+	end
+	return touched
+end
+
 function R.OpenDealer()
 	local d = R.ScanDealer(false)
 	if not d then return false, "no dealer found" end
-	if not Env.fireproximity then return false, "executor has no fireproximityprompt" end
+
+	if Cfg.s.stock.boostPrompt then pcall(R.BoostPrompts, d) end
+
 	local fired = 0
-	for _, p in ipairs(d:GetDescendants()) do
-		if p:IsA("ProximityPrompt") then
-			pcall(function() Env.fireproximity(p, 0) end)
-			fired = fired + 1
+	if Env.fireproximity then
+		for _, p in ipairs(d:GetDescendants()) do
+			if p:IsA("ProximityPrompt") then
+				pcall(function() Env.fireproximity(p, 0) end)
+				fired = fired + 1
+			end
 		end
 	end
-	if fired == 0 then return false, "dealer has no proximity prompt" end
-	return true, fired .. " prompt(s) fired"
+	if Env.fireclickdetector then
+		for _, c in ipairs(d:GetDescendants()) do
+			if c:IsA("ClickDetector") then
+				pcall(function() Env.fireclickdetector(c) end)
+				fired = fired + 1
+			end
+		end
+	end
+
+	if fired == 0 then
+		if not Env.fireproximity and not Env.fireclickdetector then
+			return false, "executor has no fireproximityprompt or fireclickdetector"
+		end
+		return false, "dealer has no prompt or click detector"
+	end
+	return true, fired .. " trigger(s) fired"
+end
+
+-- ── auto open ────────────────────────────────────────────────────────
+-- Opens the dealer's menu where you stand. Nothing here moves you.
+R.openState = "idle"
+R.openTries = 0
+local lastOpenTry = -1e9
+
+function R.StepAutoOpen(dt, now)
+	if not Cfg.s.stock.autoOpen then
+		R.openState = "off"
+		return
+	end
+
+	if R.ShopOpen() then
+		if R.openTries > 0 then
+			Notify.Good("dealer", "menu open after " .. R.openTries .. " attempt(s)")
+		end
+		R.openTries = 0
+		R.openState = "open"
+		return
+	end
+
+	-- it was open and the game shut it
+	if R.openState == "open" and not Cfg.s.stock.keepOpen then
+		R.openState = "closed, not reopening"
+		return
+	end
+
+	local dealer = R.ScanDealer(false)
+	if not dealer then
+		R.openState = "no dealer in this server"
+		return
+	end
+
+	-- back off rather than hammering a prompt the server is refusing
+	local delay = math.max(Cfg.s.stock.reopenDelay, 0.25)
+	if R.openTries >= 8 then delay = delay * 4 end
+	if now - lastOpenTry < delay then return end
+	lastOpenTry = now
+	R.openTries = R.openTries + 1
+
+	local ok, why = R.OpenDealer()
+	if not ok then
+		R.openState = why
+		Notify.Once("open_nopath", "dealer", why, "warn")
+		return
+	end
+
+	R.openState = "firing the prompt (" .. R.openTries .. ")"
+	if R.openTries == 8 then
+		Notify.Once("open_slow", "dealer",
+			"eight tries and the menu has not opened. This build checks your distance server side, so walk to the dealer once; the reader and the instant buy work the same from there.", "warn")
+	end
+end
+
+function R.OpenStatus()
+	if R.openState == "open" then return "menu open", "good" end
+	if R.openState == "off" then return "auto open off", "dim" end
+	return R.openState, "bad"
 end
 
 -- ── shop GUI ─────────────────────────────────────────────────────────

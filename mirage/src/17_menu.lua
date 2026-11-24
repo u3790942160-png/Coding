@@ -93,7 +93,16 @@ local function tabStock(w)
 			Notify.Warn("stock", why)
 		end
 	end}
-	a:Button{text = "Open the dealer's shop", callback = function()
+	readouts.opener = a:Readout{text = "Menu"}
+	a:Toggle{text = "Open the dealer menu automatically", get = get(Cfg.s.stock, "autoOpen"),
+		set = set(Cfg.s.stock, "autoOpen", function() TB.Repaint() end)}
+	a:Toggle{text = "Reopen it if the game closes it", get = get(Cfg.s.stock, "keepOpen"),
+		set = set(Cfg.s.stock, "keepOpen")}
+	a:Toggle{text = "Raise the prompt reach locally first", get = get(Cfg.s.stock, "boostPrompt"),
+		set = set(Cfg.s.stock, "boostPrompt")}
+	a:Slider{text = "Retry every", min = 0.25, max = 10, step = 0.25, suffix = " s",
+		get = get(Cfg.s.stock, "reopenDelay"), set = set(Cfg.s.stock, "reopenDelay")}
+	a:Button{text = "Open it now", callback = function()
 		local ok, why = R.OpenDealer()
 		if ok then Notify.Info("dealer", why) else Notify.Warn("dealer", why) end
 	end}
@@ -238,15 +247,13 @@ local function tabIsland(w)
 	local s = Cfg.s.island
 
 	local a = t:Section("Mirage Island")
-	a:Label("The stock is the same on every server, so hopping never changes what is for sale. It only finds a server where the island, and the dealer on it, exist.", "dim")
+	a:Label("Detection only: nothing here moves your character. The stock is the same on every server, so a hop never changes what is for sale. It only finds a server where the island, and the dealer on it, exist.", "dim")
 	readouts.island = a:Readout{text = "Island"}
 	a:Button{text = "Check this server", callback = function()
 		local here = Island.Check(true)
 		if here then Notify.Good("island", Island.tier) else Notify.Warn("island", "not in this server") end
 	end}
-	a:Button{text = "Go to the dealer", callback = function() Island.Goto() end}
 	a:Toggle{text = "Keep checking", get = get(s, "autoFind"), set = set(s, "autoFind", function() TB.Repaint() end)}
-	a:Toggle{text = "Teleport to the dealer on arrival", get = get(s, "tpToDealer"), set = set(s, "tpToDealer")}
 
 	local b = t:Section("Hopping")
 	b:Toggle{text = "Hop until the island is found", get = get(s, "hopUntilFound"),
@@ -436,6 +443,10 @@ function M.Tick()
 	if readouts.autoTop then
 		local line, tone = Buy.StatusLine()
 		readouts.autoTop:Set(line, tone)
+	end
+	if readouts.opener then
+		local line, tone = R.OpenStatus()
+		readouts.opener:Set(line, tone)
 	end
 	if readouts.armed then
 		local list = Cfg.s.auto.watchlist

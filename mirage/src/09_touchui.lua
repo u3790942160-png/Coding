@@ -21,7 +21,7 @@ TB.layout = {
 	{id = "refresh", caption = "RD",  lit = function() return Cfg.s.stock.autoRefresh end},
 	{id = "buytop",  caption = "BUY", lit = function() return false end},
 	{id = "auto",    caption = "AUT", lit = function() return Cfg.s.auto.enabled end},
-	{id = "island",  caption = "ISL", lit = function() return Cfg.s.island.autoFind end},
+	{id = "open",    caption = "OPN", lit = function() return Cfg.s.stock.autoOpen end},
 	{id = "hop",     caption = "HOP", lit = function() return Cfg.s.island.hopUntilFound end},
 	{id = "menu",    caption = "MS",  lit = function() return true end},
 }

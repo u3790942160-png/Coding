@@ -521,7 +521,14 @@ end
 function getnamecallmethod() return M.namecallMethod end
 function checkcaller() return M.selfcall end
 function firetouchinterest() M.touches = M.touches + 1 end
-function fireproximityprompt(p) M.prompts = (M.prompts or 0) + 1 end
+function fireproximityprompt(p)
+	M.prompts = (M.prompts or 0) + 1
+	if M.onPrompt then M.onPrompt(p) end
+end
+function fireclickdetector(c)
+	M.clicks = (M.clicks or 0) + 1
+	if M.onClick then M.onClick(c) end
+end
 function getconnections(sig)
 	local out = {}
 	if type(sig) == "table" and rawget(sig, "handlers") then

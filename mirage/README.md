@@ -159,7 +159,7 @@ mid-run, the auto-opener firing the prompt and standing down once the
 menu is up, its retry rate limit, a guard that the character never moves,
 a dealer stripped of its prompt still opening through the hidden frame,
 the reveal being reversible, the open watch capturing a remote, a guard
-that the character never moves, and a full mobile pass. 95 checks. Needs
+that the character never moves, and a full mobile pass. 97 checks. Needs
 `pip install lupa`.
 
 ## Layout

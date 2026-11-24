@@ -128,6 +128,40 @@ function Svc.VisibleTexts()
 	return out
 end
 
+-- Every TextLabel / TextButton under the player's GUI, shown or not.
+-- A shop that has never been opened is still sitting there, hidden.
+function Svc.AllTexts()
+	local out = {}
+	local pg = Svc.PlayerGui()
+	if not pg then return out end
+	for _, d in ipairs(pg:GetDescendants()) do
+		if d:IsA("TextLabel") or d:IsA("TextButton") then
+			local ok, text = pcall(function() return d.Text end)
+			if ok and type(text) == "string" and text ~= "" then out[#out + 1] = d end
+		end
+	end
+	return out
+end
+
+-- Models whose name carries one of these hints, Humanoid or not. Blox
+-- Fruits style NPCs are not all rigs.
+function Svc.NamedModels(hints, cap)
+	local out = {}
+	for _, d in ipairs(Svc.Workspace:GetDescendants()) do
+		if d:IsA("Model") then
+			local lower = string.lower(d.Name)
+			for _, h in ipairs(hints) do
+				if string.find(lower, h, 1, true) then
+					out[#out + 1] = d
+					break
+				end
+			end
+			if cap and #out >= cap then return out end
+		end
+	end
+	return out
+end
+
 -- Walk up from a GuiObject until a ScreenGui, reporting whether the whole
 -- chain is visible. A label inside a hidden frame is not on screen.
 function Svc.ChainVisible(gui)

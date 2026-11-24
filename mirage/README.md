@@ -20,10 +20,10 @@ stand and reads it.
 
 1. **ISLAND** tab — check whether the dealer is in this server. Usually
    not. Turn on *Hop until the island is found* and leave it.
-2. **STOCK** tab — once the dealer exists, the menu opens on its own:
-   the opener raises the prompt's reach locally, fires it, and keeps
-   firing on a backing-off retry until the shop is up. Then the seven
-   slots list with their Beli prices and a BUY button each.
+2. **STOCK** tab — the menu opens on its own. The first thing the opener
+   tries is unhiding the shop frame already in your PlayerGui, which
+   needs no NPC at all. Then the seven slots list with their Beli prices
+   and a BUY button each.
 3. **PICK** tab — tap a fruit to watch it, or type a name. The list is
    learned from what the shop actually prints, so it is never out of date
    with the game.
@@ -35,17 +35,41 @@ Pick Kitsune, arm it, walk away.
 
 ## Opening the menu
 
-*Open the dealer menu automatically* is on by default. Each attempt sets
-the prompt's `MaxActivationDistance` to 500, clears its line-of-sight and
-hold requirements locally, then fires it, and fires any ClickDetector on
-the model too. It stops the moment the shop is up, reopens it if the game
-closes it, and after eight failed tries it slows down and says so once.
+*Open the dealer menu automatically* is on by default. It tries five ways
+in order, cheapest and least invasive first, and stops at the first one
+that puts the shop on screen:
 
-Those are client-side writes to the prompt. They work on a build that
-checks the prompt, and do nothing on one that checks your position server
-side. If the eight-try notice appears, that is which case you are in:
-walk to the dealer once, and the reader and the instant buy work exactly
-the same from there.
+1. **Unhide the frame you already have.** A menu you have never opened is
+   still sitting in your PlayerGui with `Enabled` or `Visible` off. The
+   scanner finds the frame holding the most name+price label pairs
+   whether or not it is showing, switches its chain on, and that is
+   usually the whole job. No NPC, no prompt, no movement. Everything it
+   switched on is switched back on unload.
+2. **The learned open remote**, if you captured one.
+3. **The dealer's ProximityPrompt**, after raising its
+   `MaxActivationDistance` to 500 and clearing its line-of-sight and hold
+   requirements locally, plus any ClickDetector on the model.
+4. **The dealer's touch parts**, fired with `firetouchinterest` from your
+   root, which is walking into it without walking.
+5. **A button in your own GUI** whose name or text reads like a shop,
+   fired through its live handler.
+
+"the dealer model carries no prompt and no click detector" means step 3
+had nothing to fire. That is a normal thing for an NPC to be, and the
+other four steps do not care.
+
+### When none of it works
+
+CONFIG tab → **Scan and report**. It prints what is actually there: which
+model won the dealer scan and how many prompts, click detectors and parts
+it has; whether a visible shop frame exists; the top hidden shop frames
+and their row counts; and which of the four executor functions you have.
+That turns a guess into a line you can read.
+
+If the report shows no hidden frame and the dealer has nothing on it, the
+menu is being built on demand by a remote. CONFIG tab → **Watch: arm,
+then open the menu**, open it by hand once, and the call that did it is
+replayed from then on.
 
 ## Beli only
 
@@ -133,7 +157,10 @@ firing inside the read that sees the fruit land, no double buy, poll
 tightening while armed, 240 frames with everything on, the shop closing
 mid-run, the auto-opener firing the prompt and standing down once the
 menu is up, its retry rate limit, a guard that the character never moves,
-and a full mobile pass. 79 checks. Needs `pip install lupa`.
+a dealer stripped of its prompt still opening through the hidden frame,
+the reveal being reversible, the open watch capturing a remote, a guard
+that the character never moves, and a full mobile pass. 95 checks. Needs
+`pip install lupa`.
 
 ## Layout
 

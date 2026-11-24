@@ -332,6 +332,17 @@ function H.Run(bundleSource)
 		Cfg.s.stock.boostPrompt = true
 		Cfg.s.stock.reopenDelay = 0.25
 
+		-- reveal is cheaper, so it wins when a hidden frame is there
+		Cfg.s.stock.revealHidden = true
+		local okReveal, howReveal = Res.OpenAny()
+		check("reveal is preferred over firing anything", okReveal
+			and string.find(tostring(howReveal), "revealed", 1, true) ~= nil, tostring(howReveal))
+		check("nothing was fired to do it", (_MOCK.prompts or 0) == 0, tostring(_MOCK.prompts))
+		Res.RestoreReveals()
+		Res.ScanShop(true)
+
+		-- with no hidden frame to find, the prompt path carries it
+		Cfg.s.stock.revealHidden = false
 		Res.StepAutoOpen(1 / 60, 1000)
 		check("opener fired the prompt", (_MOCK.prompts or 0) >= 1, tostring(_MOCK.prompts))
 		check("prompt reach raised locally", prompt.MaxActivationDistance >= 500,
@@ -360,6 +371,73 @@ function H.Run(bundleSource)
 		Res.StepAutoOpen(1 / 60, 3000)
 		Res.ScanShop(true)
 		check("recovers and opens again", Res.ShopOpen())
+		Cfg.s.stock.revealHidden = true
+	end
+
+	-- the field case: a dealer with nothing on it to fire
+	do
+		prompt:Destroy()
+		_MOCK.onPrompt = nil
+		shopGui.Enabled = false
+		Res.ScanShop(true)
+		Res.ScanDealer(true)
+
+		check("still finds the dealer with no prompt", Res.dealer == dealer,
+			Res.dealer and Res.dealer.Name or "nil")
+		local prompts, clicks = Res.DealerParts(dealer)
+		check("reports the dealer has nothing to fire", prompts == 0 and clicks == 0,
+			prompts .. " prompts, " .. clicks .. " clicks")
+
+		local okNpc, whyNpc = Res.OpenDealer()
+		check("npc path reports why it cannot open", okNpc == false, tostring(whyNpc))
+
+		local hidden = Res.FindHiddenShops()
+		check("finds the hidden shop frame", #hidden >= 1 and hidden[1].frame == shopFrame,
+			#hidden > 0 and hidden[1].frame.Name or "none")
+		check("hidden frame counted its rows", #hidden >= 1 and hidden[1].rows >= 5,
+			#hidden > 0 and tostring(hidden[1].rows) or "0")
+
+		local okAny, howAny = Res.OpenAny()
+		check("opens anyway by unhiding the frame", okAny, tostring(howAny))
+		check("shop now reads as open", Res.ShopOpen())
+		check("the screen gui was switched on", shopGui.Enabled == true)
+
+		local readOk = S.Read(true)
+		check("reads stock off the revealed frame", readOk and #S.entries == 7, tostring(#S.entries))
+
+		local lines = Res.ScanReport()
+		check("scan report names the dealer and its parts",
+			lines[1] ~= nil and string.find(lines[1], "prompts 0", 1, true) ~= nil, tostring(lines[1]))
+
+		-- and it puts the GUI back
+		Res.RestoreReveals()
+		check("reveal is reversible", shopGui.Enabled == false, tostring(shopGui.Enabled))
+		Res.RevealShop(shopFrame)
+		Res.ScanShop(true)
+		check("re-revealed for the rest of the run", Res.ShopOpen())
+	end
+
+	-- learning how the menu opens when a remote does it
+	do
+		local openRemote = Instance.new("RemoteEvent", ReplicatedStorage)
+		openRemote.Name = "OpenShopUI"
+		Res.ScanShop(true)
+		shopGui.Enabled = false
+		Res.ScanShop(true)
+
+		local armed = Learn.ArmOpen()
+		check("open watch arms", armed, Learn.result)
+
+		_MOCK.FireFromGame(openRemote, "Advanced Fruit Dealer")
+		shopGui.Enabled = true
+		Res.ScanShop(true)
+		RunService.Heartbeat:Fire(1 / 60)
+
+		check("open watch adopted the remote", Cfg.target.openRemote == "OpenShopUI", Cfg.target.openRemote)
+		check("open watch read its shape", Cfg.target.openArgShape == "dealer", Cfg.target.openArgShape)
+		check("open watch disarms itself", Learn.state == "idle", Learn.state)
+		openRemote:Destroy()
+		Res.IndexRemotes()
 	end
 
 	-- stock read from the GUI

@@ -48,6 +48,12 @@ Cfg.target = {
 	-- from a buy you made yourself.
 	buyBeliToken = "",
 
+	-- [remote-name | build unset | source watch | unset]
+	-- Fired by the game when the dealer's menu opens. Learned by arming
+	-- the open watch and opening the shop once by hand.
+	openRemote = "",
+	openArgShape = "",
+
 	-- [remote-name | build unset | source unset | unset]
 	-- A RemoteFunction that returns the current stock, if this build has
 	-- one. With it the stock can be polled without opening the shop.
@@ -84,6 +90,8 @@ Cfg.s = {
 		reopenDelay   = 1.5,     -- seconds between attempts while shut
 		keepOpen      = true,    -- reopen if the game closes it
 		boostPrompt   = true,    -- raise the prompt's reach locally first
+		revealHidden  = true,    -- unhide the shop frame already in PlayerGui
+		useTouch      = true,    -- fire the dealer's touch parts as a fallback
 		autoRefresh   = true,
 		refreshRate   = 2.0,     -- seconds between stock reads
 		showNormal    = true,    -- also list the normal dealer when readable

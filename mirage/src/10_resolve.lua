@@ -50,6 +50,19 @@ local function promptScore(model)
 	return score
 end
 
+function R.DealerParts(model)
+	local prompts, clicks, touch = 0, 0, 0
+	if not model then return prompts, clicks, touch end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then prompts = prompts + 1
+		elseif d:IsA("ClickDetector") then clicks = clicks + 1
+		elseif d:IsA("BasePart") then
+			if d.CanTouch ~= false then touch = touch + 1 end
+		end
+	end
+	return prompts, clicks, touch
+end
+
 function R.ScanDealer(force)
 	local now = Util.Now()
 	if not force and R.dealer and R.dealer.Parent and (now - lastDealerScan) < DEALER_RESCAN then
@@ -58,15 +71,29 @@ function R.ScanDealer(force)
 	lastDealerScan = now
 
 	local pinned = Cfg.List(Cfg.target.dealerNames)
-	local best, bestScore = nil, 25
 
-	for _, npc in ipairs(Svc.Npcs()) do
+	-- rigs, plus anything named like a dealer whether or not it has one
+	local candidates = Svc.Npcs()
+	local seen = {}
+	for _, m in ipairs(candidates) do seen[m] = true end
+	for _, m in ipairs(Svc.NamedModels(DEALER_HINTS, 400)) do
+		if not seen[m] then
+			seen[m] = true
+			candidates[#candidates + 1] = m
+		end
+	end
+
+	local best, bestScore = nil, 25
+	for _, npc in ipairs(candidates) do
 		local score = hintScore(npc.Name, DEALER_HINTS, 30)
 		for _, pin in ipairs(pinned) do
 			if string.lower(npc.Name) == string.lower(pin) then score = score + 300 end
 		end
 		local ok, ps = pcall(promptScore, npc)
 		if ok then score = score + ps end
+		-- a dealer you can actually open beats one you cannot
+		local prompts, clicks = R.DealerParts(npc)
+		if prompts > 0 or clicks > 0 then score = score + 45 end
 		if score > bestScore then best, bestScore = npc, score end
 	end
 
@@ -115,6 +142,7 @@ function R.BoostPrompts(model)
 	return touched
 end
 
+-- Fire whatever the NPC exposes.
 function R.OpenDealer()
 	local d = R.ScanDealer(false)
 	if not d then return false, "no dealer found" end
@@ -143,9 +171,118 @@ function R.OpenDealer()
 		if not Env.fireproximity and not Env.fireclickdetector then
 			return false, "executor has no fireproximityprompt or fireclickdetector"
 		end
-		return false, "dealer has no prompt or click detector"
+		return false, "the dealer model carries no prompt and no click detector"
 	end
 	return true, fired .. " trigger(s) fired"
+end
+
+-- Walk into the dealer without walking: fire the touch on its parts.
+function R.TouchDealer()
+	if not Env.canTouch then return false, "executor has no firetouchinterest" end
+	local d = R.ScanDealer(false)
+	if not d then return false, "no dealer found" end
+	local hrp = Svc.HRP()
+	if not hrp then return false, "no character" end
+	local fired = 0
+	for _, part in ipairs(d:GetDescendants()) do
+		if part:IsA("BasePart") and fired < 12 then
+			pcall(function()
+				Env.firetouchinterest(hrp, part, 0)
+				Env.firetouchinterest(hrp, part, 1)
+			end)
+			fired = fired + 1
+		end
+	end
+	if fired == 0 then return false, "dealer has no parts to touch" end
+	return true, fired .. " part(s) touched"
+end
+
+-- A button in your own GUI that opens the shop.
+function R.ClickShopButton()
+	if not Env.getconnections then return false, "no getconnections" end
+	local hints = {"shop", "dealer", "fruit", "stock", "buy"}
+	for _, gui in ipairs(Svc.AllTexts()) do
+		if gui:IsA("TextButton") then
+			local lower = string.lower(gui.Name .. " " .. tostring(gui.Text))
+			for _, h in ipairs(hints) do
+				if string.find(lower, h, 1, true) then
+					local fired = 0
+					pcall(function()
+						for _, conn in ipairs(Env.getconnections(gui.MouseButton1Click)) do
+							if conn.Fire then conn:Fire() fired = fired + 1 end
+						end
+					end)
+					if fired > 0 then return true, gui.Name end
+				end
+			end
+		end
+	end
+	return false, "no shop-ish button with a live handler"
+end
+
+-- The remote the game fires when the menu opens, if the watch caught it.
+function R.FireOpenRemote()
+	local name = Util.Trim(Cfg.target.openRemote)
+	if name == "" then return false, "no open remote learned" end
+	local rem = R.FindRemote(name)
+	if not rem then return false, "open remote not in this place" end
+	local shape = Util.Trim(Cfg.target.openArgShape)
+	local ok = pcall(function()
+		if rem:IsA("RemoteFunction") then
+			rem:InvokeServer()
+		elseif shape == "dealer" and R.dealer then
+			rem:FireServer(R.dealer.Name)
+		else
+			rem:FireServer()
+		end
+	end)
+	if not ok then return false, "open remote errored" end
+	return true, name
+end
+
+-- Every way in, cheapest and least invasive first. Returns ok, how.
+function R.OpenAny()
+	if R.ShopOpen() then return true, "already open" end
+
+	if Cfg.s.stock.revealHidden then
+		local hidden = R.FindHiddenShops()
+		if #hidden > 0 then
+			local ok, why = R.RevealShop(hidden[1].frame)
+			if ok then
+				R.ScanShop(true)
+				if R.ShopOpen() then return true, "revealed " .. why end
+			end
+		end
+	end
+
+	local ok, why = R.FireOpenRemote()
+	if ok then
+		R.ScanShop(true)
+		if R.ShopOpen() then return true, "open remote " .. why end
+	end
+
+	ok, why = R.OpenDealer()
+	local lastWhy = why
+	if ok then
+		R.ScanShop(true)
+		if R.ShopOpen() then return true, why end
+	end
+
+	if Cfg.s.stock.useTouch then
+		ok, why = R.TouchDealer()
+		if ok then
+			R.ScanShop(true)
+			if R.ShopOpen() then return true, "touch: " .. why end
+		end
+	end
+
+	ok, why = R.ClickShopButton()
+	if ok then
+		R.ScanShop(true)
+		if R.ShopOpen() then return true, "ui button " .. why end
+	end
+
+	return false, lastWhy or why or "nothing worked"
 end
 
 -- ── auto open ────────────────────────────────────────────────────────
@@ -175,9 +312,11 @@ function R.StepAutoOpen(dt, now)
 		return
 	end
 
+	-- a hidden shop frame needs no dealer at all, so only bail when both
+	-- the NPC and a hidden frame are missing
 	local dealer = R.ScanDealer(false)
-	if not dealer then
-		R.openState = "no dealer in this server"
+	if not dealer and #R.FindHiddenShops() == 0 then
+		R.openState = "no dealer and no hidden shop frame"
 		return
 	end
 
@@ -188,17 +327,18 @@ function R.StepAutoOpen(dt, now)
 	lastOpenTry = now
 	R.openTries = R.openTries + 1
 
-	local ok, why = R.OpenDealer()
-	if not ok then
-		R.openState = why
-		Notify.Once("open_nopath", "dealer", why, "warn")
+	local ok, why = R.OpenAny()
+	if ok then
+		R.openState = "open"
+		Notify.Good("dealer", "menu opened: " .. why)
+		R.openTries = 0
 		return
 	end
 
-	R.openState = "firing the prompt (" .. R.openTries .. ")"
+	R.openState = why .. " (" .. R.openTries .. ")"
 	if R.openTries == 8 then
 		Notify.Once("open_slow", "dealer",
-			"eight tries and the menu has not opened. This build checks your distance server side, so walk to the dealer once; the reader and the instant buy work the same from there.", "warn")
+			"eight tries, menu still shut. CONFIG tab: Scan and report shows what is actually there, and Watch the open captures what the game fires when you open it by hand.", "warn")
 	end
 end
 
@@ -253,19 +393,12 @@ local function containerOf(gui, hops)
 	return nil
 end
 
-function R.ScanShop(force)
-	local now = Util.Now()
-	if not force and R.shopRoot and R.shopRoot.Parent and (now - lastShopScan) < SHOP_RESCAN then
-		return R.shopRoot
-	end
-	lastShopScan = now
-
-	local pinned = Cfg.List(Cfg.target.shopGuiNames)
-	local texts = Svc.VisibleTexts()
-	local tally = {}       -- container -> {names = n, prices = n}
-
+-- Group name+price label pairs by the frame that holds them, and roll
+-- those row frames up to the list that holds the most of them.
+local function bestList(texts, requireVisible)
+	local tally = {}
 	for _, label in ipairs(texts) do
-		if Svc.ChainVisible(label) then
+		if (not requireVisible) or Svc.ChainVisible(label) then
 			local box = containerOf(label, 2)
 			if box then
 				tally[box] = tally[box] or {names = 0, prices = 0}
@@ -278,7 +411,6 @@ function R.ScanShop(force)
 		end
 	end
 
-	-- roll each row container up to its parent list, counting paired rows
 	local listTally = {}
 	for box, counts in pairs(tally) do
 		if counts.names >= 1 and counts.prices >= 1 then
@@ -289,25 +421,101 @@ function R.ScanShop(force)
 		end
 	end
 
-	local best, bestRows = nil, 1
+	local ranked = {}
+	local pinned = Cfg.List(Cfg.target.shopGuiNames)
 	for list, rows in pairs(listTally) do
 		local score = rows
-		for _, pin in ipairs(pinned) do
-			if string.find(string.lower(list.Name), string.lower(pin), 1, true) then
-				score = score + 100
-			end
+		local path = string.lower(list.Name)
+		local parent = list.Parent
+		if parent then path = path .. " " .. string.lower(parent.Name) end
+		for _, hint in ipairs({"shop", "dealer", "fruit", "stock", "mirage", "buy"}) do
+			if string.find(path, hint, 1, true) then score = score + 2 end
 		end
-		if score > bestRows then best, bestRows = list, score end
+		for _, pin in ipairs(pinned) do
+			if string.find(path, string.lower(pin), 1, true) then score = score + 100 end
+		end
+		ranked[#ranked + 1] = {frame = list, rows = rows, score = score}
 	end
+	table.sort(ranked, function(a, b) return a.score > b.score end)
+	return ranked
+end
 
-	if best then
-		R.shopRoot = best
-		R.shopTier = bestRows >= 100 and "confirmed" or "derived"
+function R.ScanShop(force)
+	local now = Util.Now()
+	if not force and R.shopRoot and R.shopRoot.Parent and (now - lastShopScan) < SHOP_RESCAN then
+		return R.shopRoot
+	end
+	lastShopScan = now
+
+	local ranked = bestList(Svc.VisibleTexts(), true)
+	local top = ranked[1]
+	if top and top.rows >= 2 then
+		R.shopRoot = top.frame
+		R.shopTier = top.score >= 100 and "confirmed" or "derived"
 	else
 		R.shopRoot = nil
 		R.shopTier = "unknown"
 	end
 	return R.shopRoot
+end
+
+-- Shop frames that exist but are switched off. This is the one that
+-- matters: a menu you have never opened is still in PlayerGui, hidden.
+function R.FindHiddenShops()
+	local ranked = bestList(Svc.AllTexts(), false)
+	local out = {}
+	for _, entry in ipairs(ranked) do
+		if entry.rows >= 2 and not Svc.ChainVisible(entry.frame) then
+			out[#out + 1] = entry
+		end
+	end
+	return out
+end
+
+-- Everything we switched on, so unload puts it back.
+R.revealed = {}
+
+local function remember(inst, key, value)
+	R.revealed[#R.revealed + 1] = {inst = inst, key = key, old = value}
+end
+
+function R.RevealShop(frame)
+	if not frame then return false, "nothing to reveal" end
+	local node = frame
+	local hops = 0
+	while node and hops < 24 do
+		if node:IsA("ScreenGui") then
+			if node.Enabled ~= true then
+				remember(node, "Enabled", node.Enabled)
+				pcall(function() node.Enabled = true end)
+			end
+			break
+		end
+		if node:IsA("GuiObject") and node.Visible ~= true then
+			remember(node, "Visible", node.Visible)
+			pcall(function() node.Visible = true end)
+		end
+		node = node.Parent
+		hops = hops + 1
+	end
+	if frame:IsA("GuiObject") and frame.Visible ~= true then
+		remember(frame, "Visible", frame.Visible)
+		pcall(function() frame.Visible = true end)
+	end
+	R.shopRoot = frame
+	R.shopTier = "revealed"
+	lastShopScan = 0
+	return true, frame.Name
+end
+
+function R.RestoreReveals()
+	for i = #R.revealed, 1, -1 do
+		local entry = R.revealed[i]
+		if entry.inst and entry.inst.Parent then
+			pcall(function() entry.inst[entry.key] = entry.old end)
+		end
+	end
+	R.revealed = {}
 end
 
 function R.ShopOpen()
@@ -502,6 +710,39 @@ function R.SpyLines(count)
 		out[#out + 1] = R.spyLog[i].text
 	end
 	return out
+end
+
+-- What is actually there, in lines. Turns "it does not work" into data.
+function R.ScanReport()
+	local lines = {}
+	local d = R.ScanDealer(true)
+	if d then
+		local prompts, clicks, touch = R.DealerParts(d)
+		lines[#lines + 1] = string.format("dealer: %s  prompts %d  clicks %d  parts %d",
+			d.Name, prompts, clicks, touch)
+	else
+		lines[#lines + 1] = "dealer: none scored above the floor"
+	end
+
+	local visible = R.ScanShop(true)
+	lines[#lines + 1] = "visible shop frame: " .. (visible and visible.Name or "none")
+
+	local hidden = R.FindHiddenShops()
+	if #hidden == 0 then
+		lines[#lines + 1] = "hidden shop frames: none"
+	else
+		for i = 1, math.min(#hidden, 3) do
+			lines[#lines + 1] = string.format("hidden #%d: %s  (%d rows)",
+				i, hidden[i].frame.Name, hidden[i].rows)
+		end
+	end
+
+	lines[#lines + 1] = string.format("executor: prompt %s  click %s  touch %s  conns %s",
+		Env.fireproximity and "y" or "n",
+		Env.fireclickdetector and "y" or "n",
+		Env.canTouch and "y" or "n",
+		Env.getconnections and "y" or "n")
+	return lines
 end
 
 function R.Status()

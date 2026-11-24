@@ -26,6 +26,8 @@ L.MIN_DROP     = 1         -- currency units that count as a purchase
 
 local watchStart = 0
 local lastMoney = nil
+local lastShopOpen = false
+local stepOpen           -- defined below, declared here so L.Step binds it
 
 -- ── shape inference ──────────────────────────────────────────────────
 function L.ShapeOf(ev)
@@ -136,6 +138,10 @@ local function adopt(ev, boughtRow)
 end
 
 function L.Step(dt, now)
+	if L.state == "opening" then
+		stepOpen(now)
+		return
+	end
 	if L.state ~= "watching" then return end
 
 	if now - watchStart > L.WATCH_LIMIT then
@@ -168,6 +174,75 @@ function L.Step(dt, now)
 	end
 	adopt(best, row)
 	L.Disarm()
+end
+
+-- ── watch the open ───────────────────────────────────────────────────
+-- Some builds open the dealer menu off a remote rather than a prompt.
+-- Arm this, open the shop by hand once, and the call that did it is kept
+-- so the opener can replay it.
+function L.ArmOpen()
+	if L.state ~= "idle" then
+		Notify.Warn("learn", "already running")
+		return false
+	end
+	if not R.InstallHook() then
+		L.result = "executor cannot hook namecall"
+		Notify.Bad("learn", "this executor cannot hook namecall, so the open cannot be seen.")
+		return false
+	end
+	R.spyOn = true
+	R.ClearSpy()
+	lastShopOpen = R.ShopOpen()
+	watchStart = Util.Now()
+	L.state = "opening"
+	L.result = "watching, open the dealer menu by hand"
+	Notify.Info("learn", "armed. open the dealer's menu yourself.")
+	return true
+end
+
+local function adoptOpen(ev)
+	Cfg.target.openRemote = ev.name
+	local shape = "bare"
+	local dealer = R.dealer
+	if ev.str and dealer and string.lower(ev.str) == string.lower(dealer.Name) then
+		shape = "dealer"
+	end
+	Cfg.target.openArgShape = shape
+	L.result = "open: " .. ev.name .. " [" .. shape .. "]"
+	Notify.Good("learn", "the menu opens off " .. ev.name)
+end
+
+stepOpen = function(now)
+	if now - watchStart > L.WATCH_LIMIT then
+		L.Disarm("no open seen in " .. L.WATCH_LIMIT .. "s")
+		Notify.Warn("learn", "no open seen. If the menu never came up, nothing was there to capture.")
+		return
+	end
+
+	local open = R.ShopOpen()
+	if open and not lastShopOpen then
+		local sends = R.RecentSends(L.MATCH_WINDOW)
+		if #sends == 0 then
+			L.Disarm("menu opened with no remote behind it")
+			Notify.Info("learn",
+				"the menu opened with no remote send behind it, so it is pure client side. Reveal is the path, and it is already on.")
+			return
+		end
+		local best, bestScore = nil, -1
+		for _, ev in ipairs(sends) do
+			local sc = 0
+			local lower = string.lower(ev.name)
+			for _, hint in ipairs({"shop", "dealer", "open", "ui", "menu", "fruit", "stock"}) do
+				if string.find(lower, hint, 1, true) then sc = sc + 25 end
+			end
+			if ev.str ~= nil then sc = sc + 10 end
+			if sc > bestScore then best, bestScore = ev, sc end
+		end
+		adoptOpen(best)
+		L.Disarm()
+		return
+	end
+	lastShopOpen = open
 end
 
 -- ── stock remote prober ──────────────────────────────────────────────
@@ -258,6 +333,7 @@ end
 
 function L.Status()
 	if L.state == "watching" then return "watching for a purchase", "accent" end
+	if L.state == "opening" then return "watching for the menu to open", "accent" end
 	local good = Util.Trim(Cfg.target.buyRemote) ~= ""
 	return L.result, good and "good" or "dim"
 end

@@ -95,6 +95,7 @@ function Main.Unload()
 	if not running then return end
 	running = false
 
+	pcall(R.RestoreReveals)
 	pcall(Session.Destroy)
 	pcall(Binds.Destroy)
 	pcall(TB.Destroy)

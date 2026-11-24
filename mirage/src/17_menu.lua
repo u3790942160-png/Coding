@@ -98,13 +98,27 @@ local function tabStock(w)
 		set = set(Cfg.s.stock, "autoOpen", function() TB.Repaint() end)}
 	a:Toggle{text = "Reopen it if the game closes it", get = get(Cfg.s.stock, "keepOpen"),
 		set = set(Cfg.s.stock, "keepOpen")}
+	a:Toggle{text = "Unhide the shop frame already in your GUI", get = get(Cfg.s.stock, "revealHidden"),
+		set = set(Cfg.s.stock, "revealHidden")}
 	a:Toggle{text = "Raise the prompt reach locally first", get = get(Cfg.s.stock, "boostPrompt"),
 		set = set(Cfg.s.stock, "boostPrompt")}
+	a:Toggle{text = "Fire the dealer's touch parts too", get = get(Cfg.s.stock, "useTouch"),
+		set = set(Cfg.s.stock, "useTouch")}
 	a:Slider{text = "Retry every", min = 0.25, max = 10, step = 0.25, suffix = " s",
 		get = get(Cfg.s.stock, "reopenDelay"), set = set(Cfg.s.stock, "reopenDelay")}
 	a:Button{text = "Open it now", callback = function()
-		local ok, why = R.OpenDealer()
-		if ok then Notify.Info("dealer", why) else Notify.Warn("dealer", why) end
+		local ok, why = R.OpenAny()
+		if ok then Notify.Good("dealer", why) else Notify.Warn("dealer", why) end
+	end}
+	a:Button{text = "Unhide the shop frame", callback = function()
+		local hidden = R.FindHiddenShops()
+		if #hidden == 0 then
+			Notify.Warn("dealer", "no hidden shop frame in your GUI right now")
+			return
+		end
+		local ok, why = R.RevealShop(hidden[1].frame)
+		R.ScanShop(true)
+		if ok then Notify.Good("dealer", "revealed " .. why) else Notify.Warn("dealer", why) end
 	end}
 	a:Toggle{text = "Auto refresh", get = get(Cfg.s.stock, "autoRefresh"),
 		set = set(Cfg.s.stock, "autoRefresh", function() TB.Repaint() end)}
@@ -277,6 +291,27 @@ end
 -- ── CONFIG ───────────────────────────────────────────────────────────
 local function tabConfig(w)
 	local t = w:Tab("CONFIG")
+
+	local rep = t:Section("Scan and report")
+	rep:Label("What is actually in this server and in your GUI. Read this before changing anything else.", "dim")
+	local reportLabels = {}
+	for i = 1, 7 do
+		reportLabels[i] = rep:Label("", "dim")
+	end
+	rep:Button{text = "Scan and report", callback = function()
+		local lines = R.ScanReport()
+		for i = 1, 7 do
+			reportLabels[i]:Set(lines[i] or "")
+		end
+		Notify.Info("scan", (lines[1] or "done"))
+	end}
+
+	local op = t:Section("Learn the open")
+	op:Label("Only needed when the menu will not come up on its own. Arm it, open the dealer by hand once, and whatever the game fired is replayed next time.", "dim")
+	op:Button{text = "Watch: arm, then open the menu", callback = function() Learn.ArmOpen() end}
+	op:TextBox{text = "Open remote", placeholder = "unset", get = get(Cfg.target, "openRemote"), set = str(Cfg.target, "openRemote")}
+	op:Dropdown{text = "Open arg shape", options = {"", "bare", "dealer"},
+		get = get(Cfg.target, "openArgShape"), set = set(Cfg.target, "openArgShape")}
 
 	local a = t:Section("Learn the purchase")
 	a:Label("Arm this, then buy one fruit from the dealer by hand. It watches your balance drop, matches the drop to a stock line, and reads the remote and its argument shape off the call the game actually made.", "dim")

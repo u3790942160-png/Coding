@@ -114,6 +114,18 @@ Cfg.s = {
 		watchlist     = {},      -- array of fruit names, exact as the shop prints them
 	},
 
+	-- Buying with no menu, no NPC and no stock read: the purchase is a
+	-- remote call, and the dealer GUI is only ever a middleman.
+	direct = {
+		enabled       = false,
+		target        = "Kitsune",
+		attemptDelay  = 1.5,     -- seconds between fires once the remote is known
+		sweepDelay    = 30,      -- seconds between full sweeps while unknown
+		maxSweeps     = 0,       -- 0 = keep sweeping
+		stopOnBuy     = true,
+		useStockGate  = true,    -- only fire when a stock source says it is there
+	},
+
 	island = {
 		autoFind      = true,    -- detection only; nothing is moved
 		hopUntilFound = false,
@@ -140,6 +152,7 @@ Cfg.s = {
 		buytop  = {key = "B",      pad = "ButtonA"},
 		auto    = {key = "O",      pad = "ButtonX"},
 		open    = {key = "M",      pad = "ButtonB"},
+		direct  = {key = "K",      pad = "DPadUp"},
 		hop     = {key = "H",      pad = "DPadRight"},
 		panic   = {key = "End",    pad = ""},
 	},

@@ -13,7 +13,45 @@ loadstring(game:HttpGet(getgenv().MS_URL))()
 Menu key is `Insert`. `End` is panic eject. Setting `MS_URL` first is what
 lets a hop or a rejoin re-execute the script after the teleport.
 
-## The flow
+## DIRECT — buy it without the menu
+
+This is the path to use when the dealer menu will not open. It needs no
+menu, no NPC, no island check and no stock read.
+
+The purchase is a remote call. The shop GUI is a middleman that makes
+that call for you, so when the GUI is out of reach the call still is not.
+
+1. **DIRECT** tab, the one it opens on. The fruit box already says
+   `Kitsune`.
+2. Press **Armed**.
+
+While the buy remote is unknown it sweeps every remote in the place
+named like a purchase, firing each with the fruit name and watching your
+Beli. A remote that charges you is the buy remote; one that does not is
+discarded. Once one charges, it stops sweeping and fires only that one,
+every 1.5s, until the fruit is bought. The find is written back into the
+config, so the next session starts locked on.
+
+**Only the fruit name is ever sent, never a slot number.** A wrong guess
+can fail. It cannot buy a different fruit.
+
+If a stock source does exist, the gate uses it: nothing is fired until
+the read actually shows your fruit. With no stock source the gate has
+nothing to check and it fires on the timer instead, which is the whole
+point.
+
+Your Beli balance is the only honest confirmation available, so if no
+numeric leaderstat can be read the sweep refuses to run and says so
+rather than firing blind with no way to tell what happened.
+
+**Sweep now**, **Attempt now**, **Reset what has been tried** and
+**Report** are on the same tab. Report prints the target, the state, what
+is locked, how many candidates exist and your balance.
+
+## The flow through the menu
+
+If the menu does open for you, this is the richer path: it shows all
+seven slots with prices and lets you buy any of them on one tap.
 
 The tool never moves your character. It opens the dealer's menu where you
 stand and reads it.
@@ -158,9 +196,11 @@ tightening while armed, 240 frames with everything on, the shop closing
 mid-run, the auto-opener firing the prompt and standing down once the
 menu is up, its retry rate limit, a guard that the character never moves,
 a dealer stripped of its prompt still opening through the hidden frame,
-the reveal being reversible, the open watch capturing a remote, a guard
-that the character never moves, and a full mobile pass. 97 checks. Needs
-`pip install lupa`.
+the reveal being reversible, the open watch capturing a remote, the
+direct sweep rejecting a loud decoy that charges nothing and locking the
+one that does, never sending a slot number, the stock gate holding and
+releasing fire, a guard that the character never moves, and a full mobile
+pass. 114 checks. Needs `pip install lupa`.
 
 ## Layout
 
@@ -179,8 +219,9 @@ src/11_stock.lua     stock readers, price parsing, restock diffing
 src/12_catalog.lua   the learned fruit list
 src/13_learn.lua     purchase watch, stock probe, diagnosis
 src/14_buy.lua       buying and the instant engine
-src/15_island.lua    Mirage Island detection, no travel
-src/16_session.lua   anti-afk, servers, rejoin, panic
-src/17_menu.lua      the five tabs
-src/18_main.lua      boot, driver, teardown
+src/15_headless.lua  buying with no menu: sweep, lock, fire
+src/16_island.lua    Mirage Island detection, no travel
+src/17_session.lua   anti-afk, servers, rejoin, panic
+src/18_menu.lua      the six tabs
+src/19_main.lua      boot, driver, teardown
 ```

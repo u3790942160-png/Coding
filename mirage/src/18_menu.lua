@@ -14,6 +14,7 @@ local Catalog = _R("catalog")
 local Learn   = _R("learn")
 local Buy     = _R("buy")
 local Island  = _R("island")
+local Direct  = _R("headless")
 local Session = _R("session")
 local TB      = _R("touchui")
 
@@ -134,6 +135,48 @@ local function tabStock(w)
 
 	stockSection = t:Section("In stock right now")
 	stockSection:Label("Loading.", "dim")
+end
+
+-- ── DIRECT ───────────────────────────────────────────────────────────
+local directReport = {}
+
+local function tabDirect(w)
+	local t = w:Tab("DIRECT")
+	local d = Cfg.s.direct
+
+	local a = t:Section("Buy without the menu")
+	a:Label("No dealer menu, no NPC, no stock read. The purchase is a remote call and this makes it directly. Only the fruit name is ever sent, never a slot number, so a wrong guess can fail but cannot buy something else.", "dim")
+	a:TextBox{text = "Fruit", placeholder = "Kitsune", get = get(d, "target"), set = str(d, "target")}
+	a:Toggle{text = "Armed", get = get(d, "enabled"), set = set(d, "enabled", function() TB.Repaint() end)}
+	a:Toggle{text = "Stop once it is bought", get = get(d, "stopOnBuy"), set = set(d, "stopOnBuy")}
+	readouts.direct = a:Readout{text = "State"}
+	readouts.directLock = a:Readout{text = "Locked on"}
+
+	local b = t:Section("How hard it tries")
+	b:Label("While the buy remote is unknown it sweeps every remote named like a purchase, watching your Beli to see which one charged you. Once one charges, it fires only that one.", "dim")
+	b:Slider{text = "Fire every (once locked)", min = 0.25, max = 10, step = 0.25, suffix = " s",
+		get = get(d, "attemptDelay"), set = set(d, "attemptDelay")}
+	b:Slider{text = "Sweep every (while unknown)", min = 5, max = 300, step = 5, suffix = " s",
+		get = get(d, "sweepDelay"), set = set(d, "sweepDelay")}
+	b:Slider{text = "Sweep limit (0 = no limit)", min = 0, max = 20, step = 1,
+		get = get(d, "maxSweeps"), set = set(d, "maxSweeps")}
+	b:Toggle{text = "Only fire when a stock source has it", get = get(d, "useStockGate"), set = set(d, "useStockGate")}
+	b:Label("With no stock source the gate has nothing to check, so it fires on the timer instead. That is the point: no menu is needed either way.", "dim")
+
+	local c = t:Section("Run it")
+	c:Button{text = "Sweep now", callback = function() Direct.Sweep() end}
+	c:Button{text = "Attempt now", callback = function() Direct.Attempt() end}
+	c:Button{text = "Reset what has been tried", tone = "bad", callback = function()
+		Direct.Reset()
+		Notify.Info("direct", "cleared")
+	end}
+	for i = 1, 6 do
+		directReport[i] = c:Label("", "dim")
+	end
+	c:Button{text = "Report", callback = function()
+		local lines = Direct.Report()
+		for i = 1, 6 do directReport[i]:Set(lines[i] or "") end
+	end}
 end
 
 -- ── PICK ─────────────────────────────────────────────────────────────
@@ -429,13 +472,14 @@ function M.Build()
 	}
 	M.window = w
 
+	tabDirect(w)
 	tabStock(w)
 	tabPick(w)
 	tabAuto(w)
 	tabIsland(w)
 	tabConfig(w)
 
-	w:Select("STOCK")
+	w:Select("DIRECT")
 	rebuildStock(true)
 	rebuildPick(true)
 	return w
@@ -478,6 +522,15 @@ function M.Tick()
 	if readouts.autoTop then
 		local line, tone = Buy.StatusLine()
 		readouts.autoTop:Set(line, tone)
+	end
+	if readouts.direct then
+		local line, tone = Direct.StatusLine()
+		readouts.direct:Set(line, tone)
+	end
+	if readouts.directLock then
+		readouts.directLock:Set(Direct.found
+			and (Direct.found.name .. " [" .. Direct.found.shape .. "]")
+			or "nothing yet", Direct.found and "good" or "dim")
 	end
 	if readouts.opener then
 		local line, tone = R.OpenStatus()

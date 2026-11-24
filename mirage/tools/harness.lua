@@ -173,6 +173,19 @@ stockRemote.InvokeServer = function()
 	return out
 end
 
+-- outscores the real one on name alone, and charges nothing
+local decoyBuy = Instance.new("RemoteEvent", ReplicatedStorage)
+decoyBuy.Name = "BuyPurchaseFruitShop"
+decoyBuy.FireServer = function(_, ...)
+	table.insert(H.buyCalls, {how = "decoy", name = (select(1, ...))})
+end
+
+local decoyBuy2 = Instance.new("RemoteEvent", ReplicatedStorage)
+decoyBuy2.Name = "PurchaseShopOrder"
+decoyBuy2.FireServer = function(_, ...)
+	table.insert(H.buyCalls, {how = "decoy2", name = (select(1, ...))})
+end
+
 local noiseRemote = Instance.new("RemoteFunction", ReplicatedStorage)
 noiseRemote.Name = "GetPlayerData"
 noiseRemote.InvokeServer = function() return {Level = 2550} end
@@ -593,13 +606,95 @@ function H.Run(bundleSource)
 		check("poll relaxes when off", S.Rate() >= 0.25, string.format("%.2fs", S.Rate()))
 	end
 
+	-- buying with no menu at all
+	do
+		local Direct = _R("headless")
+		check("direct targets Kitsune out of the box", Direct.Target() == "Kitsune", Direct.Target())
+
+		-- the shop frame and the dealer are irrelevant to this path
+		shopGui.Enabled = false
+		Res.ScanShop(true)
+		check("direct does not need the menu", not Res.ShopOpen())
+
+		Cfg.target.buyRemote = ""
+		Cfg.target.buyArgShape = ""
+		Cfg.target.buyBeliToken = ""
+		Cfg.s.direct.target = "Kitsune"
+		Cfg.s.direct.useStockGate = false
+		Cfg.s.direct.stopOnBuy = true
+		Direct.Reset()
+		H.buyCalls = {}
+		beli.Value = 30000000
+
+		local cands = Direct.Candidates()
+		check("sweep has candidates to try", #cands >= 3, tostring(#cands))
+		check("the loudest name is tried first", cands[1] and cands[1].Name == "BuyPurchaseFruitShop",
+			cands[1] and cands[1].Name or "none")
+
+		Direct.Sweep()
+		check("sweep rejected the decoy that charged nothing",
+			Direct.found ~= nil and Direct.found.name ~= "BuyPurchaseFruitShop",
+			Direct.found and Direct.found.name or "nothing locked")
+		check("sweep locked the remote that took the money",
+			Direct.found ~= nil and Direct.found.name == "BuyFruitFromDealer",
+			Direct.found and Direct.found.name or "nothing locked")
+		check("the locked shape is name based",
+			Direct.found ~= nil and string.sub(Direct.found.shape, 1, 4) == "name",
+			Direct.found and Direct.found.shape or "none")
+
+		local sentKitsune, sentSlot = false, false
+		for _, c in ipairs(H.buyCalls) do
+			if c.name == "Kitsune" then sentKitsune = true end
+			if type(c.name) == "number" then sentSlot = true end
+		end
+		check("it sent the fruit name", sentKitsune)
+		check("it never sent a slot number", not sentSlot)
+		check("the find was written back to the config",
+			Cfg.target.buyRemote == "BuyFruitFromDealer", Cfg.target.buyRemote)
+		check("it stopped once it was bought", Cfg.s.direct.enabled == false and Direct.state == "bought",
+			Direct.state)
+
+		-- locked: one call per attempt, not a sweep
+		Cfg.s.direct.stopOnBuy = false
+		Direct.Arm("Kitsune")
+		H.buyCalls = {}
+		Direct.Attempt()
+		check("locked mode fires once", #H.buyCalls == 1, tostring(#H.buyCalls))
+		check("locked mode fires the locked remote",
+			#H.buyCalls == 1 and H.buyCalls[1].how == "remote", #H.buyCalls > 0 and H.buyCalls[1].how or "none")
+
+		-- the stock gate holds fire when a source says it is not there
+		Cfg.s.direct.useStockGate = true
+		shopGui.Enabled = true
+		Res.ScanShop(true)
+		buildRows(H.STOCK_B)          -- no Kitsune on this board
+		S.Read(true)
+		local gated, why = Direct.Gated()
+		check("gate holds fire when the fruit is not in the read", gated, tostring(why))
+		buildRows(H.STOCK_A)          -- Kitsune is back
+		S.Read(true)
+		local gated2 = Direct.Gated()
+		check("gate opens when it is there", not gated2)
+
+		local lines = Direct.Report()
+		check("report names the target and the lock",
+			lines[1] ~= nil and string.find(lines[1], "Kitsune", 1, true) ~= nil, tostring(lines[1]))
+
+		Direct.Reset()
+		check("reset clears the lock", Direct.found == nil and Direct.state == "idle", Direct.state)
+		Cfg.s.direct.enabled = false
+		Cfg.target.buyRemote = "BuyFruitFromDealer"
+		Cfg.target.buyArgShape = "name_cur"
+		Cfg.target.buyBeliToken = "Beli"
+	end
+
 	-- island
 	check("island reads as present", Island.Check(true), Island.tier)
 
 	-- menu
 	check("menu window built", Menu.window ~= nil)
 	if Menu.window then
-		check("five tabs present", #Menu.window.tabs == 5, tostring(#Menu.window.tabs))
+		check("six tabs present", #Menu.window.tabs == 6, tostring(#Menu.window.tabs))
 		check("menu refresh runs", pcall(function() Menu.window:Refresh() end))
 		check("menu tick runs", pcall(Menu.Tick))
 		check("stock list rebuilt in place", pcall(function() Menu.RebuildLists(true) end))
@@ -659,7 +754,7 @@ function H.RunMobile(bundleSource)
 	local Theme = _R("theme")
 	local Menu = _R("menu")
 
-	check("touch buttons built", TB.Count() == 6, tostring(TB.Count()))
+	check("touch buttons built", TB.Count() == 7, tostring(TB.Count()))
 	check("rows grow for fingers", Theme.RowHeight() >= 42, tostring(Theme.RowHeight()))
 	check("window fits the viewport",
 		Menu.window ~= nil and Menu.window.Root.Size.X.Offset <= 1280 * 0.95,

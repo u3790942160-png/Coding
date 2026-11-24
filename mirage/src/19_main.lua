@@ -11,6 +11,7 @@ local Catalog = _R("catalog")
 local Learn   = _R("learn")
 local Buy     = _R("buy")
 local Island  = _R("island")
+local Direct  = _R("headless")
 local Session = _R("session")
 local Binds   = _R("binds")
 local TB      = _R("touchui")
@@ -61,6 +62,15 @@ local function registerBinds()
 			Notify.Info("dealer", "auto open off")
 		end
 	end)
+	Binds.Register("direct", "Direct buy", function()
+		if Cfg.s.direct.enabled then
+			Cfg.s.direct.enabled = false
+			Notify.Info("direct", "off")
+		else
+			Direct.Arm(nil)
+		end
+		TB.Repaint()
+	end)
 	Binds.Register("hop", "Hop", function() Session.Hop() end)
 	Binds.Register("panic", "Panic eject", function() Main.Unload() end)
 	Binds.Register("menu", "Menu", function()
@@ -78,6 +88,7 @@ local function heartbeat(dt)
 		Learn.Step(dt, now)
 		Buy.Step(dt, now)
 		Island.Step(dt, now)
+		Direct.Step(dt, now)
 	end)
 	if not ok then
 		warn("[mirage] heartbeat: " .. tostring(err))

@@ -18,6 +18,7 @@ local DRAG_SLOP = 6
 
 -- id, caption, settings path to light the button from (or nil)
 TB.layout = {
+	{id = "direct",  caption = "DIR", lit = function() return Cfg.s.direct.enabled end},
 	{id = "refresh", caption = "RD",  lit = function() return Cfg.s.stock.autoRefresh end},
 	{id = "buytop",  caption = "BUY", lit = function() return false end},
 	{id = "auto",    caption = "AUT", lit = function() return Cfg.s.auto.enabled end},
